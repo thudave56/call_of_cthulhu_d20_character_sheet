@@ -567,6 +567,87 @@ body.gameplay-mode #featsContainer {
   overflow-y: auto;
 }
 
+/* ===== SELECTED FEATS SUMMARY ===== */
+.selected-feats-summary {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f0f4f8;
+  border: 2px solid #22334a;
+  border-radius: 6px;
+}
+
+.selected-feats-summary h3 {
+  margin: 0 0 1rem 0;
+  color: #22334a;
+  font-size: 1.1rem;
+  border-bottom: 2px solid #22334a;
+  padding-bottom: 0.5rem;
+}
+
+.selected-feats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.no-feats-message {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.feat-item {
+  padding: 0.75rem;
+  background-color: #fff;
+  border-left: 4px solid #22334a;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.feat-item-name {
+  font-weight: bold;
+  color: #22334a;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.feat-item-description {
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.feat-item-bonuses {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e0e0e0;
+  font-size: 0.85rem;
+}
+
+.feat-bonus {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  margin: 0.2rem 0.3rem 0.2rem 0;
+  background-color: #4caf50;
+  color: #fff;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+.feat-bonus.save-bonus {
+  background-color: #2196f3;
+}
+
+.feat-bonus.hp-bonus {
+  background-color: #f44336;
+}
+
+.feat-bonus.skill-bonus {
+  background-color: #ff9800;
+}
+
 /* ===== RESPONSIVE ADJUSTMENTS ===== */
 @media (max-width: 768px) {
   .session-grid {

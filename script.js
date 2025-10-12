@@ -537,6 +537,7 @@ function attachEventHandlers() {
     checkbox.addEventListener("change", () => {
       updateDerivedStats();
       updateSkillsTotals();
+      updateSelectedFeatsSummary();
     });
   });
   // Save character
@@ -874,6 +875,7 @@ function loadCharacter() {
     cb.checked = character.feats.includes(idx);
   });
   updateAll();
+  updateSelectedFeatsSummary();
   alert(`Character '${name}' loaded.`);
 }
 
@@ -913,6 +915,83 @@ function updateAll() {
  */
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Update the selected feats summary display showing all chosen feats and their benefits
+ */
+function updateSelectedFeatsSummary() {
+  const selectedFeatsList = document.getElementById('selectedFeatsList');
+  const selectedFeats = [];
+
+  // Gather all selected feats
+  document.querySelectorAll("#featsContainer input[type=checkbox]").forEach((cb) => {
+    if (cb.checked) {
+      const feat = feats[parseInt(cb.dataset.featIndex)];
+      selectedFeats.push(feat);
+    }
+  });
+
+  // Clear the list
+  selectedFeatsList.innerHTML = '';
+
+  // If no feats selected, show message
+  if (selectedFeats.length === 0) {
+    selectedFeatsList.innerHTML = '<p class="no-feats-message">No feats selected yet. Select feats above to see their benefits here.</p>';
+    return;
+  }
+
+  // Display each selected feat
+  selectedFeats.forEach(feat => {
+    const featItem = document.createElement('div');
+    featItem.className = 'feat-item';
+
+    // Feat name
+    const featName = document.createElement('div');
+    featName.className = 'feat-item-name';
+    featName.textContent = feat.name;
+    featItem.appendChild(featName);
+
+    // Feat description
+    const featDesc = document.createElement('div');
+    featDesc.className = 'feat-item-description';
+    featDesc.textContent = feat.description;
+    featItem.appendChild(featDesc);
+
+    // Bonuses section
+    const bonusesDiv = document.createElement('div');
+    bonusesDiv.className = 'feat-item-bonuses';
+    const bonuses = [];
+
+    // Save bonuses
+    if (feat.saves) {
+      Object.keys(feat.saves).forEach(saveType => {
+        const bonus = feat.saves[saveType];
+        const saveLabel = saveType === 'fort' ? 'Fortitude' :
+                         saveType === 'ref' ? 'Reflex' : 'Will';
+        bonuses.push(`<span class="feat-bonus save-bonus">+${bonus} ${saveLabel}</span>`);
+      });
+    }
+
+    // HP bonus
+    if (feat.hp) {
+      bonuses.push(`<span class="feat-bonus hp-bonus">+${feat.hp} HP</span>`);
+    }
+
+    // Skill bonuses
+    if (feat.skills) {
+      feat.skills.forEach(skill => {
+        bonuses.push(`<span class="feat-bonus skill-bonus">+2 ${skill}</span>`);
+      });
+    }
+
+    if (bonuses.length > 0) {
+      bonusesDiv.innerHTML = '<strong>Bonuses:</strong> ' + bonuses.join(' ');
+      featItem.appendChild(bonusesDiv);
+    }
+
+    selectedFeatsList.appendChild(featItem);
+  });
 }
 
 /*
@@ -1242,6 +1321,7 @@ loadCharacter = function() {
   document.getElementById('currentMoney').value = character.currentMoney || '';
 
   updateGameplayPanel();
+  updateSelectedFeatsSummary();
 };
 
 // Initialize mode toggle when page loads
