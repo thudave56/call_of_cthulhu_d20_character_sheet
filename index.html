@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Call of Cthulhu d20 Character Sheet</title>
+    <!-- Link the stylesheet -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Call of Cthulhu d20 Character Sheet</h1>
+      <p class="subtitle">
+        Build and manage your investigator characters for the d20 adaptation of
+        <em>Call of Cthulhu</em>. Ability modifiers, saving throws, attack
+        bonuses and sanity values are calculated automatically. Save your
+        creations locally and reload them any time.
+      </p>
+    </header>
+
+    <!-- Character Info -->
+    <section class="section" id="character-info">
+      <h2>Character Information</h2>
+      <div class="grid two-col">
+        <div class="form-group">
+          <label for="charName">Character Name</label>
+          <input type="text" id="charName" />
+        </div>
+        <div class="form-group">
+          <label for="playerName">Player Name</label>
+          <input type="text" id="playerName" />
+        </div>
+        <div class="form-group">
+          <label for="age">Age</label>
+          <input type="number" id="age" min="0" />
+        </div>
+        <div class="form-group">
+          <label for="gender">Gender</label>
+          <input type="text" id="gender" />
+        </div>
+        <div class="form-group">
+          <label for="profession">Profession</label>
+          <select id="profession"></select>
+        </div>
+        <div class="form-group">
+          <label for="level">Level</label>
+          <input type="number" id="level" min="1" max="20" value="1" />
+        </div>
+        <div class="form-group">
+          <label for="attackOption">Attack Option</label>
+          <select id="attackOption">
+            <option value="offense">Offense (higher attack bonus, weaker saves)</option>
+            <option value="defense">Defense (stronger saves, lower attack bonus)</option>
+          </select>
+        </div>
+        <div class="form-group" id="goodSavesContainer">
+          <label>Good Saves (choose according to option)</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" id="goodFort" /> Fortitude</label>
+            <label><input type="checkbox" id="goodRef" /> Reflex</label>
+            <label><input type="checkbox" id="goodWill" /> Will</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="era">Era</label>
+          <select id="era">
+            <option value="1901-1920">1901–1920</option>
+            <option value="1921-1940">1921–1940</option>
+            <option value="1941-1960">1941–1960</option>
+            <option value="1961-1980">1961–1980</option>
+            <option value="1981+">1981+</option>
+          </select>
+        </div>
+      </div>
+      <!-- Profession description placeholder -->
+      <div id="profession-info" class="profession-info"></div>
+    </section>
+
+    <!-- Abilities -->
+    <section class="section" id="abilities-section">
+      <h2>Ability Scores</h2>
+      <table class="abilities-table">
+        <thead>
+          <tr>
+            <th>Ability</th>
+            <th>Score</th>
+            <th>Modifier</th>
+          </tr>
+        </thead>
+        <tbody id="abilitiesBody">
+          <!-- Will be populated via script -->
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Derived Statistics -->
+    <section class="section" id="derived-section">
+      <h2>Derived Statistics</h2>
+      <div class="grid three-col">
+        <div class="derived-group">
+          <h3>Base Attack Bonus</h3>
+          <p id="baseAttack"></p>
+        </div>
+        <div class="derived-group">
+          <h3>Saving Throws</h3>
+          <p>Fortitude: <span id="fortSave"></span></p>
+          <p>Reflex: <span id="refSave"></span></p>
+          <p>Will: <span id="willSave"></span></p>
+        </div>
+        <div class="derived-group">
+          <h3>Hit Points</h3>
+          <div class="form-group small">
+            <label for="hitPoints">Max HP</label>
+            <input type="number" id="hitPoints" min="0" value="6" />
+          </div>
+          <div class="form-group small">
+            <label for="currentHP">Current HP</label>
+            <input type="number" id="currentHP" min="0" />
+          </div>
+          <p class="hp-bonus" id="hpBonusNote"></p>
+        </div>
+        <div class="derived-group">
+          <h3>Sanity</h3>
+          <p>Starting: <span id="sanityStarting"></span></p>
+          <p>Maximum: <span id="sanityMax"></span></p>
+          <p>20% Threshold: <span id="sanity20"></span></p>
+          <div class="form-group small">
+            <label for="currentSanity">Current Sanity</label>
+            <input type="number" id="currentSanity" min="0" />
+          </div>
+        </div>
+        <div class="derived-group">
+          <h3>Money</h3>
+          <p>Starting Funds: <span id="startingMoney"></span></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feats -->
+    <section class="section" id="feats-section">
+      <h2>Feats</h2>
+      <p>Select any feats your character possesses. Some feats apply
+        automatic bonuses to saves or hit points.</p>
+      <div class="checkbox-group" id="featsContainer">
+        <!-- Feat checkboxes populated by script -->
+      </div>
+    </section>
+
+    <!-- Skills -->
+    <section class="section" id="skills-section">
+      <h2>Skills</h2>
+      <p>Enter your ranks in each skill. The total column includes your
+        ranks plus the relevant ability modifier and any miscellaneous
+        bonuses. Profession skills are highlighted.</p>
+      <table class="skills-table">
+        <thead>
+          <tr>
+            <th>Skill</th>
+            <th>Ability</th>
+            <th>Ranks</th>
+            <th>Misc</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="skillsBody">
+          <!-- Populated via script -->
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Save/Load Buttons -->
+    <section class="section" id="storage-section">
+      <h2>Manage Characters</h2>
+      <div class="button-group">
+        <button id="saveButton">Save Character</button>
+        <button id="loadButton">Load Character</button>
+        <button id="deleteButton">Delete Character</button>
+      </div>
+      <div class="form-group">
+        <label for="characterSelect">Saved Characters</label>
+        <select id="characterSelect"></select>
+      </div>
+    </section>
+
+    <footer>
+      <p>
+        This sheet is built according to the
+        <em>Call of Cthulhu d20</em> ruleset. Sanity values are calculated
+        using the rules that starting Sanity equals five times Wisdom and
+        maximum Sanity equals 99 minus Cthulhu Mythos skill ranks【567432723370824†L3170-L3239】.
+        Good and bad save progressions and attack bonus progressions follow
+        the tables from the GM screen【878580011413210†L107-L120】. Profession
+        templates and starting money modifiers are taken from the same
+        reference【878580011413210†L130-L209】.
+      </p>
+    </footer>
+
+    <!-- Link the script -->
+    <script src="script.js"></script>
+  </body>
+</html>
