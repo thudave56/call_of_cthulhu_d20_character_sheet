@@ -498,6 +498,15 @@ function attachEventHandlers() {
   document.getElementById("level").addEventListener("input", () => {
     updateDerivedStats();
   });
+  // HP changes - auto-set current HP to max HP if empty
+  document.getElementById("hitPoints").addEventListener("input", () => {
+    const maxHP = parseInt(document.getElementById("hitPoints").value) || 0;
+    const currentHPInput = document.getElementById("currentHP");
+    if (!currentHPInput.value || currentHPInput.value === "0") {
+      currentHPInput.value = maxHP;
+    }
+    updateGameplayPanel();
+  });
   // Attack option changes
   document.getElementById("attackOption").addEventListener("change", () => {
     // Reset good save checkboxes
@@ -671,6 +680,7 @@ function updateMoney() {
  * Calculate and update sanity values. Starting Sanity = Wisdom × 5 and maximum
  * sanity = 99 − Cthulhu Mythos skill ranks【567432723370824†L3170-L3239】. 20% sanity
  * threshold is 20% of current maximum (rounded down).
+ * Auto-sets current sanity to starting sanity if empty.
  */
 function updateSanity() {
   const wisScore = parseInt(document.querySelector(".ability-score[data-ability='Wis']").value) || 0;
@@ -688,6 +698,12 @@ function updateSanity() {
   document.getElementById("sanityStarting").textContent = startingSanity;
   document.getElementById("sanityMax").textContent = maxSanity;
   document.getElementById("sanity20").textContent = twentyPercent;
+
+  // Auto-set current sanity to starting sanity if empty
+  const currentSanityInput = document.getElementById("currentSanity");
+  if (!currentSanityInput.value || currentSanityInput.value === "0") {
+    currentSanityInput.value = startingSanity;
+  }
 }
 
 /**
