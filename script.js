@@ -420,6 +420,31 @@ function populateSkills() {
       this.select();
     });
   });
+
+  // Add validation for skill ranks to prevent exceeding limit
+  document.querySelectorAll(".skill-ranks").forEach((input) => {
+    input.addEventListener("input", function() {
+      const newValue = parseInt(this.value) || 0;
+      const totalAvailable = calculateTotalSkillPoints();
+      const currentSpent = calculateSkillPointsSpent();
+
+      // If over limit, show warning and cap at max allowed
+      if (currentSpent > totalAvailable) {
+        // Calculate how much we can set this field to without exceeding
+        const otherSpent = currentSpent - newValue;
+        const maxAllowed = Math.max(0, totalAvailable - otherSpent);
+
+        // Only intervene if user is actively increasing beyond limit
+        if (newValue > maxAllowed && newValue > (parseInt(this.getAttribute('data-previous-value')) || 0)) {
+          this.value = maxAllowed;
+          alert(`Skill point limit reached! You have ${totalAvailable} total skill points available (8 + Int modifier × level). You can only allocate ${maxAllowed} more ranks to this skill.`);
+        }
+      }
+
+      // Store current value for next comparison
+      this.setAttribute('data-previous-value', this.value);
+    });
+  });
 }
 
 /**
@@ -502,11 +527,13 @@ function attachEventHandlers() {
       updateAbilityMods();
       updateDerivedStats();
       updateSkillsTotals();
+      updateSkillPointsTracker();
     });
   });
   // Level changes
   document.getElementById("level").addEventListener("input", () => {
     updateDerivedStats();
+    updateSkillPointsTracker();
   });
   // HP changes - auto-set current HP to max HP if empty or 0
   document.getElementById("hitPoints").addEventListener("input", () => {
@@ -542,6 +569,7 @@ function attachEventHandlers() {
     input.addEventListener("input", () => {
       updateSkillsTotals();
       updateDerivedStats();
+      updateSkillPointsTracker();
     });
   });
   // Feat selections
@@ -922,6 +950,7 @@ function updateAll() {
   updateSkillsTotals();
   updateDerivedStats();
   updateMoney();
+  updateSkillPointsTracker();
 }
 
 /**
@@ -929,6 +958,69 @@ function updateAll() {
  */
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Calculate total available skill points based on level and Intelligence modifier.
+ * Call of Cthulhu d20 uses 8 + Int modifier per level.
+ * @returns {number} Total skill points available
+ */
+function calculateTotalSkillPoints() {
+  const level = parseInt(document.getElementById("level").value) || 1;
+  const intMod = abilityMods.Int || 0;
+  return (8 + intMod) * level;
+}
+
+/**
+ * Calculate total skill points spent by summing all skill ranks.
+ * @returns {number} Total skill points spent
+ */
+function calculateSkillPointsSpent() {
+  let total = 0;
+  document.querySelectorAll(".skill-ranks").forEach((input) => {
+    total += parseInt(input.value) || 0;
+  });
+  return total;
+}
+
+/**
+ * Update the skill points tracker display with current/total and remaining.
+ * Shows warning if over limit.
+ */
+function updateSkillPointsTracker() {
+  const totalAvailable = calculateTotalSkillPoints();
+  const spent = calculateSkillPointsSpent();
+  const remaining = totalAvailable - spent;
+
+  // Update display elements
+  document.getElementById("skillPointsTotal").textContent = totalAvailable;
+  document.getElementById("skillPointsUsed").textContent = spent;
+
+  const remainingText = remaining >= 0 ? `(${remaining} remaining)` : `(${Math.abs(remaining)} over limit!)`;
+  document.getElementById("skillPointsRemaining").textContent = remainingText;
+
+  // Update styling based on whether over limit
+  const tracker = document.getElementById("skillPointsTracker");
+  if (remaining < 0) {
+    tracker.classList.add("over-limit");
+  } else {
+    tracker.classList.remove("over-limit");
+  }
+}
+
+/**
+ * Validate skill points before allowing input. Returns false if would exceed limit.
+ * @param {HTMLInputElement} input The skill ranks input field
+ * @param {number} newValue The proposed new value
+ * @returns {boolean} True if valid, false if would exceed limit
+ */
+function validateSkillPoints(input, newValue) {
+  const totalAvailable = calculateTotalSkillPoints();
+  const currentValue = parseInt(input.value) || 0;
+  const spent = calculateSkillPointsSpent();
+  const proposedSpent = spent - currentValue + newValue;
+
+  return proposedSpent <= totalAvailable;
 }
 
 /**

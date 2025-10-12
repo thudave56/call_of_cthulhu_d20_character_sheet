@@ -492,6 +492,59 @@ body.gameplay-mode .gameplay-only {
   resize: vertical;
 }
 
+/* ===== SKILL POINTS TRACKER ===== */
+.skill-points-tracker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%);
+  border: 2px solid #22334a;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.skill-points-label {
+  color: #22334a;
+}
+
+.skill-points-used {
+  color: #2196f3;
+  font-size: 1.3rem;
+}
+
+.skill-points-separator {
+  color: #666;
+  margin: 0 0.25rem;
+}
+
+.skill-points-total {
+  color: #666;
+  font-size: 1.3rem;
+}
+
+.skill-points-remaining {
+  margin-left: 0.5rem;
+  color: #4caf50;
+  font-size: 0.95rem;
+}
+
+.skill-points-tracker.over-limit {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  border-color: #f44336;
+}
+
+.skill-points-tracker.over-limit .skill-points-used {
+  color: #f44336;
+}
+
+.skill-points-tracker.over-limit .skill-points-remaining {
+  color: #f44336;
+}
+
 /* ===== SKILLS CONTROLS ===== */
 .skills-controls {
   display: flex;
