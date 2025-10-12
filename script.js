@@ -404,11 +404,21 @@ function populateSkills() {
     tr.innerHTML = `
       <td class="skill-name">${skill.name}</td>
       <td>${skill.ability || "—"}</td>
-      <td><input type="number" class="skill-ranks" min="0" value="0" /></td>
-      <td><input type="number" class="skill-misc" value="0" /></td>
+      <td><input type="number" class="skill-ranks" min="0" placeholder="0" /></td>
+      <td><input type="number" class="skill-misc" placeholder="0" /></td>
       <td class="skill-total">0</td>
     `;
     tbody.appendChild(tr);
+  });
+
+  // Add focus handlers to select all text on click
+  document.querySelectorAll(".skill-ranks, .skill-misc").forEach((input) => {
+    input.addEventListener("focus", function() {
+      this.select();
+    });
+    input.addEventListener("click", function() {
+      this.select();
+    });
   });
 }
 
