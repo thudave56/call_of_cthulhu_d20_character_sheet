@@ -498,11 +498,13 @@ function attachEventHandlers() {
   document.getElementById("level").addEventListener("input", () => {
     updateDerivedStats();
   });
-  // HP changes - auto-set current HP to max HP if empty
+  // HP changes - auto-set current HP to max HP if empty or 0
   document.getElementById("hitPoints").addEventListener("input", () => {
     const maxHP = parseInt(document.getElementById("hitPoints").value) || 0;
     const currentHPInput = document.getElementById("currentHP");
-    if (!currentHPInput.value || currentHPInput.value === "0") {
+    const currentValue = parseInt(currentHPInput.value) || 0;
+    // Only auto-set if current is 0 or empty
+    if (currentValue === 0 || currentHPInput.value.trim() === "") {
       currentHPInput.value = maxHP;
     }
     updateGameplayPanel();
@@ -700,9 +702,11 @@ function updateSanity() {
   document.getElementById("sanityMax").textContent = maxSanity;
   document.getElementById("sanity20").textContent = twentyPercent;
 
-  // Auto-set current sanity to starting sanity if empty
+  // Auto-set current sanity to starting sanity if empty or 0
   const currentSanityInput = document.getElementById("currentSanity");
-  if (!currentSanityInput.value || currentSanityInput.value === "0") {
+  const currentSanityValue = parseInt(currentSanityInput.value) || 0;
+  // Only auto-set if current is 0 or empty
+  if (currentSanityValue === 0 || currentSanityInput.value.trim() === "") {
     currentSanityInput.value = startingSanity;
   }
 }
