@@ -898,3 +898,341 @@ function updateAll() {
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
+
+/*
+ * ============================================================================
+ * UX ENHANCEMENTS: Mode Switching, Gameplay Panel, Visual Bars, Skills Filter
+ * ============================================================================
+ */
+
+// Track current display mode
+let displayMode = 'creation'; // 'creation' or 'gameplay'
+
+/**
+ * Initialize mode toggle and gameplay features
+ */
+function initializeModeToggle() {
+  const creationBtn = document.getElementById('creationModeBtn');
+  const gameplayBtn = document.getElementById('gameplayModeBtn');
+
+  creationBtn.addEventListener('click', () => switchMode('creation'));
+  gameplayBtn.addEventListener('click', () => switchMode('gameplay'));
+
+  // Initialize gameplay panel event handlers
+  initializeGameplayPanel();
+
+  // Initialize skills filtering
+  initializeSkillsFiltering();
+}
+
+/**
+ * Switch between creation and gameplay modes
+ */
+function switchMode(mode) {
+  displayMode = mode;
+  const body = document.body;
+  const creationBtn = document.getElementById('creationModeBtn');
+  const gameplayBtn = document.getElementById('gameplayModeBtn');
+
+  if (mode === 'gameplay') {
+    body.classList.add('gameplay-mode');
+    creationBtn.classList.remove('active');
+    gameplayBtn.classList.add('active');
+    updateGameplayPanel();
+  } else {
+    body.classList.remove('gameplay-mode');
+    gameplayBtn.classList.remove('active');
+    creationBtn.classList.add('active');
+  }
+}
+
+/**
+ * Initialize the gameplay panel event handlers
+ */
+function initializeGameplayPanel() {
+  // Damage/Heal buttons
+  document.getElementById('applyDamageBtn').addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('damageAmount').value) || 0;
+    if (amount > 0) {
+      applyDamage(amount);
+      document.getElementById('damageAmount').value = 0;
+    }
+  });
+
+  document.getElementById('healBtn').addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('damageAmount').value) || 0;
+    if (amount > 0) {
+      healDamage(amount);
+      document.getElementById('damageAmount').value = 0;
+    }
+  });
+
+  // Sanity loss/restore buttons
+  document.getElementById('applySanityLossBtn').addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('sanityLossAmount').value) || 0;
+    if (amount > 0) {
+      applySanityLoss(amount);
+      document.getElementById('sanityLossAmount').value = 0;
+    }
+  });
+
+  document.getElementById('restoreSanityBtn').addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('sanityLossAmount').value) || 0;
+    if (amount > 0) {
+      restoreSanity(amount);
+      document.getElementById('sanityLossAmount').value = 0;
+    }
+  });
+
+  // Update gameplay panel when HP or Sanity changes
+  document.getElementById('currentHP').addEventListener('input', updateGameplayPanel);
+  document.getElementById('hitPoints').addEventListener('input', updateGameplayPanel);
+  document.getElementById('currentSanity').addEventListener('input', updateGameplayPanel);
+}
+
+/**
+ * Apply damage to current HP
+ */
+function applyDamage(amount) {
+  const currentHPInput = document.getElementById('currentHP');
+  const current = parseInt(currentHPInput.value) || 0;
+  const newHP = Math.max(0, current - amount);
+  currentHPInput.value = newHP;
+  updateGameplayPanel();
+}
+
+/**
+ * Heal HP
+ */
+function healDamage(amount) {
+  const currentHPInput = document.getElementById('currentHP');
+  const maxHP = parseInt(document.getElementById('hitPoints').value) || 0;
+  const current = parseInt(currentHPInput.value) || 0;
+  const newHP = Math.min(maxHP, current + amount);
+  currentHPInput.value = newHP;
+  updateGameplayPanel();
+}
+
+/**
+ * Apply sanity loss
+ */
+function applySanityLoss(amount) {
+  const currentSanityInput = document.getElementById('currentSanity');
+  const current = parseInt(currentSanityInput.value) || 0;
+  const newSanity = Math.max(0, current - amount);
+  currentSanityInput.value = newSanity;
+  updateGameplayPanel();
+  updateSanity();
+}
+
+/**
+ * Restore sanity
+ */
+function restoreSanity(amount) {
+  const currentSanityInput = document.getElementById('currentSanity');
+  const maxSanity = parseInt(document.getElementById('sanityMax').textContent) || 99;
+  const current = parseInt(currentSanityInput.value) || 0;
+  const newSanity = Math.min(maxSanity, current + amount);
+  currentSanityInput.value = newSanity;
+  updateGameplayPanel();
+  updateSanity();
+}
+
+/**
+ * Update the gameplay panel with current stats
+ */
+function updateGameplayPanel() {
+  // Update HP display
+  const currentHP = parseInt(document.getElementById('currentHP').value) || 0;
+  const maxHP = parseInt(document.getElementById('hitPoints').value) || 0;
+
+  document.getElementById('displayCurrentHP').textContent = currentHP;
+  document.getElementById('displayMaxHP').textContent = maxHP;
+
+  const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 100;
+  document.getElementById('hpPercentage').textContent = `${Math.round(hpPercentage)}%`;
+
+  // Update HP bar
+  const hpBar = document.getElementById('hpBar');
+  hpBar.style.width = `${hpPercentage}%`;
+  hpBar.className = 'vital-bar';
+
+  const hpCurrent = document.getElementById('displayCurrentHP');
+  hpCurrent.className = 'vital-current';
+
+  if (hpPercentage <= 25) {
+    hpBar.classList.add('danger');
+    hpCurrent.classList.add('danger');
+  } else if (hpPercentage <= 50) {
+    hpBar.classList.add('warning');
+    hpCurrent.classList.add('warning');
+  }
+
+  // Update Sanity display
+  const currentSanity = parseInt(document.getElementById('currentSanity').value) || 0;
+  const maxSanity = parseInt(document.getElementById('sanityMax').textContent) || 99;
+  const sanity20 = parseInt(document.getElementById('sanity20').textContent) || 0;
+
+  document.getElementById('displayCurrentSanity').textContent = currentSanity;
+  document.getElementById('displayMaxSanity').textContent = maxSanity;
+  document.getElementById('displaySanity20').textContent = sanity20;
+
+  const sanityPercentage = maxSanity > 0 ? (currentSanity / maxSanity) * 100 : 100;
+  document.getElementById('sanityPercentage').textContent = `${Math.round(sanityPercentage)}%`;
+
+  // Update Sanity bar
+  const sanityBar = document.getElementById('sanityBar');
+  sanityBar.style.width = `${sanityPercentage}%`;
+  sanityBar.className = 'vital-bar sanity';
+
+  const sanityCurrent = document.getElementById('displayCurrentSanity');
+  sanityCurrent.className = 'vital-current';
+
+  const thresholdDisplay = document.getElementById('sanityThresholdDisplay');
+  thresholdDisplay.className = 'sanity-threshold';
+
+  if (currentSanity <= sanity20) {
+    sanityBar.classList.add('danger');
+    sanityCurrent.classList.add('danger');
+    thresholdDisplay.classList.add('below-threshold');
+  } else if (sanityPercentage <= 50) {
+    sanityBar.classList.add('warning');
+    sanityCurrent.classList.add('warning');
+  }
+
+  // Update combat stats
+  const baseAttackText = document.getElementById('baseAttack').textContent;
+  document.getElementById('displayBaseAttack').textContent = baseAttackText;
+
+  // Calculate melee and ranged attack
+  const baseAttackValue = parseInt(baseAttackText.replace(/[^0-9-]/g, '')) || 0;
+  const strMod = abilityMods.Str || 0;
+  const dexMod = abilityMods.Dex || 0;
+
+  const meleeAttack = baseAttackValue + strMod;
+  const rangedAttack = baseAttackValue + dexMod;
+
+  document.getElementById('displayMeleeAttack').textContent = formatBonus(meleeAttack);
+  document.getElementById('displayRangedAttack').textContent = formatBonus(rangedAttack);
+
+  // Update saves
+  document.getElementById('displayFortSave').textContent = document.getElementById('fortSave').textContent;
+  document.getElementById('displayRefSave').textContent = document.getElementById('refSave').textContent;
+  document.getElementById('displayWillSave').textContent = document.getElementById('willSave').textContent;
+}
+
+/**
+ * Format number as bonus string (+X or -X)
+ */
+function formatBonus(num) {
+  return num >= 0 ? `+${num}` : `${num}`;
+}
+
+/**
+ * Initialize skills filtering functionality
+ */
+function initializeSkillsFiltering() {
+  const searchInput = document.getElementById('skillSearch');
+  const showProfessionBtn = document.getElementById('showProfessionSkillsBtn');
+  const showAllBtn = document.getElementById('showAllSkillsBtn');
+
+  let currentFilter = 'all'; // 'all' or 'profession'
+
+  // Search functionality
+  searchInput.addEventListener('input', () => {
+    const searchTerm = searchInput.value.toLowerCase();
+    filterSkills(searchTerm, currentFilter);
+  });
+
+  // Show profession skills only
+  showProfessionBtn.addEventListener('click', () => {
+    currentFilter = 'profession';
+    showProfessionBtn.classList.add('active');
+    showAllBtn.classList.remove('active');
+    filterSkills(searchInput.value.toLowerCase(), currentFilter);
+  });
+
+  // Show all skills
+  showAllBtn.addEventListener('click', () => {
+    currentFilter = 'all';
+    showAllBtn.classList.add('active');
+    showProfessionBtn.classList.remove('active');
+    filterSkills(searchInput.value.toLowerCase(), currentFilter);
+  });
+}
+
+/**
+ * Filter skills table based on search term and filter type
+ */
+function filterSkills(searchTerm, filterType) {
+  const rows = document.querySelectorAll('#skillsBody tr');
+  const profIndex = parseInt(document.getElementById('profession').value);
+  const prof = professions[profIndex];
+
+  rows.forEach(row => {
+    const skillName = row.querySelector('.skill-name').textContent;
+    const isProfessionSkill = prof.coreSkills.includes(skillName);
+
+    // Check if matches search
+    const matchesSearch = searchTerm === '' || skillName.toLowerCase().includes(searchTerm);
+
+    // Check if matches filter
+    const matchesFilter = filterType === 'all' || (filterType === 'profession' && isProfessionSkill);
+
+    // Show/hide row
+    if (matchesSearch && matchesFilter) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+/**
+ * Extended save character to include new fields
+ */
+const originalSaveCharacter = saveCharacter;
+saveCharacter = function() {
+  originalSaveCharacter.call(this);
+  // The character object is already saved in the original function
+  // But we need to add session notes and current money
+  const name = document.getElementById("charName").value.trim();
+  if (!name) return;
+
+  const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+  if (stored[name]) {
+    stored[name].sessionNotes = document.getElementById('sessionNotes').value;
+    stored[name].currentMoney = document.getElementById('currentMoney').value;
+    localStorage.setItem("cocd20_characters", JSON.stringify(stored));
+  }
+};
+
+/**
+ * Extended load character to include new fields
+ */
+const originalLoadCharacter = loadCharacter;
+loadCharacter = function() {
+  originalLoadCharacter.call(this);
+
+  const select = document.getElementById("characterSelect");
+  const name = select.value;
+  if (!name) return;
+
+  const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+  const character = stored[name];
+  if (!character) return;
+
+  document.getElementById('sessionNotes').value = character.sessionNotes || '';
+  document.getElementById('currentMoney').value = character.currentMoney || '';
+
+  updateGameplayPanel();
+};
+
+// Initialize mode toggle when page loads
+window.addEventListener("DOMContentLoaded", () => {
+  // Wait for original initialization to complete
+  setTimeout(() => {
+    initializeModeToggle();
+    updateGameplayPanel();
+  }, 100);
+});

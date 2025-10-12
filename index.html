@@ -16,7 +16,100 @@
         bonuses and sanity values are calculated automatically. Save your
         creations locally and reload them any time.
       </p>
+      <div class="mode-toggle">
+        <button id="creationModeBtn" class="mode-btn active">📋 Creation Mode</button>
+        <button id="gameplayModeBtn" class="mode-btn">🎲 Gameplay Mode</button>
+      </div>
     </header>
+
+    <!-- Game Session Panel (Gameplay Mode Only) -->
+    <section class="section gameplay-only" id="game-session-panel">
+      <h2>🎲 Game Session</h2>
+      <div class="session-grid">
+        <div class="vitals-group">
+          <h3>Hit Points</h3>
+          <div class="vital-display">
+            <div class="vital-numbers">
+              <span class="vital-current" id="displayCurrentHP">0</span>
+              <span class="vital-separator">/</span>
+              <span class="vital-max" id="displayMaxHP">0</span>
+            </div>
+            <div class="vital-bar-container">
+              <div class="vital-bar" id="hpBar"></div>
+            </div>
+            <div class="vital-percentage" id="hpPercentage">100%</div>
+          </div>
+          <div class="quick-modify">
+            <label>Take Damage:</label>
+            <input type="number" id="damageAmount" min="0" value="0" />
+            <button id="applyDamageBtn" class="quick-btn">Apply</button>
+            <button id="healBtn" class="quick-btn heal">Heal</button>
+          </div>
+        </div>
+
+        <div class="vitals-group">
+          <h3>Sanity</h3>
+          <div class="vital-display">
+            <div class="vital-numbers">
+              <span class="vital-current" id="displayCurrentSanity">0</span>
+              <span class="vital-separator">/</span>
+              <span class="vital-max" id="displayMaxSanity">0</span>
+            </div>
+            <div class="vital-bar-container">
+              <div class="vital-bar sanity" id="sanityBar"></div>
+            </div>
+            <div class="vital-percentage" id="sanityPercentage">100%</div>
+          </div>
+          <div class="sanity-threshold" id="sanityThresholdDisplay">
+            20% Threshold: <span id="displaySanity20">0</span>
+          </div>
+          <div class="quick-modify">
+            <label>Sanity Loss:</label>
+            <input type="number" id="sanityLossAmount" min="0" value="0" />
+            <button id="applySanityLossBtn" class="quick-btn">Apply</button>
+            <button id="restoreSanityBtn" class="quick-btn heal">Restore</button>
+          </div>
+        </div>
+
+        <div class="combat-stats-group">
+          <h3>Combat Stats</h3>
+          <div class="stat-line">
+            <span class="stat-label">Base Attack:</span>
+            <span class="stat-value" id="displayBaseAttack">+0</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-label">Attack (Melee):</span>
+            <span class="stat-value" id="displayMeleeAttack">+0</span>
+            <span class="stat-detail">(BAB + STR)</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-label">Attack (Ranged):</span>
+            <span class="stat-value" id="displayRangedAttack">+0</span>
+            <span class="stat-detail">(BAB + DEX)</span>
+          </div>
+          <div class="saves-display">
+            <div class="save-item">
+              <span class="save-label">Fort:</span>
+              <span class="save-value" id="displayFortSave">+0</span>
+            </div>
+            <div class="save-item">
+              <span class="save-label">Ref:</span>
+              <span class="save-value" id="displayRefSave">+0</span>
+            </div>
+            <div class="save-item">
+              <span class="save-label">Will:</span>
+              <span class="save-value" id="displayWillSave">+0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Notes -->
+      <div class="session-notes">
+        <h3>Session Notes</h3>
+        <textarea id="sessionNotes" placeholder="Track clues, NPCs, important events..."></textarea>
+      </div>
+    </section>
 
     <!-- Character Info -->
     <section class="section" id="character-info">
@@ -132,6 +225,10 @@
         <div class="derived-group">
           <h3>Money</h3>
           <p>Starting Funds: <span id="startingMoney"></span></p>
+          <div class="form-group small">
+            <label for="currentMoney">Current Money</label>
+            <input type="number" id="currentMoney" min="0" />
+          </div>
         </div>
       </div>
     </section>
@@ -152,6 +249,11 @@
       <p>Enter your ranks in each skill. The total column includes your
         ranks plus the relevant ability modifier and any miscellaneous
         bonuses. Profession skills are highlighted.</p>
+      <div class="skills-controls">
+        <input type="text" id="skillSearch" placeholder="🔍 Search skills..." />
+        <button id="showProfessionSkillsBtn" class="filter-btn">Show Profession Skills Only</button>
+        <button id="showAllSkillsBtn" class="filter-btn active">Show All Skills</button>
+      </div>
       <table class="skills-table">
         <thead>
           <tr>
