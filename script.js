@@ -351,7 +351,6 @@ const professions = [
     name: "Writer/Reporter",
     moneyMod: 0,
     coreSkills: [
-      "Bluff",
       "Craft",
       "Craft",
       "Diplomacy",
