@@ -412,7 +412,7 @@ const feats = [
   { name: "Trustworthy", prereqs: null, description: "+2 bonus on Diplomacy and Gather Information checks.", type: "General", impactedSkills: ["Diplomacy", "Gather Information"] }, // :contentReference[oaicite:1]{index=1}
   { name: "Two-Weapon Fighting", prereqs: "Dex 15+", description: "Reduce two-weapon attack penalties by 2 per hand.", type: "General", impactedSkills: [] },
   { name: "Wealth", prereqs: null, description: "Bonus savings equal to starting savings; +2 income modifier; stacks.", type: "General", impactedSkills: [] }, // :contentReference[oaicite:2]{index=2}
-  { name: "Weapon Finesse", prereqs: "Base Attack +1", description: "Use Dex instead of Str on attacks with certain melee weapons.", type: "General", impactedSkills: [] } // :contentReference[oaicite:3]{index=3}
+  { name: "Weapon Finesse", prereqs: "Base Attack +1", description: "Use Dex instead of Str on attacks with certain melee weapons.", type: "General", impactedSkills: [] }, // :contentReference[oaicite:3]{index=3}
 //PSYCHIC FEATS
 // ======== PSYCHIC FEATS (with impactedSkills) ========
 // Psychic feats typically rely on the Psychic Focus skill (the book states the skill enhances these feats).
