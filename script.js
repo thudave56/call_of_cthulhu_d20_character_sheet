@@ -87,7 +87,7 @@ const professions = [
       "Innuendo [Wis]",
       "Move Silently [Dex]",
       "Open Lock [Dex]",
-      "Sense Motive",
+      "Sense Motive [Wis]",
     ],
     description:
       "Agents are trained operatives skilled at investigation and infiltration.",
@@ -359,7 +359,7 @@ const professions = [
       "Knowledge (any one) [Int]",
       "Knowledge (any one) [Int]",
       "Research [Int]",
-      "Sense Motive",
+      "Sense Motive [Wis]",
     ],
     description:
       "Writers and reporters craft stories and investigate leads.",
