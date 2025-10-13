@@ -23,51 +23,52 @@ const abilities = [
 // Define the list of skills and their key abilities
 // Skills marked with † in the original sheet are subject to armour check
 // penalties; this implementation does not handle armour so it is ignored.
+// trainedOnly: true means the skill requires training (can't be used with 0 ranks)
 const skills = [
-  { name: "Animal Empathy", ability: "Cha" },
-  { name: "Appraise", ability: "Int" },
-  { name: "Balance", ability: "Dex" },
-  { name: "Bluff", ability: "Cha" },
-  { name: "Climb", ability: "Str" },
-  { name: "Computer Use", ability: "Int" },
-  { name: "Concentration", ability: "Con" },
-  { name: "Craft", ability: "Int" },
-  { name: "Cthulhu Mythos", ability: null }, // treated as special; no ability modifier
-  { name: "Demolitions", ability: "Int" },
-  { name: "Diplomacy", ability: "Cha" },
-  { name: "Disguise", ability: "Cha" },
-  { name: "Drive", ability: "Dex" },
-  { name: "Escape Artist", ability: "Dex" },
-  { name: "Forgery", ability: "Int" },
-  { name: "Gather Information", ability: "Cha" },
-  { name: "Handle Animal", ability: "Cha" },
-  { name: "Heal", ability: "Wis" },
-  { name: "Hide", ability: "Dex" },
-  { name: "Innuendo", ability: "Wis" },
-  { name: "Intimidate", ability: "Cha" },
-  { name: "Jump", ability: "Str" },
-  { name: "Knowledge", ability: "Int" },
-  { name: "Listen", ability: "Wis" },
-  { name: "Move Silently", ability: "Dex" },
-  { name: "Open Lock", ability: "Dex" },
-  { name: "Operate Heavy Machinery", ability: "Dex" },
-  { name: "Performance", ability: "Cha" },
-  { name: "Pilot", ability: "Dex" },
-  { name: "Psychic Focus", ability: "Wis" },
-  { name: "Psychoanalysis", ability: "Wis" },
-  { name: "Read Lips", ability: "Int" },
-  { name: "Repair", ability: "Dex" },
-  { name: "Research", ability: "Int" },
-  { name: "Ride", ability: "Dex" },
-  { name: "Search", ability: "Int" },
-  { name: "Sense Motive", ability: "Wis" },
-  { name: "Sleight of Hand", ability: "Dex" },
-  { name: "Spellcraft", ability: "Int" },
-  { name: "Spot", ability: "Wis" },
-  { name: "Swim", ability: "Str" },
-  { name: "Tumble", ability: "Dex" },
-  { name: "Use Rope", ability: "Dex" },
-  { name: "Wilderness Lore", ability: "Wis" },
+  { name: "Animal Empathy", ability: "Cha", trainedOnly: false },
+  { name: "Appraise", ability: "Int", trainedOnly: false },
+  { name: "Balance", ability: "Dex", trainedOnly: false },
+  { name: "Bluff", ability: "Cha", trainedOnly: false },
+  { name: "Climb", ability: "Str", trainedOnly: false },
+  { name: "Computer Use", ability: "Int", trainedOnly: false },
+  { name: "Concentration", ability: "Con", trainedOnly: false },
+  { name: "Craft", ability: "Int", trainedOnly: false },
+  { name: "Cthulhu Mythos", ability: null, trainedOnly: true }, // treated as special; no ability modifier
+  { name: "Demolitions", ability: "Int", trainedOnly: true },
+  { name: "Diplomacy", ability: "Cha", trainedOnly: false },
+  { name: "Disguise", ability: "Cha", trainedOnly: false },
+  { name: "Drive", ability: "Dex", trainedOnly: false },
+  { name: "Escape Artist", ability: "Dex", trainedOnly: false },
+  { name: "Forgery", ability: "Int", trainedOnly: true },
+  { name: "Gather Information", ability: "Cha", trainedOnly: false },
+  { name: "Handle Animal", ability: "Cha", trainedOnly: false },
+  { name: "Heal", ability: "Wis", trainedOnly: false },
+  { name: "Hide", ability: "Dex", trainedOnly: false },
+  { name: "Innuendo", ability: "Wis", trainedOnly: false },
+  { name: "Intimidate", ability: "Cha", trainedOnly: false },
+  { name: "Jump", ability: "Str", trainedOnly: false },
+  { name: "Knowledge", ability: "Int", trainedOnly: true },
+  { name: "Listen", ability: "Wis", trainedOnly: false },
+  { name: "Move Silently", ability: "Dex", trainedOnly: false },
+  { name: "Open Lock", ability: "Dex", trainedOnly: true },
+  { name: "Operate Heavy Machinery", ability: "Dex", trainedOnly: false },
+  { name: "Performance", ability: "Cha", trainedOnly: false },
+  { name: "Pilot", ability: "Dex", trainedOnly: false },
+  { name: "Psychic Focus", ability: "Wis", trainedOnly: true },
+  { name: "Psychoanalysis", ability: "Wis", trainedOnly: true },
+  { name: "Read Lips", ability: "Int", trainedOnly: true },
+  { name: "Repair", ability: "Dex", trainedOnly: false },
+  { name: "Research", ability: "Int", trainedOnly: false },
+  { name: "Ride", ability: "Dex", trainedOnly: false },
+  { name: "Search", ability: "Int", trainedOnly: false },
+  { name: "Sense Motive", ability: "Wis", trainedOnly: false },
+  { name: "Sleight of Hand", ability: "Dex", trainedOnly: true },
+  { name: "Spellcraft", ability: "Int", trainedOnly: true },
+  { name: "Spot", ability: "Wis", trainedOnly: false },
+  { name: "Swim", ability: "Str", trainedOnly: false },
+  { name: "Tumble", ability: "Dex", trainedOnly: true },
+  { name: "Use Rope", ability: "Dex", trainedOnly: false },
+  { name: "Wilderness Lore", ability: "Wis", trainedOnly: false },
 ];
 
 // Profession templates drawn from the GM screen【878580011413210†L130-L209】.
@@ -403,6 +404,20 @@ const moneyBaseByEra = {
   "1981+": 6000,
 };
 
+// Synergy bonuses: Skills with 5+ ranks grant +2 to related skills (rulebook page 22, Table 2-4)
+const synergyBonuses = {
+  "Balance": ["Jump", "Tumble"],
+  "Bluff": ["Diplomacy", "Intimidate", "Sleight of Hand"],
+  "Climb": ["Use Rope"],
+  "Craft": ["Appraise"],
+  "Handle Animal": ["Ride"],
+  "Jump": ["Tumble"],
+  "Knowledge": ["Research"],
+  "Sense Motive": ["Diplomacy"],
+  "Tumble": ["Balance", "Jump"],
+  "Use Rope": ["Climb", "Escape Artist"]
+};
+
 // Global state to store ability mods, selected feats, etc.
 let abilityMods = {};
 
@@ -443,8 +458,12 @@ function populateSkills() {
   skills.forEach((skill, index) => {
     const tr = document.createElement("tr");
     tr.dataset.skillIndex = index;
+
+    // Add trained-only indicator
+    const trainedIndicator = skill.trainedOnly ? '<span class="trained-only-badge" title="Trained Only: Requires at least 1 rank to use">⚠</span>' : '';
+
     tr.innerHTML = `
-      <td class="skill-name">${skill.name}</td>
+      <td class="skill-name">${skill.name}${trainedIndicator}</td>
       <td>${skill.ability || "—"}</td>
       <td class="core-skill-checkbox-cell">
         <input type="checkbox" class="skill-core-checkbox" data-skill-index="${index}" title="Mark as additional core skill for your profession" />
@@ -604,7 +623,16 @@ function attachEventHandlers() {
     });
   });
   // Level changes
+  let previousLevel = parseInt(document.getElementById("level").value) || 1;
   document.getElementById("level").addEventListener("input", () => {
+    const newLevel = parseInt(document.getElementById("level").value) || 1;
+
+    // Check if level increased (character leveled up)
+    if (newLevel > previousLevel) {
+      applySanityGainOnLevelUp();
+    }
+    previousLevel = newLevel;
+
     updateDerivedStats();
     updateSkillPointsTracker();
     updateFeatCounter();
@@ -679,6 +707,85 @@ function attachEventHandlers() {
   document.getElementById("loadButton").addEventListener("click", () => loadCharacter());
   // Delete character
   document.getElementById("deleteButton").addEventListener("click", () => deleteCharacter());
+  // Ability score reroll checks
+  document.getElementById("checkRerollBtn").addEventListener("click", () => checkIfRerollNeeded());
+  document.getElementById("rerollAllBtn").addEventListener("click", () => rerollAllAbilities());
+}
+
+/**
+ * Check if ability scores are too low and qualify for a reroll.
+ * Per rulebook page 7: Reroll if total modifiers ≤ 0 OR highest score ≤ 13
+ */
+function checkIfRerollNeeded() {
+  updateAbilityMods();
+
+  let totalMods = 0;
+  let highestScore = 0;
+  let scores = [];
+
+  document.querySelectorAll(".ability-score").forEach((input) => {
+    const score = parseInt(input.value) || 10;
+    const ability = input.dataset.ability;
+    const mod = abilityMods[ability] || 0;
+
+    totalMods += mod;
+    highestScore = Math.max(highestScore, score);
+    scores.push(score);
+  });
+
+  const messageDiv = document.getElementById("rerollMessage");
+
+  if (totalMods <= 0 || highestScore <= 13) {
+    messageDiv.innerHTML = `<strong>⚠️ Reroll Recommended!</strong><br>
+      Total modifiers: ${totalMods >= 0 ? '+' : ''}${totalMods} ${totalMods <= 0 ? '(≤ 0)' : ''}<br>
+      Highest score: ${highestScore} ${highestScore <= 13 ? '(≤ 13)' : ''}<br>
+      <em>Per rulebook page 7, you may reroll all six scores.</em>`;
+    messageDiv.className = "reroll-message warning";
+  } else {
+    messageDiv.innerHTML = `<strong>✓ Scores are acceptable!</strong><br>
+      Total modifiers: ${totalMods >= 0 ? '+' : ''}${totalMods}<br>
+      Highest score: ${highestScore}<br>
+      <em>No reroll needed.</em>`;
+    messageDiv.className = "reroll-message success";
+  }
+}
+
+/**
+ * Reroll all ability scores using 4d6 drop lowest method.
+ */
+function rerollAllAbilities() {
+  if (!confirm("This will replace all current ability scores with new random rolls (4d6 drop lowest). Continue?")) {
+    return;
+  }
+
+  document.querySelectorAll(".ability-score").forEach((input) => {
+    const newScore = roll4d6DropLowest();
+    input.value = newScore;
+  });
+
+  updateAbilityMods();
+  updateDerivedStats();
+  updateSkillsTotals();
+  updateSkillPointsTracker();
+
+  alert("All ability scores have been rerolled!");
+
+  // Automatically check if another reroll is needed
+  checkIfRerollNeeded();
+}
+
+/**
+ * Roll 4d6 and drop the lowest die.
+ * @returns {number} The sum of the three highest dice
+ */
+function roll4d6DropLowest() {
+  const rolls = [];
+  for (let i = 0; i < 4; i++) {
+    rolls.push(Math.floor(Math.random() * 6) + 1);
+  }
+  rolls.sort((a, b) => a - b);
+  // Drop the lowest (first element after sort) and sum the rest
+  return rolls[1] + rolls[2] + rolls[3];
 }
 
 /**
@@ -907,6 +1014,26 @@ function updateSanity() {
 }
 
 /**
+ * Apply 1d6 Sanity gain when character levels up.
+ * Per rulebook pages 50-51: Characters gain 1d6 Sanity points when gaining a level.
+ */
+function applySanityGainOnLevelUp() {
+  const currentSanityInput = document.getElementById("currentSanity");
+  const currentSanity = parseInt(currentSanityInput.value) || 0;
+  const maxSanity = parseInt(document.getElementById("sanityMax").textContent) || 99;
+
+  // Roll 1d6
+  const sanityGain = Math.floor(Math.random() * 6) + 1;
+  const newSanity = Math.min(maxSanity, currentSanity + sanityGain);
+
+  currentSanityInput.value = newSanity;
+  updateGameplayPanel();
+
+  // Show notification
+  alert(`Level Up! You gained ${sanityGain} Sanity points (rolled 1d6).\nCurrent Sanity: ${currentSanity} → ${newSanity}`);
+}
+
+/**
  * Gather selected feat bonuses for saves, HP and skills.
  * @returns {Object} e.g. { saves: { fort:2, ref:2, will:0 }, hp:3, skills: { Listen:2, Spot:2 } }
  */
@@ -937,12 +1064,39 @@ function getFeatBonuses() {
 }
 
 /**
- * Update the totals for all skills. Total = ranks + ability mod + misc + feat bonus.
+ * Calculate synergy bonuses for all skills.
+ * Skills with 5+ ranks grant +2 to related skills.
+ * @returns {Object} Map of skill names to synergy bonuses
+ */
+function calculateSynergyBonuses() {
+  const bonuses = {};
+
+  // First pass: check which skills have 5+ ranks
+  document.querySelectorAll("#skillsBody tr").forEach((row) => {
+    const index = parseInt(row.dataset.skillIndex);
+    const skill = skills[index];
+    const ranks = parseInt(row.querySelector(".skill-ranks").value) || 0;
+
+    // If this skill has 5+ ranks and grants synergy bonuses
+    if (ranks >= 5 && synergyBonuses[skill.name]) {
+      synergyBonuses[skill.name].forEach((targetSkill) => {
+        bonuses[targetSkill] = (bonuses[targetSkill] || 0) + 2;
+      });
+    }
+  });
+
+  return bonuses;
+}
+
+/**
+ * Update the totals for all skills. Total = ranks + ability mod + misc + feat bonus + synergy bonus.
  * Also highlight profession core skills (both pre-defined and user-marked).
  */
 function updateSkillsTotals() {
   const featBonuses = getFeatBonuses();
+  const synergyBonuses = calculateSynergyBonuses();
   const prof = professions[parseInt(document.getElementById("profession").value)];
+
   document.querySelectorAll("#skillsBody tr").forEach((row) => {
     const index = parseInt(row.dataset.skillIndex);
     const skill = skills[index];
@@ -952,9 +1106,20 @@ function updateSkillsTotals() {
     const abilityCode = skill.ability;
     const abilityMod = abilityCode ? (abilityMods[abilityCode] || 0) : 0;
     const featBonus = featBonuses.skills[skill.name] || 0;
-    const total = ranks + misc + abilityMod + featBonus;
+    const synergyBonus = synergyBonuses[skill.name] || 0;
+    const total = ranks + misc + abilityMod + featBonus + synergyBonus;
     const totalCell = row.querySelector(".skill-total");
     totalCell.textContent = total >= 0 ? `+${total}` : `${total}`;
+
+    // Add synergy indicator if applicable
+    if (synergyBonus > 0) {
+      totalCell.title = `Includes +${synergyBonus} synergy bonus`;
+      totalCell.classList.add("has-synergy");
+    } else {
+      totalCell.title = "";
+      totalCell.classList.remove("has-synergy");
+    }
+
     // Highlight profession core skills (pre-defined OR user-marked as core)
     const coreCheckbox = row.querySelector(".skill-core-checkbox");
     const isUserMarkedCore = coreCheckbox && coreCheckbox.checked;
@@ -1229,13 +1394,14 @@ function calculateSkillPointsSpent() {
 
 /**
  * Calculate total feats available based on level.
- * Characters get 1 feat at 1st level, then 1 more at 3rd, 6th, 9th, etc. (every 3 levels)
+ * Characters get 2 feats at 1st level, then 1 more at 3rd, 6th, 9th, etc. (every 3 levels)
+ * Per rulebook page 38: "Each character gets two feats when the character is created"
  * @returns {number} Total feats available
  */
 function calculateTotalFeats() {
   const level = parseInt(document.getElementById("level").value) || 1;
-  // 1 feat at 1st level, +1 at 3rd, 6th, 9th, 12th, 15th, 18th
-  return 1 + Math.floor(level / 3);
+  // 2 feats at 1st level, +1 at 3rd, 6th, 9th, 12th, 15th, 18th
+  return 2 + Math.floor(level / 3);
 }
 
 /**
@@ -1249,7 +1415,7 @@ function updateFeatCounter() {
   document.getElementById("featCounterCurrent").textContent = selectedCount;
 
   const level = parseInt(document.getElementById("level").value) || 1;
-  let noteText = `(1 at 1st level`;
+  let noteText = `(2 at 1st level`;
   if (level >= 3) {
     noteText += `, +1 every 3 levels`;
   }
