@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd comprehensive UX improvements for gameplay mode\n\nThis commit implements major UX enhancements based on Call of Cthulhu d20\ngameplay analysis and recommendations:\n\nFeatures Added:\n- Mode toggle: Creation Mode vs Gameplay Mode with distinct layouts\n- Game Session Panel with visual HP/Sanity tracking\n- Color-coded health bars (green/yellow/orange/red) based on percentage\n- Quick damage/heal and sanity loss/restore buttons\n- Sanity threshold warning (pulses when below 20%)\n- Skills search and filter functionality\n- \"Show Profession Skills Only\" filter\n- Session notes textarea for tracking clues and events\n- Current money tracking field\n- Melee and ranged attack calculations (BAB + ability mods)\n\nGameplay Mode Optimizations:\n- Hides ability score inputs (shows only modifiers)\n- Hides skill ranks/misc columns (shows only totals)\n- Collapses profession info and feat descriptions\n- Larger, easier-to-read skill totals\n- Prominent vitals display at top of page\n\nTechnical Implementation:\n- Added mode switching with body class toggle\n- Extended save/load to persist session notes and current money\n- Real-time visual feedback for HP/Sanity changes\n- Responsive CSS Grid layout for game session panel\n- Skills filtering with search and profession filter\n\nDocumentation:\n- Added CLAUDE.md for repository guidance\n- Added UX_RECOMMENDATIONS.md with detailed analysis\n\n🎲 Generated with Claude Code (https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git pull:*)",
+      "Bash(gh:*)",
+      "Bash(git commit:*)",
+      "Bash(node:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

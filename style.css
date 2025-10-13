@@ -492,6 +492,102 @@ body.gameplay-mode .gameplay-only {
   resize: vertical;
 }
 
+/* ===== AGE MODIFIERS NOTE ===== */
+.age-modifiers-note {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background-color: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #856404;
+  display: none;
+}
+
+.age-modifiers-note.active {
+  display: block;
+}
+
+.age-modifiers-note strong {
+  color: #22334a;
+}
+
+/* ===== HP CALCULATION HELPER ===== */
+.hp-calculation {
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: #e8f5e9;
+  border-radius: 3px;
+}
+
+.auto-calc-btn {
+  padding: 0.3rem 0.6rem;
+  margin-left: 0.5rem;
+  background-color: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.auto-calc-btn:hover {
+  background-color: #388e3c;
+}
+
+/* ===== FEAT COUNTER ===== */
+.feat-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #e8eef5 0%, #d0dce8 100%);
+  border: 2px solid #22334a;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.feat-counter-label {
+  color: #22334a;
+}
+
+.feat-counter-current {
+  color: #2196f3;
+  font-size: 1.2rem;
+}
+
+.feat-counter-separator {
+  color: #666;
+}
+
+.feat-counter-total {
+  color: #666;
+  font-size: 1.2rem;
+}
+
+.feat-counter-note {
+  margin-left: 0.5rem;
+  color: #666;
+  font-size: 0.85rem;
+  font-weight: normal;
+}
+
+.feat-counter.over-limit .feat-counter-current {
+  color: #f44336;
+}
+
+.feat-counter.over-limit {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  border-color: #f44336;
+}
+
 /* ===== SKILL POINTS TRACKER ===== */
 .skill-points-tracker {
   display: flex;

@@ -125,7 +125,16 @@
         </div>
         <div class="form-group">
           <label for="age">Age</label>
-          <input type="number" id="age" min="0" />
+          <input type="number" id="age" min="15" max="120" />
+        </div>
+        <div class="form-group">
+          <label for="ageCategory">Age Category</label>
+          <select id="ageCategory">
+            <option value="young">Young Adult (15-34)</option>
+            <option value="middle">Middle Age (35-52)</option>
+            <option value="old">Old (53-69)</option>
+            <option value="venerable">Venerable (70+)</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="gender">Gender</label>
@@ -172,6 +181,7 @@
     <!-- Abilities -->
     <section class="section" id="abilities-section">
       <h2>Ability Scores</h2>
+      <div id="ageModifiersNote" class="age-modifiers-note"></div>
       <table class="abilities-table">
         <thead>
           <tr>
@@ -202,9 +212,11 @@
         </div>
         <div class="derived-group">
           <h3>Hit Points</h3>
+          <p class="hp-calculation" id="hpCalculation"></p>
           <div class="form-group small">
             <label for="hitPoints">Max HP</label>
             <input type="number" id="hitPoints" min="0" value="6" />
+            <button type="button" id="autoCalcHPBtn" class="auto-calc-btn">Auto-Calculate</button>
           </div>
           <div class="form-group small">
             <label for="currentHP">Current HP</label>
@@ -238,6 +250,13 @@
       <h2>Feats</h2>
       <p>Select any feats your character possesses. Some feats apply
         automatic bonuses to saves or hit points.</p>
+      <div class="feat-counter" id="featCounter">
+        <span class="feat-counter-label">Feats Selected:</span>
+        <span class="feat-counter-current" id="featCounterCurrent">0</span>
+        <span class="feat-counter-separator">/</span>
+        <span class="feat-counter-total" id="featCounterTotal">1</span>
+        <span class="feat-counter-note" id="featCounterNote">(1 at 1st level)</span>
+      </div>
       <div class="checkbox-group" id="featsContainer">
         <!-- Feat checkboxes populated by script -->
       </div>

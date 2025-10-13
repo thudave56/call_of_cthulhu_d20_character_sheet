@@ -421,14 +421,23 @@ function populateSkills() {
     });
   });
 
-  // Add validation for skill ranks to prevent exceeding limit
+  // Add validation for skill ranks to prevent exceeding limits
   document.querySelectorAll(".skill-ranks").forEach((input) => {
     input.addEventListener("input", function() {
       const newValue = parseInt(this.value) || 0;
+      const level = parseInt(document.getElementById("level").value) || 1;
+      const maxRanksPerSkill = level + 3;
       const totalAvailable = calculateTotalSkillPoints();
       const currentSpent = calculateSkillPointsSpent();
 
-      // If over limit, show warning and cap at max allowed
+      // Check per-skill rank maximum (Level + 3)
+      if (newValue > maxRanksPerSkill) {
+        this.value = maxRanksPerSkill;
+        alert(`Maximum skill ranks exceeded! At level ${level}, you can have at most ${maxRanksPerSkill} ranks in any skill (Level + 3).`);
+        return;
+      }
+
+      // Check total skill points limit
       if (currentSpent > totalAvailable) {
         // Calculate how much we can set this field to without exceeding
         const otherSpent = currentSpent - newValue;
@@ -478,7 +487,7 @@ function updateProfessionInfo() {
   const prof = professions[profIndex];
   const infoDiv = document.getElementById("profession-info");
   const coreList = prof.coreSkills.map((s) => `<li>${s}</li>`).join("");
-  infoDiv.innerHTML = `<p><strong>Core Skills:</strong></p><ul>${coreList}</ul><p class="desc">${prof.description}</p>`;
+  infoDiv.innerHTML = `<p><strong>Core Skills:</strong></p><ul>${coreList}</ul><p style="font-style: italic; color: #666; margin-top: 0.5rem;">+ three more skills of your choice</p><p class="desc">${prof.description}</p>`;
 }
 
 /**
@@ -534,6 +543,7 @@ function attachEventHandlers() {
   document.getElementById("level").addEventListener("input", () => {
     updateDerivedStats();
     updateSkillPointsTracker();
+    updateFeatCounter();
   });
   // HP changes - auto-set current HP to max HP if empty or 0
   document.getElementById("hitPoints").addEventListener("input", () => {
@@ -545,6 +555,10 @@ function attachEventHandlers() {
       currentHPInput.value = maxHP;
     }
     updateGameplayPanel();
+  });
+  // Auto-calculate HP button
+  document.getElementById("autoCalcHPBtn").addEventListener("click", () => {
+    autoCalculateHP();
   });
   // Attack option changes
   document.getElementById("attackOption").addEventListener("change", () => {
@@ -564,6 +578,13 @@ function attachEventHandlers() {
   document.getElementById("era").addEventListener("change", () => {
     updateMoney();
   });
+  // Age category changes
+  document.getElementById("ageCategory").addEventListener("change", () => {
+    updateAbilityMods();
+    updateDerivedStats();
+    updateSkillsTotals();
+    updateSkillPointsTracker();
+  });
   // Skill input changes
   document.querySelectorAll(".skill-ranks, .skill-misc").forEach((input) => {
     input.addEventListener("input", () => {
@@ -578,6 +599,7 @@ function attachEventHandlers() {
       updateDerivedStats();
       updateSkillsTotals();
       updateSelectedFeatsSummary();
+      updateFeatCounter();
     });
   });
   // Save character
@@ -589,18 +611,25 @@ function attachEventHandlers() {
 }
 
 /**
- * Update ability modifiers based on current scores. Modifier = floor((score - 10) / 2).
+ * Update ability modifiers based on current scores and age.
+ * Modifier = floor((score + age modifier - 10) / 2).
  */
 function updateAbilityMods() {
   abilityMods = {};
+  const ageModifiers = getAgeModifiers();
+
   document.querySelectorAll(".ability-score").forEach((input) => {
-    const score = parseInt(input.value) || 0;
+    const baseScore = parseInt(input.value) || 0;
     const ability = input.dataset.ability;
-    const mod = Math.floor((score - 10) / 2);
+    const ageMod = ageModifiers[ability] || 0;
+    const adjustedScore = baseScore + ageMod;
+    const mod = Math.floor((adjustedScore - 10) / 2);
     abilityMods[ability] = mod;
     const modCell = document.querySelector(`.ability-mod[data-ability='${ability}']`);
     if (modCell) modCell.textContent = mod >= 0 ? `+${mod}` : `${mod}`;
   });
+
+  updateAgeModifiersDisplay();
 }
 
 /**
@@ -633,6 +662,8 @@ function updateDerivedStats() {
   } else {
     hpBonusNote.textContent = "";
   }
+  // Update HP calculation helper
+  updateHPCalculation();
   // Sanity calculations
   updateSanity();
 }
@@ -715,6 +746,61 @@ function updateMoney() {
   if (multiplier < 1) multiplier = 1;
   const starting = multiplier * base;
   document.getElementById("startingMoney").textContent = `$${starting.toLocaleString()}`;
+}
+
+/**
+ * Calculate recommended HP based on level and Constitution modifier.
+ * 1st level: 6 (max d6) + Con mod
+ * Subsequent levels: Average of 3.5 per level + Con mod
+ * @returns {number} Calculated HP
+ */
+function calculateRecommendedHP() {
+  const level = parseInt(document.getElementById("level").value) || 1;
+  const conMod = abilityMods.Con || 0;
+  const featBonuses = getFeatBonuses();
+  const hpBonus = featBonuses.hp || 0;
+
+  // First level: max d6 (6) + Con mod
+  let hp = 6 + conMod;
+
+  // Subsequent levels: average of 3.5 per level + Con mod per level
+  if (level > 1) {
+    hp += Math.floor((level - 1) * 3.5) + (conMod * (level - 1));
+  }
+
+  // Add feat bonuses
+  hp += hpBonus;
+
+  return Math.max(1, hp); // Minimum 1 HP
+}
+
+/**
+ * Update HP calculation display showing recommended HP
+ */
+function updateHPCalculation() {
+  const recommendedHP = calculateRecommendedHP();
+  const level = parseInt(document.getElementById("level").value) || 1;
+  const conMod = abilityMods.Con || 0;
+  const conModText = conMod >= 0 ? `+${conMod}` : `${conMod}`;
+
+  let calcText = `Recommended: <strong>${recommendedHP} HP</strong> `;
+  if (level === 1) {
+    calcText += `(6 + Con ${conModText})`;
+  } else {
+    calcText += `(6 + ${level - 1}×avg(d6) + ${level}×Con ${conModText})`;
+  }
+
+  document.getElementById("hpCalculation").innerHTML = calcText;
+}
+
+/**
+ * Auto-calculate and set HP to recommended value
+ */
+function autoCalculateHP() {
+  const recommendedHP = calculateRecommendedHP();
+  document.getElementById("hitPoints").value = recommendedHP;
+  document.getElementById("currentHP").value = recommendedHP;
+  updateGameplayPanel();
 }
 
 /**
@@ -829,6 +915,7 @@ function saveCharacter() {
   const character = {
     playerName: document.getElementById("playerName").value,
     age: document.getElementById("age").value,
+    ageCategory: document.getElementById("ageCategory").value,
     gender: document.getElementById("gender").value,
     profession: parseInt(document.getElementById("profession").value),
     level: document.getElementById("level").value,
@@ -886,6 +973,7 @@ function loadCharacter() {
   document.getElementById("charName").value = name;
   document.getElementById("playerName").value = character.playerName;
   document.getElementById("age").value = character.age;
+  document.getElementById("ageCategory").value = character.ageCategory || "young";
   document.getElementById("gender").value = character.gender;
   document.getElementById("profession").value = character.profession;
   updateProfessionInfo();
@@ -951,6 +1039,7 @@ function updateAll() {
   updateDerivedStats();
   updateMoney();
   updateSkillPointsTracker();
+  updateFeatCounter();
 }
 
 /**
@@ -958,6 +1047,80 @@ function updateAll() {
  */
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Get age-based ability score modifiers based on age category.
+ * Young Adult: No modifiers
+ * Middle Age: -1 Str, Dex, Con; +1 Int, Wis, Cha
+ * Old: -3 Str, Dex, Con; +2 Int, Wis, Cha
+ * Venerable: -6 Str, Dex, Con; +3 Int, Wis, Cha
+ * @returns {Object} Modifiers for each ability
+ */
+function getAgeModifiers() {
+  const ageCategory = document.getElementById("ageCategory").value;
+  const modifiers = {
+    Str: 0, Dex: 0, Con: 0, Int: 0, Wis: 0, Cha: 0
+  };
+
+  switch (ageCategory) {
+    case "middle":
+      modifiers.Str = -1;
+      modifiers.Dex = -1;
+      modifiers.Con = -1;
+      modifiers.Int = 1;
+      modifiers.Wis = 1;
+      modifiers.Cha = 1;
+      break;
+    case "old":
+      modifiers.Str = -3;
+      modifiers.Dex = -3;
+      modifiers.Con = -3;
+      modifiers.Int = 2;
+      modifiers.Wis = 2;
+      modifiers.Cha = 2;
+      break;
+    case "venerable":
+      modifiers.Str = -6;
+      modifiers.Dex = -6;
+      modifiers.Con = -6;
+      modifiers.Int = 3;
+      modifiers.Wis = 3;
+      modifiers.Cha = 3;
+      break;
+    default: // "young"
+      // No modifiers
+      break;
+  }
+
+  return modifiers;
+}
+
+/**
+ * Update the age modifiers display note
+ */
+function updateAgeModifiersDisplay() {
+  const ageCategory = document.getElementById("ageCategory").value;
+  const noteDiv = document.getElementById("ageModifiersNote");
+
+  if (ageCategory === "young") {
+    noteDiv.classList.remove("active");
+    noteDiv.innerHTML = "";
+    return;
+  }
+
+  const modifiers = getAgeModifiers();
+  let modText = [];
+
+  if (modifiers.Str < 0) {
+    modText.push(`<strong>Physical:</strong> ${modifiers.Str} Str, ${modifiers.Dex} Dex, ${modifiers.Con} Con`);
+  }
+  if (modifiers.Int > 0) {
+    modText.push(`<strong>Mental:</strong> +${modifiers.Int} Int, +${modifiers.Wis} Wis, +${modifiers.Cha} Cha`);
+  }
+
+  noteDiv.innerHTML = `<strong>Age Modifiers Applied:</strong> ${modText.join(" | ")}`;
+  noteDiv.classList.add("active");
 }
 
 /**
@@ -981,6 +1144,43 @@ function calculateSkillPointsSpent() {
     total += parseInt(input.value) || 0;
   });
   return total;
+}
+
+/**
+ * Calculate total feats available based on level.
+ * Characters get 1 feat at 1st level, then 1 more at 3rd, 6th, 9th, etc. (every 3 levels)
+ * @returns {number} Total feats available
+ */
+function calculateTotalFeats() {
+  const level = parseInt(document.getElementById("level").value) || 1;
+  // 1 feat at 1st level, +1 at 3rd, 6th, 9th, 12th, 15th, 18th
+  return 1 + Math.floor(level / 3);
+}
+
+/**
+ * Update the feat counter display
+ */
+function updateFeatCounter() {
+  const totalAvailable = calculateTotalFeats();
+  const selectedCount = document.querySelectorAll("#featsContainer input[type=checkbox]:checked").length;
+
+  document.getElementById("featCounterTotal").textContent = totalAvailable;
+  document.getElementById("featCounterCurrent").textContent = selectedCount;
+
+  const level = parseInt(document.getElementById("level").value) || 1;
+  let noteText = `(1 at 1st level`;
+  if (level >= 3) {
+    noteText += `, +1 every 3 levels`;
+  }
+  noteText += `)`;
+  document.getElementById("featCounterNote").textContent = noteText;
+
+  const counterDiv = document.getElementById("featCounter");
+  if (selectedCount > totalAvailable) {
+    counterDiv.classList.add("over-limit");
+  } else {
+    counterDiv.classList.remove("over-limit");
+  }
 }
 
 /**
