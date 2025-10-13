@@ -1169,6 +1169,7 @@ function saveCharacter() {
     hitPoints: document.getElementById("hitPoints").value,
     currentHP: document.getElementById("currentHP").value,
     currentSanity: document.getElementById("currentSanity").value,
+    insanityState: document.getElementById("insanityState").value,
     abilities: {},
     skills: [],
     feats: [],
@@ -1228,6 +1229,7 @@ function loadCharacter() {
   document.getElementById("hitPoints").value = character.hitPoints;
   document.getElementById("currentHP").value = character.currentHP;
   document.getElementById("currentSanity").value = character.currentSanity;
+  document.getElementById("insanityState").value = character.insanityState || "sane";
   // Abilities
   document.querySelectorAll(".ability-score").forEach((input) => {
     input.value = character.abilities[input.dataset.ability] || 10;
@@ -1286,6 +1288,7 @@ function updateAll() {
   updateMoney();
   updateSkillPointsTracker();
   updateFeatCounter();
+  updateInsanityNotes();
 }
 
 /**
@@ -1635,7 +1638,92 @@ function initializeGameplayPanel() {
   // Update gameplay panel when HP or Sanity changes
   document.getElementById('currentHP').addEventListener('input', updateGameplayPanel);
   document.getElementById('hitPoints').addEventListener('input', updateGameplayPanel);
-  document.getElementById('currentSanity').addEventListener('input', updateGameplayPanel);
+  document.getElementById('currentSanity').addEventListener('input', () => {
+    updateGameplayPanel();
+    checkInsanityStates();
+  });
+  // Insanity state changes
+  document.getElementById('insanityState').addEventListener('change', updateInsanityNotes);
+}
+
+/**
+ * Check for insanity state triggers based on Sanity loss.
+ * Temporary: Lose ≥ Wisdom/2 in single roll
+ * Indefinite: Lose ≥ 20% current Sanity in 1 hour
+ * Permanent: Sanity ≤ -10
+ */
+function checkInsanityStates() {
+  const currentSanity = parseInt(document.getElementById("currentSanity").value) || 0;
+  const maxSanity = parseInt(document.getElementById("sanityMax").textContent) || 99;
+  const wisScore = parseInt(document.querySelector(".ability-score[data-ability='Wis']").value) || 10;
+  const currentState = document.getElementById("insanityState").value;
+
+  // Check for permanent insanity
+  if (currentSanity <= -10) {
+    document.getElementById("insanityState").value = "permanent";
+    updateInsanityNotes();
+    alert("⚠️ PERMANENT INSANITY! Your character has reached -10 Sanity and is permanently insane. This character may need to become an NPC.");
+    return;
+  }
+
+  // Always update insanity notes when sanity changes (to show/hide warnings)
+  // Only do this if currently in "sane" state - don't override manual state selections
+  if (currentState === "sane") {
+    updateInsanityNotes();
+  }
+}
+
+/**
+ * Update insanity notes based on current state
+ */
+function updateInsanityNotes() {
+  const state = document.getElementById("insanityState").value;
+  const noteDiv = document.getElementById("insanityNote");
+  const currentSanity = parseInt(document.getElementById("currentSanity").value) || 0;
+  const maxSanity = parseInt(document.getElementById("sanityMax").textContent) || 99;
+  const wisScore = parseInt(document.querySelector(".ability-score[data-ability='Wis']").value) || 10;
+  const twentyPercent = Math.floor(maxSanity * 0.2);
+
+  switch (state) {
+    case "temporary":
+      noteDiv.innerHTML = `<strong>Temporary Insanity</strong><br>
+        <em>Triggered by: Losing ≥ ${Math.floor(wisScore/2)} Sanity in one roll</em><br>
+        Duration: 1d10 rounds. GM determines specific phobia/disorder.<br>
+        <span class="mythos-gain-note">Gain +2 Cthulhu Mythos on first Mythos-related temporary insanity.</span>`;
+      noteDiv.className = "insanity-note warning";
+      break;
+
+    case "indefinite":
+      noteDiv.innerHTML = `<strong>Indefinite Insanity</strong><br>
+        <em>Triggered by: Losing ≥ ${Math.floor(maxSanity * 0.2)} Sanity in 1 hour</em><br>
+        Duration: 1d6 months. Character unplayable during recovery.<br>
+        <span class="mythos-gain-note">Gain +1 Cthulhu Mythos on each subsequent Mythos-related insanity.</span>`;
+      noteDiv.className = "insanity-note critical";
+      break;
+
+    case "permanent":
+      noteDiv.innerHTML = `<strong>Permanent Insanity</strong><br>
+        <em>Triggered by: Sanity drops to -10 or below</em><br>
+        Character is permanently insane and should become an NPC.`;
+      noteDiv.className = "insanity-note danger";
+      break;
+
+    default: // sane
+      if (currentSanity <= twentyPercent && currentSanity > 0) {
+        noteDiv.innerHTML = `<strong>⚠️ Below 20% Threshold!</strong><br>
+          Current: ${currentSanity} / Max: ${maxSanity} (${Math.round((currentSanity/maxSanity)*100)}%)<br>
+          <em>Vulnerable to indefinite insanity if losing more Sanity rapidly.</em>`;
+        noteDiv.className = "insanity-note warning";
+      } else if (currentSanity > 0) {
+        noteDiv.innerHTML = "";
+        noteDiv.className = "insanity-note";
+      } else {
+        noteDiv.innerHTML = `<strong>⚠️ Zero Sanity!</strong><br>
+          <em>Character is likely experiencing severe psychological trauma.</em>`;
+        noteDiv.className = "insanity-note critical";
+      }
+      break;
+  }
 }
 
 /**
@@ -1875,6 +1963,7 @@ loadCharacter = function() {
 
   updateGameplayPanel();
   updateSelectedFeatsSummary();
+  updateInsanityNotes();
 };
 
 // Initialize mode toggle when page loads
