@@ -104,7 +104,6 @@ const professions = [
       "Knowledge",
       "Knowledge",
       "Research",
-      "Search",
       "Speak Other Language",
     ],
     description:
@@ -118,7 +117,10 @@ const professions = [
       "Climb",
       "Knowledge",
       "Knowledge",
+      "Knowledge",
+      "Research",
       "Search",
+      "Speak Other Language",
       "Spot",
     ],
     description:
@@ -132,6 +134,7 @@ const professions = [
       "Craft",
       "Diplomacy",
       "Innuendo",
+      "Knowledge",
       "Listen",
       "Performance",
       "Sense Motive",
@@ -146,6 +149,7 @@ const professions = [
     coreSkills: [
       "Climb",
       "Craft",
+      "Disable Device",
       "Drive",
       "Gather Information",
       "Operate Heavy Machinery",
@@ -161,9 +165,14 @@ const professions = [
     moneyMod: -1,
     coreSkills: [
       "Bluff",
+      "Disable Device",
       "Escape Artist",
       "Forgery",
+      "Gather Information",
       "Hide",
+      "Move Silently",
+      "Open Lock",
+      "Sleight of Hand",
     ],
     description:
       "Criminals live outside the law and excel at stealth, deception and larceny.",
@@ -174,7 +183,6 @@ const professions = [
     coreSkills: [
       "Gather Information",
       "Hide",
-      "Innuendo",
       "Intimidate",
       "Listen",
       "Move Silently",
@@ -248,6 +256,7 @@ const professions = [
       "Knowledge",
       "Listen",
       "Sense Motive",
+      "Speak Other Language",
       "Spot",
     ],
     description:
@@ -310,6 +319,7 @@ const professions = [
     coreSkills: [
       "Computer Use",
       "Craft",
+      "Disable Device",
       "Knowledge",
       "Open Lock",
       "Operate Heavy Machinery",
@@ -365,7 +375,7 @@ const feats = [
   { name: "Animal Affinity", skills: ["Handle Animal", "Ride"], description: "+2 to Handle Animal and Ride checks" },
   { name: "Athletic", skills: ["Climb", "Swim"], description: "+2 to Climb and Swim checks" },
   { name: "Blind-Fight", description: "Improved fighting in darkness" },
-  { name: "Cautious", skills: ["Demolitions", "Open Lock"], description: "+2 to Demolitions and Open Lock checks" },
+  { name: "Cautious", skills: ["Demolitions", "Disable Device"], description: "+2 to Demolitions and Disable Device checks" },
   { name: "Combat Casting", skills: ["Concentration"], description: "+4 to Concentration checks for defensive casting" },
   { name: "Dodge", description: "+1 dodge bonus to AC" },
   { name: "Endurance", description: "+4 on checks to avoid subdual damage" },
@@ -376,7 +386,7 @@ const feats = [
   { name: "Lightning Reflexes", saves: { ref: 2 }, description: "+2 on Reflex saves" },
   { name: "Martial Artist", description: "Improved unarmed attack damage" },
   { name: "Nimble", skills: ["Escape Artist", "Sleight of Hand"], description: "+2 to Escape Artist and Sleight of Hand checks" },
-  { name: "Persuasive", skills: ["Bluff", "Diplomacy"], description: "+2 to Bluff and Diplomacy checks" },
+  { name: "Persuasive", skills: ["Bluff", "Intimidate"], description: "+2 to Bluff and Intimidate checks" },
   { name: "Point Blank Shot", description: "+1 attack and damage on ranged attacks within 30 ft." },
   { name: "Precise Shot", description: "No penalty for shooting into melee" },
   { name: "Rapid Shot", description: "Extra ranged attack at -2 penalty" },
@@ -1375,12 +1385,20 @@ function updateAgeModifiersDisplay() {
 /**
  * Calculate total available skill points based on level and Intelligence modifier.
  * Call of Cthulhu d20 uses 8 + Int modifier per level.
+ * At 1st level, characters get 4× the normal amount (standard d20 rule).
+ * Formula: (8 + Int) × 4 at 1st level, then (8 + Int) per additional level
+ * Simplified: (8 + Int) × (level + 3)
  * @returns {number} Total skill points available
  */
 function calculateTotalSkillPoints() {
   const level = parseInt(document.getElementById("level").value) || 1;
   const intMod = abilityMods.Int || 0;
-  return (8 + intMod) * level;
+  const basePoints = 8 + intMod;
+
+  // 1st level gets 4x, subsequent levels get 1x
+  // Total = (base × 4) + (base × (level - 1))
+  // Simplified = base × (level + 3)
+  return basePoints * (level + 3);
 }
 
 /**

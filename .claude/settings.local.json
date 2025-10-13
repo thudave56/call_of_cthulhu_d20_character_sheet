@@ -10,7 +10,9 @@
       "Bash(git pull:*)",
       "Bash(gh:*)",
       "Bash(git commit:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(pdftotext:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
