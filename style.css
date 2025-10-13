@@ -133,6 +133,23 @@ tr.profession-skill td {
   background-color: #f9f5e9;
 }
 
+/* Core skill checkbox */
+.core-skill-checkbox-cell {
+  text-align: center;
+  width: 80px;
+}
+
+.skill-core-checkbox {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.skill-core-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Derived stats group */
 .derived-group h3 {
   margin-top: 0;
@@ -688,9 +705,11 @@ body.gameplay-mode .abilities-table td:nth-child(2) {
 body.gameplay-mode .skills-table th:nth-child(2),
 body.gameplay-mode .skills-table th:nth-child(3),
 body.gameplay-mode .skills-table th:nth-child(4),
+body.gameplay-mode .skills-table th:nth-child(5),
 body.gameplay-mode .skills-table td:nth-child(2),
 body.gameplay-mode .skills-table td:nth-child(3),
-body.gameplay-mode .skills-table td:nth-child(4) {
+body.gameplay-mode .skills-table td:nth-child(4),
+body.gameplay-mode .skills-table td:nth-child(5) {
   display: none;
 }
 

@@ -446,6 +446,9 @@ function populateSkills() {
     tr.innerHTML = `
       <td class="skill-name">${skill.name}</td>
       <td>${skill.ability || "—"}</td>
+      <td class="core-skill-checkbox-cell">
+        <input type="checkbox" class="skill-core-checkbox" data-skill-index="${index}" title="Mark as additional core skill for your profession" />
+      </td>
       <td><input type="number" class="skill-ranks" min="0" placeholder="0" /></td>
       <td><input type="number" class="skill-misc" placeholder="0" /></td>
       <td class="skill-total">0</td>
@@ -523,6 +526,7 @@ function populateProfessions() {
 
 /**
  * Display information about the selected profession including its core skills and description.
+ * Also auto-check the core skill checkboxes for the profession's pre-defined skills.
  */
 function updateProfessionInfo() {
   const profIndex = parseInt(document.getElementById("profession").value);
@@ -530,6 +534,24 @@ function updateProfessionInfo() {
   const infoDiv = document.getElementById("profession-info");
   const coreList = prof.coreSkills.map((s) => `<li>${s}</li>`).join("");
   infoDiv.innerHTML = `<p><strong>Core Skills:</strong></p><ul>${coreList}</ul><p style="font-style: italic; color: #666; margin-top: 0.5rem;">+ three more skills of your choice</p><p class="desc">${prof.description}</p>`;
+
+  // Update core skill checkboxes: disable and check profession core skills
+  document.querySelectorAll("#skillsBody tr").forEach((row) => {
+    const index = parseInt(row.dataset.skillIndex);
+    const skill = skills[index];
+    const coreCheckbox = row.querySelector(".skill-core-checkbox");
+
+    if (prof.coreSkills.includes(skill.name)) {
+      // Pre-defined profession skill: check and disable checkbox
+      coreCheckbox.checked = true;
+      coreCheckbox.disabled = true;
+      coreCheckbox.title = "This is a pre-defined core skill for your profession";
+    } else {
+      // Not a pre-defined skill: enable checkbox for user selection
+      coreCheckbox.disabled = false;
+      coreCheckbox.title = "Mark as additional core skill for your profession";
+    }
+  });
 }
 
 /**
@@ -633,6 +655,13 @@ function attachEventHandlers() {
       updateSkillsTotals();
       updateDerivedStats();
       updateSkillPointsTracker();
+    });
+  });
+  // Core skill checkbox changes
+  document.querySelectorAll(".skill-core-checkbox").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      updateSkillsTotals();
+      updateSkillsHighlight();
     });
   });
   // Feat selections
@@ -909,7 +938,7 @@ function getFeatBonuses() {
 
 /**
  * Update the totals for all skills. Total = ranks + ability mod + misc + feat bonus.
- * Also highlight profession core skills.
+ * Also highlight profession core skills (both pre-defined and user-marked).
  */
 function updateSkillsTotals() {
   const featBonuses = getFeatBonuses();
@@ -926,8 +955,12 @@ function updateSkillsTotals() {
     const total = ranks + misc + abilityMod + featBonus;
     const totalCell = row.querySelector(".skill-total");
     totalCell.textContent = total >= 0 ? `+${total}` : `${total}`;
-    // Highlight profession core skills
-    if (prof.coreSkills.includes(skill.name)) {
+    // Highlight profession core skills (pre-defined OR user-marked as core)
+    const coreCheckbox = row.querySelector(".skill-core-checkbox");
+    const isUserMarkedCore = coreCheckbox && coreCheckbox.checked;
+    const isProfessionCore = prof.coreSkills.includes(skill.name);
+
+    if (isProfessionCore || isUserMarkedCore) {
       row.classList.add("profession-skill");
     } else {
       row.classList.remove("profession-skill");
@@ -984,7 +1017,9 @@ function saveCharacter() {
     const index = parseInt(row.dataset.skillIndex);
     const ranks = row.querySelector(".skill-ranks").value;
     const misc = row.querySelector(".skill-misc").value;
-    character.skills.push({ index, ranks, misc });
+    const coreCheckbox = row.querySelector(".skill-core-checkbox");
+    const isCustomCore = coreCheckbox && coreCheckbox.checked && !coreCheckbox.disabled;
+    character.skills.push({ index, ranks, misc, isCustomCore });
   });
   // Feats
   document.querySelectorAll("#featsContainer input[type=checkbox]").forEach((cb) => {
@@ -1039,6 +1074,10 @@ function loadCharacter() {
     if (data) {
       row.querySelector(".skill-ranks").value = data.ranks;
       row.querySelector(".skill-misc").value = data.misc;
+      const coreCheckbox = row.querySelector(".skill-core-checkbox");
+      if (coreCheckbox && !coreCheckbox.disabled && data.isCustomCore) {
+        coreCheckbox.checked = true;
+      }
     }
   });
   // Feats
