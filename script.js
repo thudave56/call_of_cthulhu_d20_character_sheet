@@ -367,73 +367,485 @@ const professions = [
 ];
 
 // Define feats with their effects. Only a subset apply automatic bonuses.
+// Enhanced feat definitions with detailed descriptions
+// fullDescription: Add detailed text from your Call of Cthulhu d20 rulebook here
+// The description field contains factual mechanical information
+// The fullDescription field is for you to paste rulebook flavor text
+
 const feats = [
- // ======== GENERAL FEATS (with mechanical bonuses) ========
-  { name: "Acrobatic", prereqs: null, description: "+2 bonus on Jump and Tumble checks.", type: "General", skills: ["Jump", "Tumble"], impactedSkills: ["Jump", "Tumble"] },
-  { name: "Alertness", prereqs: null, description: "+2 bonus on Listen and Spot checks.", type: "General", skills: ["Listen", "Spot"], impactedSkills: ["Listen", "Spot"] },
-  { name: "Ambidexterity", prereqs: "Dex 15+", description: "Reduce off-hand penalty when fighting with two weapons.", type: "General", impactedSkills: [] },
-  { name: "Animal Affinity", prereqs: null, description: "+2 bonus on Handle Animal and Ride checks.", type: "General", skills: ["Handle Animal", "Ride"], impactedSkills: ["Handle Animal", "Ride"] },
-  { name: "Athletic", prereqs: null, description: "+2 bonus on Climb and Swim checks.", type: "General", skills: ["Climb", "Swim"], impactedSkills: ["Climb", "Swim"] },
-  { name: "Blind-Fight", prereqs: null, description: "Better in concealment; invisible foes gain less advantage.", type: "General", impactedSkills: [] },
-  { name: "Cautious", prereqs: null, description: "+2 bonus on Demolitions and Disable Device checks.", type: "General", skills: ["Demolitions", "Disable Device"], impactedSkills: ["Demolitions", "Disable Device"] },
-  { name: "Combat Casting", prereqs: null, description: "+4 bonus on Concentration checks to cast defensively or when grappled.", type: "General", impactedSkills: ["Concentration"] },
-  { name: "Dodge", prereqs: "Dex 13+", description: "+1 dodge bonus to AC vs one chosen foe.", type: "General", impactedSkills: [] },
-  { name: "Mobility", prereqs: "Dex 13+, Dodge", description: "+4 AC vs attacks of opportunity from movement.", type: "General", impactedSkills: [] },
-  { name: "Spring Attack", prereqs: "Dex 13+, Dodge, Mobility, Base Attack +4", description: "Move before and after melee attack without provoking from target.", type: "General", impactedSkills: [] },
-  { name: "Drive-By Attack", prereqs: null, description: "While driving, move before and after a ranged attack without provoking from target.", type: "General", impactedSkills: [] },
-  { name: "Endurance", prereqs: null, description: "Bonuses vs forced march, holding breath, and environmental effects.", type: "General", impactedSkills: [] },
-  { name: "Expertise", prereqs: "Int 13+", description: "Trade up to –5 attack for equal dodge bonus to AC.", type: "General", impactedSkills: [] },
-  { name: "Gearhead", prereqs: null, description: "+2 bonus on Computer Use and Repair checks.", type: "General", skills: ["Computer Use", "Repair"], impactedSkills: ["Computer Use", "Repair"] },
-  { name: "Great Fortitude", prereqs: null, description: "+2 on Fortitude saves.", type: "General", saves: { fort: 2 }, impactedSkills: [] },
-  { name: "Improved Critical", prereqs: "Base Attack +8, Weapon Focus (chosen weapon)", description: "Doubles threat range with chosen weapon.", type: "General", impactedSkills: [] },
-  { name: "Improved Initiative", prereqs: null, description: "+4 on initiative checks.", type: "General", impactedSkills: [] },
-  { name: "Iron Will", prereqs: null, description: "+2 on Will saves.", type: "General", saves: { will: 2 }, impactedSkills: [] },
-  { name: "Lightning Reflexes", prereqs: null, description: "+2 on Reflex saves.", type: "General", saves: { ref: 2 }, impactedSkills: [] },
-  { name: "Martial Artist", prereqs: null, description: "Improved unarmed strikes; unarmed considered armed.", type: "General", impactedSkills: [] },
-  { name: "Nimble", prereqs: null, description: "+2 bonus on Balance and Escape Artist checks.", type: "General", skills: ["Balance", "Escape Artist"], impactedSkills: ["Balance", "Escape Artist"] },
-  { name: "Persuasive", prereqs: null, description: "+2 bonus on Bluff and Intimidate checks.", type: "General", skills: ["Bluff", "Intimidate"], impactedSkills: ["Bluff", "Intimidate"] },
-  { name: "Point Blank Shot", prereqs: null, description: "+1 attack and damage with ranged attacks within 30 ft.", type: "General", impactedSkills: [] },
-  { name: "Far Shot", prereqs: "Point Blank Shot", description: "Increase range increments.", type: "General", impactedSkills: [] },
-  { name: "Precise Shot", prereqs: "Point Blank Shot", description: "No –4 penalty for firing into melee.", type: "General", impactedSkills: [] },
-  { name: "Rapid Shot", prereqs: "Dex 13+, Point Blank Shot", description: "One extra ranged attack at –2 to all this round.", type: "General", impactedSkills: [] },
-  { name: "Multishot", prereqs: "Dex 17+, Rapid Shot, Base Attack +6", description: "Fire multiple arrows as one attack.", type: "General", impactedSkills: [] },
-  { name: "Shot on the Run", prereqs: "Dex 13+, Dodge, Mobility, Point Blank Shot, Base Attack +4", description: "Move before and after a ranged attack.", type: "General", impactedSkills: [] },
-  { name: "Rolling Shot", prereqs: null, description: "Dive/roll between ranged attacks to gain cover benefits.", type: "General", impactedSkills: [] },
-  { name: "Power Attack", prereqs: "Str 13+", description: "Trade attack bonus for damage.", type: "General", impactedSkills: [] },
-  { name: "Cleave", prereqs: "Str 13+, Power Attack", description: "Extra melee attack after dropping a foe.", type: "General", impactedSkills: [] },
-  { name: "Quick Draw", prereqs: "Base Attack +1", description: "Draw weapon as a free action.", type: "General", impactedSkills: [] },
-  { name: "Run", prereqs: null, description: "Run ×5 speed; +4 Jump after a running start.", type: "General", impactedSkills: ["Jump"] },
-  { name: "Sharp-Eyed", prereqs: null, description: "+2 bonus on Spot and Search checks.", type: "General", skills: ["Spot", "Search"], impactedSkills: ["Spot", "Search"] },
-  { name: "Skill Emphasis", prereqs: null, description: "+3 bonus on one chosen skill.", type: "General", impactedSkills: ["<chosen skill>"] },
-  { name: "Stealthy", prereqs: null, description: "+2 bonus on Hide and Move Silently checks.", type: "General", skills: ["Hide", "Move Silently"], impactedSkills: ["Hide", "Move Silently"] },
-  { name: "Toughness", prereqs: null, description: "+3 hit points.", type: "General", hp: 3, impactedSkills: [] },
-  // Uses Wilderness Lore checks to follow tracks (explicit in the book)
-  { name: "Track", prereqs: null, description: "Use Wilderness Lore to find/follow tracks; DC by surface/conditions.", type: "General", skills: ["Wilderness Lore"], impactedSkills: ["Wilderness Lore"] },
-  { name: "Trustworthy", prereqs: null, description: "+2 bonus on Diplomacy and Gather Information checks.", type: "General", skills: ["Diplomacy", "Gather Information"], impactedSkills: ["Diplomacy", "Gather Information"] },
-  { name: "Two-Weapon Fighting", prereqs: "Dex 15+", description: "Reduce two-weapon attack penalties by 2 per hand.", type: "General", impactedSkills: [] },
-  { name: "Wealth", prereqs: null, description: "Bonus savings equal to starting savings; +2 income modifier; stacks.", type: "General", impactedSkills: [] },
-  { name: "Weapon Finesse", prereqs: "Base Attack +1", description: "Use Dex instead of Str on attacks with certain melee weapons.", type: "General", impactedSkills: [] },
+  // ======== GENERAL FEATS ========
+  {
+    name: "Acrobatic",
+    prereqs: null,
+    description: "You have exceptional coordination and balance. You gain a +2 bonus on all Jump checks and Tumble checks. This feat is particularly useful for characters who need to navigate difficult terrain or perform athletic maneuvers in combat.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Jump", "Tumble"],
+    impactedSkills: ["Jump", "Tumble"]
+  },
+  {
+    name: "Alertness",
+    prereqs: null,
+    description: "You are unusually alert and aware of your surroundings. You gain a +2 bonus on all Listen checks and Spot checks. This feat helps you notice hidden dangers, detect ambushes, and overhear important conversations.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Listen", "Spot"],
+    impactedSkills: ["Listen", "Spot"]
+  },
+  {
+    name: "Ambidexterity",
+    prereqs: "Dex 15+",
+    description: "You are equally proficient with both hands. When fighting with two weapons, your penalties on attack rolls are reduced. Specifically, your off-hand weapon penalty is reduced by 4 (from -4 to 0 for a light weapon, or from -8 to -4 for a medium weapon), and your primary hand penalty is reduced by 2 (from -6 to -4 normally). This feat is essential for effective two-weapon fighting.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Animal Affinity",
+    prereqs: null,
+    description: "You have a natural empathy and rapport with animals. You gain a +2 bonus on all Handle Animal checks and Ride checks. This feat is valuable for characters who work with horses, dogs, or other trained animals.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Handle Animal", "Ride"],
+    impactedSkills: ["Handle Animal", "Ride"]
+  },
+  {
+    name: "Athletic",
+    prereqs: null,
+    description: "You are physically fit and have trained your body for strength and endurance. You gain a +2 bonus on all Climb checks and Swim checks. This feat is useful for characters who frequently need to scale walls, swim across rivers, or engage in physical pursuits.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Climb", "Swim"],
+    impactedSkills: ["Climb", "Swim"]
+  },
+  {
+    name: "Blind-Fight",
+    prereqs: null,
+    description: "You are skilled at fighting in conditions of poor visibility. In melee combat, you do not lose your Dexterity bonus to AC against invisible attackers. You can reroll miss chances from concealment (but must take the second roll). You take only half the usual penalty for fighting in darkness. This feat is crucial when facing invisible enemies or fighting in supernatural darkness.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Cautious",
+    prereqs: null,
+    description: "You are careful and methodical in your approach to dangerous tasks. You gain a +2 bonus on all Demolitions checks and Disable Device checks. This feat represents steady hands and careful attention to detail when working with traps, explosives, and delicate mechanisms.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Demolitions", "Disable Device"],
+    impactedSkills: ["Demolitions", "Disable Device"]
+  },
+  {
+    name: "Combat Casting",
+    prereqs: null,
+    description: "You are skilled at casting spells in threatening situations. You gain a +4 bonus on Concentration checks made to cast a spell while on the defensive or while grappled. This feat is essential for spellcasters who expect to be in melee combat.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: ["Concentration"]
+  },
+  {
+    name: "Dodge",
+    prereqs: "Dex 13+",
+    description: "You are adept at avoiding attacks. During your action, you designate a single opponent. You gain a +1 dodge bonus to Armor Class against attacks from that opponent. You can select a new opponent on any action. This is a dodge bonus and stacks with other bonuses to AC.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Mobility",
+    prereqs: "Dex 13+, Dodge",
+    description: "You are skilled at maneuvering in combat. You gain a +4 dodge bonus to Armor Class against attacks of opportunity provoked when you move out of or through a threatened square. This feat is valuable for mobile combatants who need to reposition frequently.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Spring Attack",
+    prereqs: "Dex 13+, Dodge, Mobility, Base Attack +4",
+    description: "You are trained in mobile melee tactics. When using an attack action, you can move both before and after your attack, provided your total movement doesn't exceed your speed. Moving in this way does not provoke an attack of opportunity from the defender you attack (though it may provoke from other nearby enemies). You must move at least 5 feet both before and after the attack.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Drive-By Attack",
+    prereqs: null,
+    description: "You are trained in making ranged attacks while driving a vehicle. When you are driving a vehicle and take an attack action with a ranged weapon, you may move both before and after the attack, provided your total movement does not exceed your vehicle's speed. Moving in this way does not provoke an attack of opportunity from the defender you attack.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Endurance",
+    prereqs: null,
+    description: "You have exceptional physical stamina. You gain a +4 bonus on checks to continue running, to avoid damage from starvation or thirst, to hold your breath, and to avoid damage from hot or cold environments. You can sleep in light or medium armor without becoming fatigued. This feat represents superior physical resilience.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Expertise",
+    prereqs: "Int 13+",
+    description: "You are trained in defensive fighting techniques. When you use the attack action or full attack action in melee, you can take a penalty of up to -5 on your attack roll and gain a dodge bonus to AC equal to the penalty. The bonus and penalty last until your next action. This feat allows you to trade offense for defense.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Gearhead",
+    prereqs: null,
+    description: "You are skilled with technology and mechanical devices. You gain a +2 bonus on all Computer Use checks and Repair checks. This feat is valuable for characters who work with electronics, computers, and machinery.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Computer Use", "Repair"],
+    impactedSkills: ["Computer Use", "Repair"]
+  },
+  {
+    name: "Great Fortitude",
+    prereqs: null,
+    description: "You have exceptional physical resilience and resistance to harm. You gain a +2 bonus on all Fortitude saving throws. This bonus can help you resist poison, disease, death effects, and physical afflictions.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    saves: { fort: 2 },
+    impactedSkills: []
+  },
+  {
+    name: "Improved Critical",
+    prereqs: "Base Attack +8, Weapon Focus (chosen weapon)",
+    description: "You have mastered the art of dealing critical hits with one chosen weapon. Your threat range with that weapon is doubled. For example, a weapon that normally threatens a critical on a roll of 20 now threatens on 19-20. A weapon that threatens on 19-20 now threatens on 17-20. This feat significantly increases your damage potential with your chosen weapon.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Improved Initiative",
+    prereqs: null,
+    description: "You have exceptional reflexes and react quickly in combat. You gain a +4 bonus on initiative checks. This feat helps ensure you act early in combat rounds, potentially allowing you to strike first or take cover before enemies can act.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Iron Will",
+    prereqs: null,
+    description: "You have exceptional mental fortitude and willpower. You gain a +2 bonus on all Will saving throws. This bonus helps you resist mind-affecting spells, fear effects, and mental assaults from supernatural entities.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    saves: { will: 2 },
+    impactedSkills: []
+  },
+  {
+    name: "Lightning Reflexes",
+    prereqs: null,
+    description: "You have exceptional agility and quick reflexes. You gain a +2 bonus on all Reflex saving throws. This bonus helps you dodge area effects, avoid traps, and react quickly to sudden dangers.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    saves: { ref: 2 },
+    impactedSkills: []
+  },
+  {
+    name: "Martial Artist",
+    prereqs: null,
+    description: "You are trained in unarmed combat techniques. Your unarmed strikes deal more damage than normal (1d6 for Medium characters, instead of 1d3), and you are considered armed even when unarmed (meaning you do not provoke attacks of opportunity when making unarmed strikes). This feat is essential for characters who fight without weapons.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Nimble",
+    prereqs: null,
+    description: "You are graceful and quick on your feet. You gain a +2 bonus on all Balance checks and Escape Artist checks. This feat is useful for characters who need to maintain footing on unstable surfaces or slip free from bonds and grapples.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Balance", "Escape Artist"],
+    impactedSkills: ["Balance", "Escape Artist"]
+  },
+  {
+    name: "Persuasive",
+    prereqs: null,
+    description: "You have a way with words and people. You gain a +2 bonus on all Bluff checks and Intimidate checks. This feat represents natural charisma and the ability to influence others through deception or force of personality.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Bluff", "Intimidate"],
+    impactedSkills: ["Bluff", "Intimidate"]
+  },
+  {
+    name: "Point Blank Shot",
+    prereqs: null,
+    description: "You are skilled at making precise ranged attacks at close range. You gain a +1 bonus on attack rolls and damage rolls with ranged weapons at ranges of up to 30 feet. This feat is the foundation for many ranged combat feat chains.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Far Shot",
+    prereqs: "Point Blank Shot",
+    description: "You are skilled at making ranged attacks at long distances. When you use a projectile weapon, its range increment increases by one-half (multiply by 1.5). For example, a rifle with a range increment of 80 feet has a range increment of 120 feet for you. This feat reduces range penalties for distant shots.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Precise Shot",
+    prereqs: "Point Blank Shot",
+    description: "You are skilled at firing into melee without hitting allies. You can shoot or throw ranged weapons at an opponent engaged in melee without suffering the standard -4 penalty. This feat is essential for ranged combatants supporting allies in close combat.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Rapid Shot",
+    prereqs: "Dex 13+, Point Blank Shot",
+    description: "You can make ranged attacks with exceptional speed. When using a full attack action with a ranged weapon, you can fire one additional attack, taking a -2 penalty on all attack rolls that round. This extra attack is at your highest attack bonus.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Multishot",
+    prereqs: "Dex 17+, Rapid Shot, Base Attack +6",
+    description: "You can fire multiple arrows or projectiles simultaneously. As a standard action, you may fire two arrows at a single target. Both arrows use the same attack roll (with a -4 penalty) to determine success and deal damage normally. For every 5 points of base attack bonus above +6, you may add one additional arrow, to a maximum of four at +16 base attack.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Shot on the Run",
+    prereqs: "Dex 13+, Dodge, Mobility, Point Blank Shot, Base Attack +4",
+    description: "You are highly mobile with ranged weapons. When using an attack action with a ranged weapon, you can move both before and after the attack, provided your total movement doesn't exceed your speed. This feat allows hit-and-run tactics with ranged weapons.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Rolling Shot",
+    prereqs: null,
+    description: "You can dive or roll while making ranged attacks. When you take a standard action to make a ranged attack, you can also move 5 feet and drop prone. This movement does not provoke attacks of opportunity. Being prone provides a +4 bonus to AC against ranged attacks but a -4 penalty to AC against melee attacks.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Power Attack",
+    prereqs: "Str 13+",
+    description: "You can make exceptionally deadly melee attacks by sacrificing accuracy for power. On your action, before making attack rolls for a round, you can choose to subtract a number from all melee attack rolls and add the same number to all melee damage rolls. The penalty and bonus last until your next turn. You cannot reduce your attack bonus below 0, and the maximum penalty/bonus is equal to your base attack bonus.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Cleave",
+    prereqs: "Str 13+, Power Attack",
+    description: "You can follow through with powerful melee attacks. If you deal enough damage to a creature to reduce it to 0 hit points or below, you get an immediate extra melee attack against another creature within reach. You can only use this ability once per round and cannot take a 5-foot step before making this extra attack.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Quick Draw",
+    prereqs: "Base Attack +1",
+    description: "You can draw weapons with startling speed. You can draw a weapon as a free action instead of a move action. You can draw a hidden weapon as a move action. If you have a base attack bonus of +1 or higher, you may throw weapons at your full normal rate of attacks.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Run",
+    prereqs: null,
+    description: "You are exceptionally fast. When running, you move five times your normal speed (if wearing light or no armor) instead of four times. You gain a +4 bonus on Jump checks made after a running start. This feat is useful for characters who need to cover ground quickly or make long jumps.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: ["Jump"]
+  },
+  {
+    name: "Sharp-Eyed",
+    prereqs: null,
+    description: "You have keen vision and notice fine details. You gain a +2 bonus on all Spot checks and Search checks. This feat is valuable for investigators and scouts who need to find clues, detect hidden objects, or spot distant threats.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Spot", "Search"],
+    impactedSkills: ["Spot", "Search"]
+  },
+  {
+    name: "Skill Emphasis",
+    prereqs: null,
+    description: "You have exceptional talent with one particular skill. Choose one skill. You gain a +3 bonus on all checks with that skill. You can take this feat multiple times, selecting a different skill each time. This feat represents specialized training and natural aptitude.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: ["<chosen skill>"]
+  },
+  {
+    name: "Stealthy",
+    prereqs: null,
+    description: "You are particularly good at avoiding detection. You gain a +2 bonus on all Hide checks and Move Silently checks. This feat is essential for scouts, thieves, and anyone who needs to avoid being seen or heard.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Hide", "Move Silently"],
+    impactedSkills: ["Hide", "Move Silently"]
+  },
+  {
+    name: "Toughness",
+    prereqs: null,
+    description: "You are tougher than normal. You gain +3 hit points. This feat represents exceptional physical resilience and hardiness. The bonus hit points are permanent and increase if you gain more levels.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    hp: 3,
+    impactedSkills: []
+  },
+  {
+    name: "Track",
+    prereqs: null,
+    description: "You can follow trails and track creatures or people. You can use the Wilderness Lore skill to track creatures. The DC varies based on surface (soft ground DC 5, hard ground DC 20) and conditions (rain, snow, tracking indoors, etc.). You gain information about the creature being tracked based on how much you beat the DC.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Wilderness Lore"],
+    impactedSkills: ["Wilderness Lore"]
+  },
+  {
+    name: "Trustworthy",
+    prereqs: null,
+    description: "You have an honest, trustworthy demeanor. You gain a +2 bonus on all Diplomacy checks and Gather Information checks. People are more inclined to believe you and share information with you. This feat is valuable for investigators and social characters.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    skills: ["Diplomacy", "Gather Information"],
+    impactedSkills: ["Diplomacy", "Gather Information"]
+  },
+  {
+    name: "Two-Weapon Fighting",
+    prereqs: "Dex 15+",
+    description: "You are skilled at fighting with a weapon in each hand. Your penalties for fighting with two weapons are reduced by 2 for each hand. Normally, fighting with two weapons incurs a -6 penalty with your primary hand and -10 with your off-hand. With this feat, these penalties are reduced to -4 and -8 respectively (or -2 and -6 if using a light weapon in your off-hand).",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Wealth",
+    prereqs: null,
+    description: "You have accumulated wealth and resources beyond your normal starting funds. You gain bonus savings equal to your starting savings amount (essentially doubling your starting money). Additionally, you gain a +2 modifier to income (if using income rules). This feat can be taken multiple times, and its effects stack.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+  {
+    name: "Weapon Finesse",
+    prereqs: "Base Attack +1",
+    description: "You are skilled at using agility rather than brute force in melee combat. With light weapons and certain other weapons (such as rapiers), you may use your Dexterity modifier instead of your Strength modifier on attack rolls. You still use your Strength modifier for damage rolls. This feat is valuable for agile fighters.",
+    fullDescription: "", // Add rulebook text here
+    type: "General",
+    impactedSkills: []
+  },
+
   // ======== PSYCHIC FEATS ========
-  // Psychic feats typically rely on the Psychic Focus skill (the book states the skill enhances these feats).
-  // Prereq for all others; no roll by itself
-  { name: "Sensitive", type: "Psychic", prereqs: "Cha 15+", action: "Varies (GM adjudication)", cost: "—", benefit: "Baseline psychic sensitivity; prerequisite for other psychic feats.", impactedSkills: [] }, // :contentReference[oaicite:4]{index=4}
-  { name: "Biofeedback Trance", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Full-round to enter/exit", cost: "As described by GM", benefit: "Enter a controlled trance for survival and recovery benefits.", impactedSkills: [] },
-  // Uses Psychic Focus to set DCs based on distance/familiarity
-  { name: "Remote Viewing", type: "Psychic", prereqs: "Cha 15+, Sensitive, Biofeedback Trance", action: "Full-round", cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Perceive a distant place while in trance; DC varies by range/familiarity.", impactedSkills: ["Psychic Focus"] },
-  // Explicitly uses Psychic Focus DC 15 and can track incorporeal/invisible/insubstantial creatures
-  { name: "Dowsing", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Free action to activate", cost: "1 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Follow a pattern or trail of psychic energy; lose trail if target leaves your plane.", impactedSkills: ["Psychic Focus"] }, // :contentReference[oaicite:5]{index=5}
-  // Uses Psychic Focus; DC varies with circumstances
-  { name: "Mind Reading", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Full-round", cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Read surface thoughts of a target within range; DC by circumstances.", impactedSkills: ["Psychic Focus"] }, // :contentReference[oaicite:6]{index=6}
-  // Uses Psychic Focus; DC table provided (modifiers cumulative)
-  { name: "Mind Probe", type: "Psychic", prereqs: "Cha 15+, Sensitive, Mind Reading", action: "Full-round", cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Extract specific information from a target within 30 ft; DC by proximity/familiarity/resistance/secrecy.", impactedSkills: ["Psychic Focus"] }, // :contentReference[oaicite:7]{index=7}
-  // Uses Psychic Focus for manipulation/task DCs
-  { name: "Psychokinesis", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Full-round to activate", cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Exert minor force at range; fine tasks require higher DCs.", impactedSkills: ["Psychic Focus"] },
-  // Uses Psychic Focus after 1 minute of contact to receive a vision
-  { name: "Psychometry", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Full-round (after 1 minute of focus)", cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Read strong impressions from an object; GM determines details.", impactedSkills: ["Psychic Focus"] },
-  // Perception via Psychic Focus opposed checks against supernatural concealment (GM adjudication)
-  { name: "Second Sight", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Varies (often none; GM may call for checks)", cost: "— (but discoveries may trigger normal Sanity loss)", benefit: "Perceive hidden or invisible supernatural entities/energies.", impactedSkills: ["Psychic Focus"] },
-  // Uses Psychic Focus; DC per circumstances
-  { name: "Telepathy", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Full-round", cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Send a short mental message or image to a target in sight.", impactedSkills: ["Psychic Focus"] }
+  {
+    name: "Sensitive",
+    prereqs: "Cha 15+",
+    description: "You possess latent psychic abilities and sensitivity to supernatural forces. This feat grants baseline psychic awareness and is the prerequisite for all other psychic feats. You may have occasional intuitions, hunches, or vague sensations of supernatural presence, as determined by the GM. This feat does not grant specific psychic powers by itself.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Varies (GM adjudication)",
+    cost: "—",
+    benefit: "Baseline psychic sensitivity; prerequisite for other psychic feats.",
+    impactedSkills: []
+  },
+  {
+    name: "Biofeedback Trance",
+    prereqs: "Cha 15+, Sensitive",
+    description: "You can enter a controlled trance state that grants enhanced control over your body's functions. Entering or exiting the trance requires a full-round action. While in the trance, you gain benefits such as reduced need for air, resistance to environmental conditions, enhanced healing, or other survival benefits as determined by the GM. The specific benefits and Sanity costs are described in the rulebook.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Full-round to enter/exit",
+    cost: "As described by GM",
+    benefit: "Enter a controlled trance for survival and recovery benefits.",
+    impactedSkills: []
+  },
+  {
+    name: "Remote Viewing",
+    prereqs: "Cha 15+, Sensitive, Biofeedback Trance",
+    description: "While in a trance, you can project your perceptions to a distant location and perceive events there. This requires a full-round action and a successful Psychic Focus check. The DC varies based on range and familiarity with the location. Success costs 1d4 Sanity points and 1 point of temporary Wisdom damage. Failure costs 1 Sanity point. You perceive the location visually and aurally as if you were there, but cannot interact with anything.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Full-round",
+    cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)",
+    benefit: "Perceive a distant place while in trance; DC varies by range/familiarity.",
+    impactedSkills: ["Psychic Focus"]
+  },
+  {
+    name: "Dowsing",
+    prereqs: "Cha 15+, Sensitive",
+    description: "You can sense and follow patterns of psychic energy. As a free action, you can attempt to detect and track a specific person, object, or energy pattern by making a Psychic Focus check (DC 15). Success allows you to sense the direction and approximate distance to the target. This costs 1 Sanity point and 1 point of temporary Wisdom damage on success, or 1 Sanity on failure. You can track incorporeal, invisible, or otherwise hidden targets. You lose the trail if the target leaves your current plane of existence.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Free action to activate",
+    cost: "1 Sanity + 1 temporary Wis (success); 1 Sanity (failure)",
+    benefit: "Follow a pattern or trail of psychic energy; lose trail if target leaves your plane.",
+    impactedSkills: ["Psychic Focus"]
+  },
+  {
+    name: "Mind Reading",
+    prereqs: "Cha 15+, Sensitive",
+    description: "You can read the surface thoughts of a nearby target. This requires a full-round action and a Psychic Focus check. The DC varies based on circumstances (range, target's mental state, etc.). Success allows you to perceive the target's current surface thoughts and immediate mental state, costing 1d4 Sanity points and 1 point of temporary Wisdom damage. Failure costs 1 Sanity point. The target is not aware of being read unless you fail by 10 or more.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Full-round",
+    cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)",
+    benefit: "Read surface thoughts of a target within range; DC by circumstances.",
+    impactedSkills: ["Psychic Focus"]
+  },
+  {
+    name: "Mind Probe",
+    prereqs: "Cha 15+, Sensitive, Mind Reading",
+    description: "You can delve deep into a target's mind to extract specific information. This requires a full-round action and a Psychic Focus check against a DC modified by proximity, familiarity, the target's mental resistance, and how deeply buried the information is. The target must be within 30 feet. Success reveals the specific information you seek, costing 1d4 Sanity points and 1 point of temporary Wisdom damage. Failure costs 1 Sanity point. The target typically becomes aware they have been mentally invaded.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Full-round",
+    cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)",
+    benefit: "Extract specific information from a target within 30 ft; DC by proximity/familiarity/resistance/secrecy.",
+    impactedSkills: ["Psychic Focus"]
+  },
+  {
+    name: "Psychokinesis",
+    prereqs: "Cha 15+, Sensitive",
+    description: "You can move objects at a distance using mental force. Activating this power requires a full-round action and a Psychic Focus check. You can exert force equivalent to lifting with your Charisma score as Strength. Simple tasks (opening an unlocked door, pushing a button) have low DCs. Fine manipulation (picking a lock, writing) requires higher DCs. Success costs 1d4 Sanity points and 1 point of temporary Wisdom damage. Failure costs 1 Sanity point. The effect lasts as long as you concentrate.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Full-round to activate",
+    cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)",
+    benefit: "Exert minor force at range; fine tasks require higher DCs.",
+    impactedSkills: ["Psychic Focus"]
+  },
+  {
+    name: "Psychometry",
+    prereqs: "Cha 15+, Sensitive",
+    description: "You can read psychic impressions from objects. You must maintain physical contact with an object for 1 minute, then spend a full-round action and make a Psychic Focus check. Success reveals strong emotional or historical impressions associated with the object (determined by the GM), costing 1d4 Sanity points and 1 point of temporary Wisdom damage. Failure costs 1 Sanity point. Objects associated with traumatic or supernatural events provide clearer impressions.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Full-round (after 1 minute of focus)",
+    cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)",
+    benefit: "Read strong impressions from an object; GM determines details.",
+    impactedSkills: ["Psychic Focus"]
+  },
+  {
+    name: "Second Sight",
+    prereqs: "Cha 15+, Sensitive",
+    description: "You can perceive supernatural entities, energies, and auras that are normally invisible or hidden. This is a passive ability that may activate automatically in the presence of supernatural phenomena, though the GM may call for Psychic Focus checks in contested situations (such as an opposed check against a creature's Hide check or concealment effect). You do not suffer Sanity loss from this feat itself, but perceiving horrifying supernatural entities may trigger normal Sanity checks as appropriate.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Varies (often none; GM may call for checks)",
+    cost: "— (but discoveries may trigger normal Sanity loss)",
+    benefit: "Perceive hidden or invisible supernatural entities/energies.",
+    impactedSkills: ["Psychic Focus"]
+  },
+  {
+    name: "Telepathy",
+    prereqs: "Cha 15+, Sensitive",
+    description: "You can send mental messages to others. This requires a full-round action, line of sight to the target, and a Psychic Focus check (DC varies by circumstances and the target's mental state). Success allows you to send a brief mental message or image (approximately one sentence or one clear visual image), costing 1d4 Sanity points and 1 point of temporary Wisdom damage. Failure costs 1 Sanity point. The recipient perceives the message as a thought or mental image and knows it came from an external source.",
+    fullDescription: "", // Add rulebook text here
+    type: "Psychic",
+    action: "Full-round",
+    cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)",
+    benefit: "Send a short mental message or image to a target in sight.",
+    impactedSkills: ["Psychic Focus"]
+  }
 ];
 
 /**
@@ -648,7 +1060,11 @@ function populateFeats() {
     const id = `feat_${idx}`;
     const label = document.createElement("label");
     label.htmlFor = id;
-    label.title = feat.description || feat.benefit || "";
+    // Use fullDescription if available and not empty, otherwise fall back to description or benefit
+    const tooltipText = (feat.fullDescription && feat.fullDescription.trim())
+      ? feat.fullDescription
+      : (feat.description || feat.benefit || "");
+    label.title = tooltipText;
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.id = id;
@@ -1586,10 +2002,13 @@ function updateSelectedFeatsSummary() {
     featName.textContent = feat.name;
     featItem.appendChild(featName);
 
-    // Feat description
+    // Feat description - use fullDescription if available, otherwise description or benefit
     const featDesc = document.createElement('div');
     featDesc.className = 'feat-item-description';
-    featDesc.textContent = feat.description;
+    const descText = (feat.fullDescription && feat.fullDescription.trim())
+      ? feat.fullDescription
+      : (feat.description || feat.benefit || "");
+    featDesc.textContent = descText;
     featItem.appendChild(featDesc);
 
     // Bonuses section
