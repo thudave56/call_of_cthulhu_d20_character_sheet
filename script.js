@@ -80,7 +80,7 @@ const professions = [
     moneyMod: -1,
     coreSkills: [
       "Bluff [Cha]",
-      "Computer Use [Cha]",
+      "Computer Use [Int]",
       "Forgery [Int]",
       "Gather Information [Cha]",
       "Hide [Dex]",
@@ -437,6 +437,23 @@ const feats = [
   { name: "Telepathy", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Full-round", cost: "1d4 Sanity + 1 temporary Wis (success); 1 Sanity (failure)", benefit: "Send a short mental message or image to a target in sight.", impactedSkills: ["Psychic Focus"] }
 ];
 
+/**
+ * Extract base skill name from profession core skill string.
+ * Profession skills may include ability notation like "Bluff [Cha]" or "Knowledge (history) [Int]".
+ * This function strips the ability notation to get the base skill name.
+ * @param {string} professionSkill - The profession skill string (e.g., "Bluff [Cha]" or "Knowledge (history) [Int]")
+ * @returns {string} The base skill name (e.g., "Bluff" or "Knowledge")
+ */
+function getBaseSkillName(professionSkill) {
+  // Remove ability notation in square brackets: "Bluff [Cha]" → "Bluff"
+  // Handle cases like "Knowledge (history) [Int]" → "Knowledge"
+  const withoutAbility = professionSkill.replace(/\s*\[.*?\]\s*$/, '').trim();
+
+  // For specialized skills like "Knowledge (history)", extract base skill "Knowledge"
+  const match = withoutAbility.match(/^([^(]+)/);
+  return match ? match[1].trim() : withoutAbility;
+}
+
 // Money base amounts by era. The starting money is (1d6 + moneyMod) × base【878580011413210†L210-L224】.
 const moneyBaseByEra = {
   "1901-1920": 1000,
@@ -602,7 +619,13 @@ function updateProfessionInfo() {
     const skill = skills[index];
     const coreCheckbox = row.querySelector(".skill-core-checkbox");
 
-    if (prof.coreSkills.includes(skill.name)) {
+    // Check if this skill matches any profession core skill (comparing base names)
+    const isProfessionCoreSkill = prof.coreSkills.some(profSkill => {
+      const baseSkillName = getBaseSkillName(profSkill);
+      return baseSkillName === skill.name;
+    });
+
+    if (isProfessionCoreSkill) {
       // Pre-defined profession skill: check and disable checkbox
       coreCheckbox.checked = true;
       coreCheckbox.disabled = true;
@@ -1165,7 +1188,12 @@ function updateSkillsTotals() {
     // Highlight profession core skills (pre-defined OR user-marked as core)
     const coreCheckbox = row.querySelector(".skill-core-checkbox");
     const isUserMarkedCore = coreCheckbox && coreCheckbox.checked;
-    const isProfessionCore = prof.coreSkills.includes(skill.name);
+
+    // Check if this skill matches any profession core skill (comparing base names)
+    const isProfessionCore = prof.coreSkills.some(profSkill => {
+      const baseSkillName = getBaseSkillName(profSkill);
+      return baseSkillName === skill.name;
+    });
 
     if (isProfessionCore || isUserMarkedCore) {
       row.classList.add("profession-skill");
@@ -1956,8 +1984,13 @@ function filterSkills(searchTerm, filterType) {
   const prof = professions[profIndex];
 
   rows.forEach(row => {
-    const skillName = row.querySelector('.skill-name').textContent;
-    const isProfessionSkill = prof.coreSkills.includes(skillName);
+    const skillName = row.querySelector('.skill-name').textContent.replace(/⚠/g, '').trim();
+
+    // Check if this skill matches any profession core skill (comparing base names)
+    const isProfessionSkill = prof.coreSkills.some(profSkill => {
+      const baseSkillName = getBaseSkillName(profSkill);
+      return baseSkillName === skillName;
+    });
 
     // Check if matches search
     const matchesSearch = searchTerm === '' || skillName.toLowerCase().includes(searchTerm);
