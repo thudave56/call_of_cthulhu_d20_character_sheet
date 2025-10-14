@@ -631,7 +631,8 @@ function updateProfessionInfo() {
       coreCheckbox.disabled = true;
       coreCheckbox.title = "This is a pre-defined core skill for your profession";
     } else {
-      // Not a pre-defined skill: enable checkbox for user selection
+      // Not a pre-defined skill: enable checkbox for user selection and uncheck it
+      coreCheckbox.checked = false;
       coreCheckbox.disabled = false;
       coreCheckbox.title = "Mark as additional core skill for your profession";
     }
