@@ -368,14 +368,14 @@ const professions = [
 
 // Define feats with their effects. Only a subset apply automatic bonuses.
 const feats = [
- // ======== GENERAL FEATS (with impactedSkills) ========
-  { name: "Acrobatic", prereqs: null, description: "+2 bonus on Jump and Tumble checks.", type: "General", impactedSkills: ["Jump", "Tumble"] },
-  { name: "Alertness", prereqs: null, description: "+2 bonus on Listen and Spot checks.", type: "General", impactedSkills: ["Listen", "Spot"] },
+ // ======== GENERAL FEATS (with mechanical bonuses) ========
+  { name: "Acrobatic", prereqs: null, description: "+2 bonus on Jump and Tumble checks.", type: "General", skills: ["Jump", "Tumble"], impactedSkills: ["Jump", "Tumble"] },
+  { name: "Alertness", prereqs: null, description: "+2 bonus on Listen and Spot checks.", type: "General", skills: ["Listen", "Spot"], impactedSkills: ["Listen", "Spot"] },
   { name: "Ambidexterity", prereqs: "Dex 15+", description: "Reduce off-hand penalty when fighting with two weapons.", type: "General", impactedSkills: [] },
-  { name: "Animal Affinity", prereqs: null, description: "+2 bonus on Handle Animal and Ride checks.", type: "General", impactedSkills: ["Handle Animal", "Ride"] },
-  { name: "Athletic", prereqs: null, description: "+2 bonus on Climb and Swim checks.", type: "General", impactedSkills: ["Climb", "Swim"] },
+  { name: "Animal Affinity", prereqs: null, description: "+2 bonus on Handle Animal and Ride checks.", type: "General", skills: ["Handle Animal", "Ride"], impactedSkills: ["Handle Animal", "Ride"] },
+  { name: "Athletic", prereqs: null, description: "+2 bonus on Climb and Swim checks.", type: "General", skills: ["Climb", "Swim"], impactedSkills: ["Climb", "Swim"] },
   { name: "Blind-Fight", prereqs: null, description: "Better in concealment; invisible foes gain less advantage.", type: "General", impactedSkills: [] },
-  { name: "Cautious", prereqs: null, description: "+2 bonus on Demolitions and Disable Device checks.", type: "General", impactedSkills: ["Demolitions", "Disable Device"] },
+  { name: "Cautious", prereqs: null, description: "+2 bonus on Demolitions and Disable Device checks.", type: "General", skills: ["Demolitions", "Disable Device"], impactedSkills: ["Demolitions", "Disable Device"] },
   { name: "Combat Casting", prereqs: null, description: "+4 bonus on Concentration checks to cast defensively or when grappled.", type: "General", impactedSkills: ["Concentration"] },
   { name: "Dodge", prereqs: "Dex 13+", description: "+1 dodge bonus to AC vs one chosen foe.", type: "General", impactedSkills: [] },
   { name: "Mobility", prereqs: "Dex 13+, Dodge", description: "+4 AC vs attacks of opportunity from movement.", type: "General", impactedSkills: [] },
@@ -383,15 +383,15 @@ const feats = [
   { name: "Drive-By Attack", prereqs: null, description: "While driving, move before and after a ranged attack without provoking from target.", type: "General", impactedSkills: [] },
   { name: "Endurance", prereqs: null, description: "Bonuses vs forced march, holding breath, and environmental effects.", type: "General", impactedSkills: [] },
   { name: "Expertise", prereqs: "Int 13+", description: "Trade up to –5 attack for equal dodge bonus to AC.", type: "General", impactedSkills: [] },
-  { name: "Gearhead", prereqs: null, description: "+2 bonus on Computer Use and Repair checks.", type: "General", impactedSkills: ["Computer Use", "Repair"] },
-  { name: "Great Fortitude", prereqs: null, description: "+2 on Fortitude saves.", type: "General", impactedSkills: [] },
+  { name: "Gearhead", prereqs: null, description: "+2 bonus on Computer Use and Repair checks.", type: "General", skills: ["Computer Use", "Repair"], impactedSkills: ["Computer Use", "Repair"] },
+  { name: "Great Fortitude", prereqs: null, description: "+2 on Fortitude saves.", type: "General", saves: { fort: 2 }, impactedSkills: [] },
   { name: "Improved Critical", prereqs: "Base Attack +8, Weapon Focus (chosen weapon)", description: "Doubles threat range with chosen weapon.", type: "General", impactedSkills: [] },
   { name: "Improved Initiative", prereqs: null, description: "+4 on initiative checks.", type: "General", impactedSkills: [] },
-  { name: "Iron Will", prereqs: null, description: "+2 on Will saves.", type: "General", impactedSkills: [] },
-  { name: "Lightning Reflexes", prereqs: null, description: "+2 on Reflex saves.", type: "General", impactedSkills: [] },
+  { name: "Iron Will", prereqs: null, description: "+2 on Will saves.", type: "General", saves: { will: 2 }, impactedSkills: [] },
+  { name: "Lightning Reflexes", prereqs: null, description: "+2 on Reflex saves.", type: "General", saves: { ref: 2 }, impactedSkills: [] },
   { name: "Martial Artist", prereqs: null, description: "Improved unarmed strikes; unarmed considered armed.", type: "General", impactedSkills: [] },
-  { name: "Nimble", prereqs: null, description: "+2 bonus on Balance and Escape Artist checks.", type: "General", impactedSkills: ["Balance", "Escape Artist"] },
-  { name: "Persuasive", prereqs: null, description: "+2 bonus on Bluff and Intimidate checks.", type: "General", impactedSkills: ["Bluff", "Intimidate"] },
+  { name: "Nimble", prereqs: null, description: "+2 bonus on Balance and Escape Artist checks.", type: "General", skills: ["Balance", "Escape Artist"], impactedSkills: ["Balance", "Escape Artist"] },
+  { name: "Persuasive", prereqs: null, description: "+2 bonus on Bluff and Intimidate checks.", type: "General", skills: ["Bluff", "Intimidate"], impactedSkills: ["Bluff", "Intimidate"] },
   { name: "Point Blank Shot", prereqs: null, description: "+1 attack and damage with ranged attacks within 30 ft.", type: "General", impactedSkills: [] },
   { name: "Far Shot", prereqs: "Point Blank Shot", description: "Increase range increments.", type: "General", impactedSkills: [] },
   { name: "Precise Shot", prereqs: "Point Blank Shot", description: "No –4 penalty for firing into melee.", type: "General", impactedSkills: [] },
@@ -403,16 +403,16 @@ const feats = [
   { name: "Cleave", prereqs: "Str 13+, Power Attack", description: "Extra melee attack after dropping a foe.", type: "General", impactedSkills: [] },
   { name: "Quick Draw", prereqs: "Base Attack +1", description: "Draw weapon as a free action.", type: "General", impactedSkills: [] },
   { name: "Run", prereqs: null, description: "Run ×5 speed; +4 Jump after a running start.", type: "General", impactedSkills: ["Jump"] },
-  { name: "Sharp-Eyed", prereqs: null, description: "+2 bonus on Spot and Search checks.", type: "General", impactedSkills: ["Spot", "Search"] },
+  { name: "Sharp-Eyed", prereqs: null, description: "+2 bonus on Spot and Search checks.", type: "General", skills: ["Spot", "Search"], impactedSkills: ["Spot", "Search"] },
   { name: "Skill Emphasis", prereqs: null, description: "+3 bonus on one chosen skill.", type: "General", impactedSkills: ["<chosen skill>"] },
-  { name: "Stealthy", prereqs: null, description: "+2 bonus on Hide and Move Silently checks.", type: "General", impactedSkills: ["Hide", "Move Silently"] },
-  { name: "Toughness", prereqs: null, description: "+3 hit points.", type: "General", impactedSkills: [] },
+  { name: "Stealthy", prereqs: null, description: "+2 bonus on Hide and Move Silently checks.", type: "General", skills: ["Hide", "Move Silently"], impactedSkills: ["Hide", "Move Silently"] },
+  { name: "Toughness", prereqs: null, description: "+3 hit points.", type: "General", hp: 3, impactedSkills: [] },
   // Uses Wilderness Lore checks to follow tracks (explicit in the book)
-  { name: "Track", prereqs: null, description: "Use Wilderness Lore to find/follow tracks; DC by surface/conditions.", type: "General", impactedSkills: ["Wilderness Lore"] }, // :contentReference[oaicite:0]{index=0}
-  { name: "Trustworthy", prereqs: null, description: "+2 bonus on Diplomacy and Gather Information checks.", type: "General", impactedSkills: ["Diplomacy", "Gather Information"] }, // :contentReference[oaicite:1]{index=1}
+  { name: "Track", prereqs: null, description: "Use Wilderness Lore to find/follow tracks; DC by surface/conditions.", type: "General", skills: ["Wilderness Lore"], impactedSkills: ["Wilderness Lore"] },
+  { name: "Trustworthy", prereqs: null, description: "+2 bonus on Diplomacy and Gather Information checks.", type: "General", skills: ["Diplomacy", "Gather Information"], impactedSkills: ["Diplomacy", "Gather Information"] },
   { name: "Two-Weapon Fighting", prereqs: "Dex 15+", description: "Reduce two-weapon attack penalties by 2 per hand.", type: "General", impactedSkills: [] },
-  { name: "Wealth", prereqs: null, description: "Bonus savings equal to starting savings; +2 income modifier; stacks.", type: "General", impactedSkills: [] }, // :contentReference[oaicite:2]{index=2}
-  { name: "Weapon Finesse", prereqs: "Base Attack +1", description: "Use Dex instead of Str on attacks with certain melee weapons.", type: "General", impactedSkills: [] }, // :contentReference[oaicite:3]{index=3}
+  { name: "Wealth", prereqs: null, description: "Bonus savings equal to starting savings; +2 income modifier; stacks.", type: "General", impactedSkills: [] },
+  { name: "Weapon Finesse", prereqs: "Base Attack +1", description: "Use Dex instead of Str on attacks with certain melee weapons.", type: "General", impactedSkills: [] }
 //PSYCHIC FEATS
 // ======== PSYCHIC FEATS (with impactedSkills) ========
 // Psychic feats typically rely on the Psychic Focus skill (the book states the skill enhances these feats).
