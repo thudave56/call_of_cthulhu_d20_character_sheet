@@ -25,50 +25,270 @@ const abilities = [
 // penalties; this implementation does not handle armour so it is ignored.
 // trainedOnly: true means the skill requires training (can't be used with 0 ranks)
 const skills = [
-  { name: "Animal Empathy", ability: "Cha", trainedOnly: false },
-  { name: "Appraise", ability: "Int", trainedOnly: false },
-  { name: "Balance", ability: "Dex", trainedOnly: false },
-  { name: "Bluff", ability: "Cha", trainedOnly: false },
-  { name: "Climb", ability: "Str", trainedOnly: false },
-  { name: "Computer Use", ability: "Int", trainedOnly: false },
-  { name: "Concentration", ability: "Con", trainedOnly: false },
-  { name: "Craft", ability: "Int", trainedOnly: false },
-  { name: "Cthulhu Mythos", ability: null, trainedOnly: true }, // treated as special; no ability modifier
-  { name: "Demolitions", ability: "Int", trainedOnly: true },
-  { name: "Diplomacy", ability: "Cha", trainedOnly: false },
-  { name: "Disguise", ability: "Cha", trainedOnly: false },
-  { name: "Drive", ability: "Dex", trainedOnly: false },
-  { name: "Escape Artist", ability: "Dex", trainedOnly: false },
-  { name: "Forgery", ability: "Int", trainedOnly: true },
-  { name: "Gather Information", ability: "Cha", trainedOnly: false },
-  { name: "Handle Animal", ability: "Cha", trainedOnly: false },
-  { name: "Heal", ability: "Wis", trainedOnly: false },
-  { name: "Hide", ability: "Dex", trainedOnly: false },
-  { name: "Innuendo", ability: "Wis", trainedOnly: false },
-  { name: "Intimidate", ability: "Cha", trainedOnly: false },
-  { name: "Jump", ability: "Str", trainedOnly: false },
-  { name: "Knowledge", ability: "Int", trainedOnly: true },
-  { name: "Listen", ability: "Wis", trainedOnly: false },
-  { name: "Move Silently", ability: "Dex", trainedOnly: false },
-  { name: "Open Lock", ability: "Dex", trainedOnly: true },
-  { name: "Operate Heavy Machinery", ability: "Dex", trainedOnly: false },
-  { name: "Performance", ability: "Cha", trainedOnly: false },
-  { name: "Pilot", ability: "Dex", trainedOnly: false },
-  { name: "Psychic Focus", ability: "Wis", trainedOnly: true },
-  { name: "Psychoanalysis", ability: "Wis", trainedOnly: true },
-  { name: "Read Lips", ability: "Int", trainedOnly: true },
-  { name: "Repair", ability: "Dex", trainedOnly: false },
-  { name: "Research", ability: "Int", trainedOnly: false },
-  { name: "Ride", ability: "Dex", trainedOnly: false },
-  { name: "Search", ability: "Int", trainedOnly: false },
-  { name: "Sense Motive", ability: "Wis", trainedOnly: false },
-  { name: "Sleight of Hand", ability: "Dex", trainedOnly: true },
-  { name: "Spellcraft", ability: "Int", trainedOnly: true },
-  { name: "Spot", ability: "Wis", trainedOnly: false },
-  { name: "Swim", ability: "Str", trainedOnly: false },
-  { name: "Tumble", ability: "Dex", trainedOnly: true },
-  { name: "Use Rope", ability: "Dex", trainedOnly: false },
-  { name: "Wilderness Lore", ability: "Wis", trainedOnly: false },
+  {
+    name: "Animal Empathy",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can calm, befriend, or train domestic and wild animals. This skill allows you to influence an animal's behavior, handle a frightened mount, teach an animal tricks, or calm an aggressive creature. DC varies by task: calming an animal (DC 15-25), teaching a trick (DC 15), or handling an attack-trained animal (varies)."
+  },
+  {
+    name: "Appraise",
+    ability: "Int",
+    trainedOnly: false,
+    description: "You can estimate the value and authenticity of items. Use this skill to determine the monetary worth of art, antiques, gems, or unusual objects. A successful check (DC 12-20) provides an accurate estimate within 10% of actual value. This skill is essential for antiquarians and dealers in rare objects."
+  },
+  {
+    name: "Balance",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can keep your footing on narrow, slippery, or unstable surfaces. Use this to walk on ledges, tightropes, ice, or shifting debris. DC varies by surface width and conditions. With 5+ ranks, you gain +2 synergy bonus to Jump and Tumble checks. Failure may result in falling."
+  },
+  {
+    name: "Bluff",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can deceive others through lies, misdirection, or acting. Use this to tell convincing lies, create diversions, pass secret messages, or feint in combat. Opposed by target's Sense Motive. With 5+ ranks, gain +2 synergy bonus to Diplomacy, Intimidate, and Sleight of Hand. Critical for con artists and undercover agents."
+  },
+  {
+    name: "Climb",
+    ability: "Str",
+    trainedOnly: false,
+    description: "You can scale walls, cliffs, and other vertical surfaces. DC varies by surface: ladder (DC 0), rope (DC 5-15), rough wall (DC 15), smooth wall (DC 25). Failure by 5+ means you fall. With 5+ ranks, gain +2 synergy bonus to Use Rope checks. Essential for urban exploration and outdoor adventures."
+  },
+  {
+    name: "Computer Use",
+    ability: "Int",
+    trainedOnly: false,
+    description: "You can operate computers, search databases, hack systems, and write programs. Use this to find information online (DC 10-25), break into secured systems (DC 20-40), or recover deleted files. Higher DCs for encrypted or well-protected systems. Essential for modern-era investigators."
+  },
+  {
+    name: "Concentration",
+    ability: "Con",
+    trainedOnly: false,
+    description: "You can maintain focus under duress, particularly when casting spells or using psychic powers. Use this to cast defensively (DC 15 + spell level), maintain concentration when damaged, or resist distractions. Essential for spellcasters and psychics. Some feats (like Combat Casting) provide bonuses."
+  },
+  {
+    name: "Craft",
+    ability: "Int",
+    trainedOnly: false,
+    description: "You can create or repair objects in a specific craft (photography, writing, mechanics, etc.). Use this to create items, repair broken objects, or assess quality of craftsmanship. DC varies by complexity. With 5+ ranks, gain +2 synergy bonus to Appraise checks for items of your craft specialty."
+  },
+  {
+    name: "Cthulhu Mythos",
+    ability: null,
+    trainedOnly: true,
+    description: "You possess forbidden knowledge of alien entities, dark rituals, and cosmic horrors. This skill has no ability modifier—only ranks matter. Each rank reduces your maximum Sanity by 1 (max Sanity = 99 - ranks). Use this to identify monsters, recall occult lore, or decipher eldritch texts. Gaining ranks may require encountering the Mythos or studying forbidden tomes. High ranks = low Sanity."
+  },
+  {
+    name: "Demolitions",
+    ability: "Int",
+    trainedOnly: true,
+    description: "You can set, disarm, and work with explosives safely. Use this to plant bombs, calculate blast radii, disarm explosive traps, or identify explosive types. DC varies by complexity and stability. Failure when disarming may trigger the explosive. This skill requires training—you cannot attempt it untrained."
+  },
+  {
+    name: "Diplomacy",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can negotiate, persuade, and influence others through tact and social grace. Use this to change attitudes (hostile to friendly), negotiate deals, or gather information from cooperative sources. With 5+ ranks from Bluff or Sense Motive, gain +2 synergy bonus. Essential for social characters and investigators."
+  },
+  {
+    name: "Disguise",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can alter your appearance to appear as someone else or hide your identity. Use makeup, clothing, and mannerisms to change gender (+2 DC), race (+5 DC), or age category (+5 DC). Opposed by Spot checks. Takes 10 minutes to create. Useful for infiltration and undercover work."
+  },
+  {
+    name: "Drive",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can operate ground vehicles including cars, trucks, and motorcycles. Use this for routine driving, evasive maneuvers (DC 15), high-speed chases, or controlling a vehicle in bad conditions. Failure may result in accidents or loss of control. Represents both skill and experience with vehicles."
+  },
+  {
+    name: "Escape Artist",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can slip free from bonds, squeeze through tight spaces, or wriggle out of grapples. DC varies by restraint type: rope (DC 20), handcuffs (DC 30), masterwork manacles (DC 35). With 5+ ranks from Use Rope, gain +2 synergy bonus. Takes 1 minute or more depending on binding. Essential for captured investigators."
+  },
+  {
+    name: "Forgery",
+    ability: "Int",
+    trainedOnly: true,
+    description: "You can create false documents or detect forged items. Creating a forgery takes time proportional to the document's length. Your check is opposed by the reader's Forgery check. Simple documents (letter) are easier than complex ones (contracts, official papers with seals). With related Craft skill, may gain bonus. Requires training to attempt."
+  },
+  {
+    name: "Gather Information",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can collect rumors, gossip, and information from local contacts and informants. Make a check after 1d4+1 hours of mingling. DC 10 for common knowledge, DC 15-25 for obscure or protected information. With 5+ ranks from Knowledge or Bluff, may gain +2 synergy bonus. Core skill for urban investigators."
+  },
+  {
+    name: "Handle Animal",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can train, command, and work with domesticated animals. Use this to teach tricks, train for specific tasks (guard, attack, perform), or control a mount in combat. DC varies by task and animal intelligence. With 5+ ranks, gain +2 synergy bonus to Ride checks. Takes weeks to train an animal fully."
+  },
+  {
+    name: "Heal",
+    ability: "Wis",
+    trainedOnly: false,
+    description: "You can provide medical care and treat injuries. Use this for first aid (DC 15, restore 1 HP), treat wounds from Cthulhu Mythos creatures, treat poison or disease, perform surgery, or provide long-term care. Without a healer's kit, you take -2 penalty. Essential for keeping your party alive during investigations."
+  },
+  {
+    name: "Hide",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can conceal yourself from observation. Opposed by observers' Spot checks. You need cover or concealment to attempt. Size modifier applies (Large -8, Tiny +8). With 5+ ranks from Move Silently, gain +2 synergy bonus. You must remain stationary or move at half speed. Essential for stealth and ambushes."
+  },
+  {
+    name: "Innuendo",
+    ability: "Wis",
+    trainedOnly: false,
+    description: "You can send and interpret hidden messages in seemingly normal conversation. Use this to communicate secretly in public or detect when others are doing so. Both parties roll Innuendo opposed by listeners' Sense Motive. Useful for passing information without alerting enemies or eavesdroppers."
+  },
+  {
+    name: "Intimidate",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can frighten, coerce, or bully others through threats and force of personality. Opposed by target's level check or Intimidate. Success makes target shaken (-2 to attacks, saves, checks) for 1d6 rounds or longer. With 5+ ranks from Bluff, gain +2 synergy. Can demoralize foes in combat or extract information."
+  },
+  {
+    name: "Jump",
+    ability: "Str",
+    trainedOnly: false,
+    description: "You can leap across gaps or reach high places. DC equals distance in feet for long jump (running start) or 4× distance for standing jump. High jump DC = 4× height in feet. With 5+ ranks from Balance or Tumble, gain +2 synergy bonus. Run feat provides +4 after running start. Useful for chase scenes."
+  },
+  {
+    name: "Knowledge",
+    ability: "Int",
+    trainedOnly: true,
+    description: "You have studied a specific field (history, occult, medicine, etc.). Use this to recall facts about your specialty. DC 10 for common knowledge, DC 15-20 for uncommon, DC 25+ for rare or esoteric. With 5+ ranks, gain +2 synergy to Research checks. Must specify a specialty when taking ranks. Cannot use untrained."
+  },
+  {
+    name: "Listen",
+    ability: "Wis",
+    trainedOnly: false,
+    description: "You can hear faint sounds, detect creatures, or overhear conversations. Opposed by Move Silently or uses a DC (DC 0 for normal conversation, DC 10 for whisper, DC 15 through door). Distance and conditions modify DC. With 5+ ranks, +2 synergy to certain checks. Essential for detecting ambushes and eavesdropping."
+  },
+  {
+    name: "Move Silently",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can move without making noise. Opposed by observers' Listen checks. Move at half speed or take -5 penalty for full speed. With 5+ ranks from Hide, gain +2 synergy bonus. Essential for stealth operations, sneaking past guards, or stalking creatures without alerting them."
+  },
+  {
+    name: "Open Lock",
+    ability: "Dex",
+    trainedOnly: true,
+    description: "You can pick locks and disable mechanical locking mechanisms. Requires thieves' tools. DC varies by lock quality: simple (DC 20), average (DC 25), good (DC 30), masterwork (DC 40). Takes 1 minute or more. Without proper tools, take -2 penalty or cannot attempt. Requires training to use."
+  },
+  {
+    name: "Operate Heavy Machinery",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can operate large vehicles and equipment like bulldozers, cranes, forklifts, or construction equipment. DC 15 for routine operation, higher for complex maneuvers or emergency situations. Useful in industrial settings, construction sites, or when you need to move heavy objects."
+  },
+  {
+    name: "Performance",
+    ability: "Cha",
+    trainedOnly: false,
+    description: "You can entertain an audience through acting, singing, dancing, or playing an instrument. DC 10 for routine performance, DC 15 for memorable, DC 20+ for masterwork. Can earn money through performances. Also useful for creating distractions, going undercover as an entertainer, or impressing NPCs."
+  },
+  {
+    name: "Pilot",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can operate aircraft including planes, helicopters, or other flying vehicles. DC 15 for routine flight, higher for difficult maneuvers, bad weather, or emergency landings. Failure may result in crashes. Different aircraft types may require separate specializations in your GM's campaign."
+  },
+  {
+    name: "Psychic Focus",
+    ability: "Wis",
+    trainedOnly: true,
+    description: "You can focus your mind to use psychic powers. Required for all psychic feats (Remote Viewing, Mind Reading, Psychokinesis, etc.). DC varies by specific power and circumstances. Each use typically costs Sanity points. Higher ranks increase chance of success with psychic abilities. Requires training—represents years of mental discipline."
+  },
+  {
+    name: "Psychoanalysis",
+    ability: "Wis",
+    trainedOnly: true,
+    description: "You can treat mental disorders and restore lost Sanity through therapy. Requires extended therapy sessions (weeks or months). Use this to help characters recover from insanity or regain lost Sanity points. DC varies by disorder severity. Essential for treating the psychological trauma common in Mythos investigations. Requires training."
+  },
+  {
+    name: "Read Lips",
+    ability: "Int",
+    trainedOnly: true,
+    description: "You can understand speech by watching a speaker's lips. Requires line of sight to the speaker's mouth. DC 15 for normal speech, higher for fast speech, distance, or obstructions. Can only understand languages you know. Useful for surveillance, spying on conversations through windows, or in loud environments. Requires training."
+  },
+  {
+    name: "Repair",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can fix broken mechanical and electronic devices. DC varies by damage and complexity. Simple repairs (DC 10-15) take minutes. Complex repairs (DC 20-30) take hours. Can improvise repairs at +5 DC. Useful for fixing vehicles, weapons, locks, or other equipment during investigations."
+  },
+  {
+    name: "Research",
+    ability: "Int",
+    trainedOnly: false,
+    description: "You can find information in libraries, archives, databases, and records. DC varies by how obscure the information is. Takes 1d4 hours. With 5+ ranks from Knowledge, gain +2 synergy bonus. Essential for investigators researching clues, historical events, or background on suspects and locations."
+  },
+  {
+    name: "Ride",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can control and ride horses or other mounts. DC 5 for routine riding, DC 15 for controlling frightened mount, DC 20 for combat riding or trick riding. With 5+ ranks from Handle Animal, gain +2 synergy. Useful in rural areas or historical settings where horses are common transportation."
+  },
+  {
+    name: "Search",
+    ability: "Int",
+    trainedOnly: false,
+    description: "You can find hidden objects, secret doors, traps, or clues. DC varies by concealment quality: simple hidden object (DC 10), well-hidden (DC 20), secret door (DC 20), trap (DC 20+). Takes 1 minute per 5-foot square. Essential for investigators finding evidence, detecting traps, or discovering hidden compartments."
+  },
+  {
+    name: "Sense Motive",
+    ability: "Wis",
+    trainedOnly: false,
+    description: "You can detect lies, gauge emotions, and read body language. Opposed by target's Bluff check or DC 20 to detect mental influence. Use this to tell if someone is lying, sense hostile intent, or determine if someone is under magical influence. With 5+ ranks, gain +2 synergy to Diplomacy. Critical for investigators."
+  },
+  {
+    name: "Sleight of Hand",
+    ability: "Dex",
+    trainedOnly: true,
+    description: "You can pick pockets, palm objects, or perform close-up magic. Opposed by observers' Spot checks. DC varies by object size and observer attention. Use to steal items, plant evidence, conceal weapons, or perform magic tricks. Requires training—represents years of manual dexterity practice."
+  },
+  {
+    name: "Spellcraft",
+    ability: "Int",
+    trainedOnly: true,
+    description: "You can identify spells, magic items, and magical effects. Use this to recognize spells being cast (DC 15 + spell level), identify magic items (DC varies), or understand magical writing. Essential for characters dealing with sorcery or studying magical tomes. Requires training in arcane lore."
+  },
+  {
+    name: "Spot",
+    ability: "Wis",
+    trainedOnly: false,
+    description: "You can notice details, see hidden creatures, or detect visual anomalies. Opposed by Hide checks or uses a DC for spotting objects (DC varies by distance and concealment). Use to notice ambushes, spot clues, read lips (with Read Lips skill), or see invisible creatures. With 5+ ranks, +2 synergy to certain checks."
+  },
+  {
+    name: "Swim",
+    ability: "Str",
+    trainedOnly: false,
+    description: "You can move through water effectively. DC 10 for calm water, DC 15 for rough water, DC 20 for stormy water. Failure by 5+ means you go underwater and must hold breath. Armor and encumbrance apply heavy penalties. Each hour of swimming requires a check. Essential for aquatic adventures or escaping floods."
+  },
+  {
+    name: "Tumble",
+    ability: "Dex",
+    trainedOnly: true,
+    description: "You can perform acrobatic stunts, rolls, and flips. Use this to avoid attacks of opportunity when moving through threatened squares (DC 15), reduce falling damage (DC 15, reduce 10 feet), or stand from prone as a free action (DC 25). With 5+ ranks, gain +2 synergy to Balance and Jump. Requires training."
+  },
+  {
+    name: "Use Rope",
+    ability: "Dex",
+    trainedOnly: false,
+    description: "You can tie knots, secure prisoners, or use ropes effectively. DC varies by task: secure binding (DC 15), special knot (DC 15-20), bind a struggling captive (opposed by Escape Artist). With 5+ ranks, gain +2 synergy to Climb and Escape Artist checks. Useful for climbing, restraining suspects, or creating makeshift solutions."
+  },
+  {
+    name: "Wilderness Lore",
+    ability: "Wis",
+    trainedOnly: false,
+    description: "You can survive in the wild, track creatures, and navigate natural terrain. Use this to follow tracks (with Track feat), avoid getting lost, find food and shelter, predict weather, or identify natural hazards. DC varies by task and conditions. Essential for outdoor adventures and rural investigations."
+  },
 ];
 
 // Profession templates drawn from the GM screen【878580011413210†L130-L209】.
@@ -932,8 +1152,11 @@ function populateSkills() {
     // Add trained-only indicator
     const trainedIndicator = skill.trainedOnly ? '<span class="trained-only-badge" title="Trained Only: Requires at least 1 rank to use">⚠</span>' : '';
 
+    // Escape quotes in description for HTML attribute
+    const skillDescription = skill.description ? skill.description.replace(/"/g, '&quot;') : '';
+
     tr.innerHTML = `
-      <td class="skill-name">${skill.name}${trainedIndicator}</td>
+      <td class="skill-name" title="${skillDescription}">${skill.name}${trainedIndicator}</td>
       <td>${skill.ability || "—"}</td>
       <td class="core-skill-checkbox-cell">
         <input type="checkbox" class="skill-core-checkbox" data-skill-index="${index}" title="Mark as additional core skill for your profession" />
