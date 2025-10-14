@@ -1183,14 +1183,32 @@ function populateSkills() {
     input.addEventListener("input", function() {
       const newValue = parseInt(this.value) || 0;
       const level = parseInt(document.getElementById("level").value) || 1;
-      const maxRanksPerSkill = level + 3;
       const totalAvailable = calculateTotalSkillPoints();
       const currentSpent = calculateSkillPointsSpent();
 
-      // Check per-skill rank maximum (Level + 3)
+      // Determine max ranks for this specific skill (core vs non-core)
+      const row = this.closest("tr");
+      const index = parseInt(row.dataset.skillIndex);
+      const skill = skills[index];
+      const prof = professions[parseInt(document.getElementById("profession").value)];
+
+      // Check if this is a core skill
+      const coreCheckbox = row.querySelector(".skill-core-checkbox");
+      const isUserMarkedCore = coreCheckbox && coreCheckbox.checked;
+      const isProfessionCore = prof.coreSkills.some(profSkill => {
+        const baseSkillName = getBaseSkillName(profSkill);
+        return baseSkillName === skill.name;
+      });
+      const isCoreSkill = isProfessionCore || isUserMarkedCore;
+
+      // Core skills: level + 3, Non-core: (level + 3) / 2
+      const maxRanksPerSkill = isCoreSkill ? (level + 3) : Math.floor((level + 3) / 2);
+
+      // Check per-skill rank maximum
       if (newValue > maxRanksPerSkill) {
         this.value = maxRanksPerSkill;
-        alert(`Maximum skill ranks exceeded! At level ${level}, you can have at most ${maxRanksPerSkill} ranks in any skill (Level + 3).`);
+        const skillType = isCoreSkill ? "core skill" : "non-core skill";
+        alert(`Maximum skill ranks exceeded! At level ${level}, you can have at most ${maxRanksPerSkill} ranks in any ${skillType}. Core skills: Level + 3. Non-core skills: (Level + 3) / 2.`);
         return;
       }
 
@@ -2102,13 +2120,38 @@ function calculateTotalSkillPoints() {
 
 /**
  * Calculate total skill points spent by summing all skill ranks.
+ * Core skills: 1 point per rank
+ * Non-core skills: 2 points per rank (1 point = 0.5 rank)
  * @returns {number} Total skill points spent
  */
 function calculateSkillPointsSpent() {
+  const prof = professions[parseInt(document.getElementById("profession").value)];
   let total = 0;
-  document.querySelectorAll(".skill-ranks").forEach((input) => {
-    total += parseInt(input.value) || 0;
+
+  document.querySelectorAll("#skillsBody tr").forEach((row) => {
+    const index = parseInt(row.dataset.skillIndex);
+    const skill = skills[index];
+    const ranksInput = row.querySelector(".skill-ranks");
+    const ranks = parseInt(ranksInput.value) || 0;
+
+    if (ranks > 0) {
+      // Check if this is a core skill (profession core OR user-marked)
+      const coreCheckbox = row.querySelector(".skill-core-checkbox");
+      const isUserMarkedCore = coreCheckbox && coreCheckbox.checked;
+
+      const isProfessionCore = prof.coreSkills.some(profSkill => {
+        const baseSkillName = getBaseSkillName(profSkill);
+        return baseSkillName === skill.name;
+      });
+
+      const isCoreSkill = isProfessionCore || isUserMarkedCore;
+
+      // Core skills cost 1 point per rank, non-core cost 2 points per rank
+      const cost = isCoreSkill ? ranks : ranks * 2;
+      total += cost;
+    }
   });
+
   return total;
 }
 
