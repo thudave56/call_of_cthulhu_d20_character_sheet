@@ -412,10 +412,9 @@ const feats = [
   { name: "Trustworthy", prereqs: null, description: "+2 bonus on Diplomacy and Gather Information checks.", type: "General", skills: ["Diplomacy", "Gather Information"], impactedSkills: ["Diplomacy", "Gather Information"] },
   { name: "Two-Weapon Fighting", prereqs: "Dex 15+", description: "Reduce two-weapon attack penalties by 2 per hand.", type: "General", impactedSkills: [] },
   { name: "Wealth", prereqs: null, description: "Bonus savings equal to starting savings; +2 income modifier; stacks.", type: "General", impactedSkills: [] },
-  { name: "Weapon Finesse", prereqs: "Base Attack +1", description: "Use Dex instead of Str on attacks with certain melee weapons.", type: "General", impactedSkills: [] }
-//PSYCHIC FEATS
-// ======== PSYCHIC FEATS (with impactedSkills) ========
-// Psychic feats typically rely on the Psychic Focus skill (the book states the skill enhances these feats).
+  { name: "Weapon Finesse", prereqs: "Base Attack +1", description: "Use Dex instead of Str on attacks with certain melee weapons.", type: "General", impactedSkills: [] },
+  // ======== PSYCHIC FEATS ========
+  // Psychic feats typically rely on the Psychic Focus skill (the book states the skill enhances these feats).
   // Prereq for all others; no roll by itself
   { name: "Sensitive", type: "Psychic", prereqs: "Cha 15+", action: "Varies (GM adjudication)", cost: "—", benefit: "Baseline psychic sensitivity; prerequisite for other psychic feats.", impactedSkills: [] }, // :contentReference[oaicite:4]{index=4}
   { name: "Biofeedback Trance", type: "Psychic", prereqs: "Cha 15+, Sensitive", action: "Full-round to enter/exit", cost: "As described by GM", benefit: "Enter a controlled trance for survival and recovery benefits.", impactedSkills: [] },
