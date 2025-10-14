@@ -625,7 +625,7 @@ function populateFeats() {
     const id = `feat_${idx}`;
     const label = document.createElement("label");
     label.htmlFor = id;
-    label.title = feat.description;
+    label.title = feat.description || feat.benefit || "";
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.id = id;
