@@ -2461,7 +2461,7 @@ function updateAgeModifiersDisplay() {
 function calculateTotalSkillPoints() {
   const level = parseInt(document.getElementById("level").value) || 1;
   const intMod = abilityMods.Int || 0;
-  const basePoints = 8 + intMod;
+  const basePoints = Math.max(1, 8 + intMod); // Minimum 1 skill point per level
 
   // 1st level gets 4x, subsequent levels get 1x
   // Total = (base × 4) + (base × (level - 1))
@@ -2553,8 +2553,35 @@ function updateSkillPointsTracker() {
   const spent = calculateSkillPointsSpent();
   const remaining = totalAvailable - spent;
 
+  // Calculate detailed breakdown for tooltip
+  const level = parseInt(document.getElementById("level").value) || 1;
+  const intMod = abilityMods.Int || 0;
+  const baseCalculated = 8 + intMod;
+  const basePoints = Math.max(1, baseCalculated); // Minimum 1 skill point per level
+  
+  // Create detailed tooltip text
+  let tooltipText = `Skill Points Calculation:
+Base: 8 points
+Intelligence Modifier: ${intMod >= 0 ? '+' + intMod : intMod} points`;
+
+  if (baseCalculated < 1) {
+    tooltipText += `
+Raw Per Level: ${baseCalculated} (minimum 1)
+Effective Per Level: ${basePoints} points`;
+  } else {
+    tooltipText += `
+Per Level: ${basePoints} points`;
+  }
+
+  tooltipText += `
+Formula: (8 + Int Mod) × (Level + 3), minimum 1 per level
+Calculation: max(1, 8 + ${intMod}) × (${level} + 3) = ${basePoints} × ${level + 3} = ${totalAvailable} points`;
+
   // Update display elements
-  document.getElementById("skillPointsTotal").textContent = totalAvailable;
+  const totalElement = document.getElementById("skillPointsTotal");
+  totalElement.textContent = totalAvailable;
+  totalElement.title = tooltipText;
+  
   document.getElementById("skillPointsUsed").textContent = spent;
 
   const remainingText = remaining >= 0 ? `(${remaining} remaining)` : `(${Math.abs(remaining)} over limit!)`;

@@ -2301,6 +2301,15 @@ body.gameplay-mode .gameplay-only {
 .skill-points-total {
   color: #666;
   font-size: 1.3rem;
+  cursor: help;
+  text-decoration: underline dotted;
+  text-decoration-color: #ccc;
+  position: relative;
+}
+
+.skill-points-total:hover {
+  color: #333;
+  text-decoration-color: #666;
 }
 
 .skill-points-remaining {
