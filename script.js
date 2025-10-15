@@ -3790,13 +3790,25 @@ function createCharacterCard(name, character) {
   const level = parseInt(character.level) || 1;
   const conScore = parseInt(character.abilities?.con) || 10;
   const wisScore = parseInt(character.abilities?.wis) || 10;
-  
+
   const currentHP = parseInt(character.currentHP) || 0;
   const maxHP = parseInt(character.hitPoints) || (conScore + level); // Use saved hitPoints or fallback calculation
   const hpPercent = maxHP > 0 ? (currentHP / maxHP) * 100 : 100;
-  
+
   const currentSanity = parseInt(character.currentSanity) || 0;
-  const maxSanity = wisScore * 5; // Starting sanity = WIS * 5
+  // Calculate maximum sanity: 99 - Cthulhu Mythos ranks
+  let mythosRanks = 0;
+  if (character.skills && Array.isArray(character.skills)) {
+    // Find Cthulhu Mythos skill in the skills array
+    const mythosSkill = character.skills.find(skill => {
+      const skillIndex = parseInt(skill.index);
+      return skills[skillIndex] && skills[skillIndex].name === 'Cthulhu Mythos';
+    });
+    if (mythosSkill) {
+      mythosRanks = parseInt(mythosSkill.ranks) || 0;
+    }
+  }
+  const maxSanity = 99 - mythosRanks;
   const sanityPercent = maxSanity > 0 ? (currentSanity / maxSanity) * 100 : 100;
   
   // Determine bar colors
