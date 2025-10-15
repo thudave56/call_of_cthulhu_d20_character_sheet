@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equipment Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Equipment & Combat Section Test</h1>
+    
+    <div class="test-section">
+        <h2>Combat Overview Test</h2>
+        <div class="combat-stat-cards">
+            <div class="stat-card">
+                <h4>Armor Class</h4>
+                <div class="big-number">14</div>
+                <div class="calculation">10 + 2 (armor) + 2 (Dex)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Weapon Card Test</h2>
+        <div class="weapon-card">
+            <div class="weapon-header">
+                <input type="text" class="weapon-name" value="Longsword" />
+                <select class="weapon-type">
+                    <option value="melee" selected>Melee</option>
+                    <option value="ranged">Ranged</option>
+                </select>
+                <button class="delete-weapon">×</button>
+            </div>
+            <div class="weapon-stats">
+                <div class="stat-group">
+                    <label>Attack</label>
+                    <div class="big-stat">+6</div>
+                    <small>BAB +3, Str +3</small>
+                </div>
+                <div class="stat-group">
+                    <label>Damage</label>
+                    <input type="text" value="1d8+3" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Weight Bar Test</h2>
+        <div class="weight-bar-container">
+            <div class="weight-bar">
+                <div class="weight-progress" style="width: 60%;"></div>
+            </div>
+        </div>
+        <div class="weight-summary">
+            <span class="current-weight">36 lbs</span>
+            <span class="weight-status medium">Medium Load</span>
+            <span class="weight-limit">(max 60 lbs)</span>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="style.css">
+</body>
+</html>

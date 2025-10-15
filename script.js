@@ -1071,16 +1071,16 @@ const feats = [
 /**
  * Extract base skill name from profession core skill string.
  * Profession skills may include ability notation like "Bluff [Cha]" or "Knowledge (history) [Int]".
- * This function strips the ability notation to get the base skill name.
+ * This function strips the ability notation and specializations to get the base skill name.
  * @param {string} professionSkill - The profession skill string (e.g., "Bluff [Cha]" or "Knowledge (history) [Int]")
  * @returns {string} The base skill name (e.g., "Bluff" or "Knowledge")
  */
 function getBaseSkillName(professionSkill) {
   // Remove ability notation in square brackets: "Bluff [Cha]" → "Bluff"
-  // Handle cases like "Knowledge (history) [Int]" → "Knowledge"
   const withoutAbility = professionSkill.replace(/\s*\[.*?\]\s*$/, '').trim();
 
-  // For specialized skills like "Knowledge (history)", extract base skill "Knowledge"
+  // For specialized skills like "Knowledge (history)" or "Craft (any one)", extract base skill "Knowledge" or "Craft"
+  // Match everything before the first opening parenthesis
   const match = withoutAbility.match(/^([^(]+)/);
   return match ? match[1].trim() : withoutAbility;
 }
@@ -1120,6 +1120,10 @@ window.addEventListener("DOMContentLoaded", () => {
   populateSavedCharacters();
   attachEventHandlers();
   updateAll();
+  // Initialize equipment system if available
+  if (typeof initializeEquipmentSystem === "function") {
+    initializeEquipmentSystem();
+  }
 });
 
 /**
@@ -1184,7 +1188,6 @@ function populateSkills() {
       const newValue = parseInt(this.value) || 0;
       const level = parseInt(document.getElementById("level").value) || 1;
       const totalAvailable = calculateTotalSkillPoints();
-      const currentSpent = calculateSkillPointsSpent();
 
       // Determine max ranks for this specific skill (core vs non-core)
       const row = this.closest("tr");
@@ -1212,17 +1215,29 @@ function populateSkills() {
         return;
       }
 
-      // Check total skill points limit
-      if (currentSpent > totalAvailable) {
-        // Calculate how much we can set this field to without exceeding
-        const otherSpent = currentSpent - newValue;
-        const maxAllowed = Math.max(0, totalAvailable - otherSpent);
+      // Calculate what the total would be with this new value
+      const previousValue = parseInt(this.getAttribute('data-previous-value')) || 0;
+      const currentSpent = calculateSkillPointsSpent();
+      const costOfPreviousValue = isCoreSkill ? previousValue : previousValue * 2;
+      const costOfNewValue = isCoreSkill ? newValue : newValue * 2;
+      
+      // Debug: Let's recalculate without using previous value
+      // This avoids issues with uninitialized data-previous-value
+      const tempValue = this.value;
+      this.value = 0; // Temporarily zero out this field
+      const spentWithoutThisSkill = calculateSkillPointsSpent();
+      this.value = tempValue; // Restore the temporary value
+      
+      const projectedTotal = spentWithoutThisSkill + costOfNewValue;
 
-        // Only intervene if user is actively increasing beyond limit
-        if (newValue > maxAllowed && newValue > (parseInt(this.getAttribute('data-previous-value')) || 0)) {
-          this.value = maxAllowed;
-          alert(`Skill point limit reached! You have ${totalAvailable} total skill points available (8 + Int modifier × level). You can only allocate ${maxAllowed} more ranks to this skill.`);
-        }
+      // Check total skill points limit
+      if (projectedTotal > totalAvailable) {
+        // Calculate how much we can actually allocate
+        const remainingPoints = totalAvailable - spentWithoutThisSkill;
+        const maxRanks = isCoreSkill ? remainingPoints : Math.floor(remainingPoints / 2);
+        
+        this.value = Math.max(0, maxRanks);
+        alert(`Skill point limit reached! You have ${totalAvailable} total skill points available (8 + Int modifier × level). You can only allocate ${Math.max(0, maxRanks)} ranks to this skill.`);
       }
 
       // Store current value for next comparison
@@ -1255,6 +1270,69 @@ function populateProfessions() {
 }
 
 /**
+ * Count how many optional core skills are currently selected (not counting profession core skills)
+ */
+function countOptionalCoreSkills() {
+  const profIndex = parseInt(document.getElementById("profession").value);
+  if (isNaN(profIndex) || profIndex < 0 || profIndex >= professions.length) {
+    return 0;
+  }
+  
+  const prof = professions[profIndex];
+  let optionalCount = 0;
+  
+  document.querySelectorAll("#skillsBody tr").forEach((row) => {
+    const index = parseInt(row.dataset.skillIndex);
+    const skill = skills[index];
+    const coreCheckbox = row.querySelector(".skill-core-checkbox");
+    
+    if (coreCheckbox && coreCheckbox.checked && !coreCheckbox.disabled) {
+      // This is an optional core skill (checked but not disabled/pre-defined)
+      optionalCount++;
+    }
+  });
+  
+  return optionalCount;
+}
+
+/**
+ * Update the core skills selection limit display and validation
+ */
+function updateCoreSkillsLimit() {
+  const optionalCount = countOptionalCoreSkills();
+  const professionInfo = document.getElementById("profession-info");
+  
+  if (professionInfo) {
+    // Update the text to show current selection count
+    const limitText = professionInfo.querySelector('.core-skills-limit');
+    if (limitText) {
+      limitText.textContent = `+ three more skills of your choice (${optionalCount}/3 selected)`;
+      if (optionalCount >= 3) {
+        limitText.style.color = '#d32f2f';
+        limitText.style.fontWeight = 'bold';
+      } else {
+        limitText.style.color = '#666';
+        limitText.style.fontWeight = 'normal';
+      }
+    }
+  }
+  
+  // Enable/disable unchecked optional core skill checkboxes based on limit
+  document.querySelectorAll("#skillsBody tr").forEach((row) => {
+    const coreCheckbox = row.querySelector(".skill-core-checkbox");
+    if (coreCheckbox && !coreCheckbox.disabled && !coreCheckbox.checked) {
+      // This is an unchecked optional core skill
+      coreCheckbox.disabled = optionalCount >= 3;
+      if (optionalCount >= 3) {
+        coreCheckbox.title = "Maximum of 3 optional core skills already selected";
+      } else {
+        coreCheckbox.title = "Mark as additional core skill for your profession";
+      }
+    }
+  });
+}
+
+/**
  * Display information about the selected profession including its core skills and description.
  * Also auto-check the core skill checkboxes for the profession's pre-defined skills.
  */
@@ -1263,7 +1341,7 @@ function updateProfessionInfo() {
   const prof = professions[profIndex];
   const infoDiv = document.getElementById("profession-info");
   const coreList = prof.coreSkills.map((s) => `<li>${s}</li>`).join("");
-  infoDiv.innerHTML = `<p><strong>Core Skills:</strong></p><ul>${coreList}</ul><p style="font-style: italic; color: #666; margin-top: 0.5rem;">+ three more skills of your choice</p><p class="desc">${prof.description}</p>`;
+  infoDiv.innerHTML = `<p><strong>Core Skills:</strong></p><ul>${coreList}</ul><p class="core-skills-limit" style="font-style: italic; color: #666; margin-top: 0.5rem;">+ three more skills of your choice (0/3 selected)</p><p class="desc">${prof.description}</p>`;
 
   // Update core skill checkboxes: disable and check profession core skills
   document.querySelectorAll("#skillsBody tr").forEach((row) => {
@@ -1289,6 +1367,9 @@ function updateProfessionInfo() {
       coreCheckbox.title = "Mark as additional core skill for your profession";
     }
   });
+  
+  // Update the core skills limit display and validation
+  updateCoreSkillsLimit();
 }
 
 /**
@@ -1412,6 +1493,7 @@ function attachEventHandlers() {
     checkbox.addEventListener("change", () => {
       updateSkillsTotals();
       updateSkillsHighlight();
+      updateCoreSkillsLimit();
     });
   });
   // Feat selections
@@ -1425,6 +1507,8 @@ function attachEventHandlers() {
   });
   // Save character
   document.getElementById("saveButton").addEventListener("click", () => saveCharacter());
+  // Export character to file
+  document.getElementById("exportButton").addEventListener("click", () => exportCharacterToFile());
   // Load character
   document.getElementById("loadButton").addEventListener("click", () => loadCharacter());
   // Delete character
@@ -1715,7 +1799,7 @@ function updateSanity() {
   // Find Cthulhu Mythos ranks
   let mythosRanks = 0;
   document.querySelectorAll("#skillsBody tr").forEach((row) => {
-    const skillName = row.querySelector(".skill-name").textContent;
+    const skillName = row.querySelector(".skill-name").textContent.replace(/⚠/g, '').trim();
     if (skillName === "Cthulhu Mythos") {
       mythosRanks = parseInt(row.querySelector(".skill-ranks").value) || 0;
     }
@@ -1726,12 +1810,22 @@ function updateSanity() {
   document.getElementById("sanityMax").textContent = maxSanity;
   document.getElementById("sanity20").textContent = twentyPercent;
 
-  // Auto-set current sanity to starting sanity if empty or 0
+  // Auto-sync current sanity based on mode
   const currentSanityInput = document.getElementById("currentSanity");
   const currentSanityValue = parseInt(currentSanityInput.value) || 0;
-  // Only auto-set if current is 0 or empty
-  if (currentSanityValue === 0 || currentSanityInput.value.trim() === "") {
+  
+  // In creation mode, always sync current sanity to starting sanity
+  // In gameplay mode, only auto-fill if empty or 0
+  const isCreationMode = !document.body.classList.contains('gameplay-mode');
+  
+  if (isCreationMode) {
+    // During character creation, always keep current sanity synced to starting sanity
     currentSanityInput.value = startingSanity;
+  } else {
+    // During gameplay, only auto-set if current is 0 or empty
+    if (currentSanityValue === 0 || currentSanityInput.value.trim() === "") {
+      currentSanityInput.value = startingSanity;
+    }
   }
 }
 
@@ -1817,7 +1911,9 @@ function calculateSynergyBonuses() {
 function updateSkillsTotals() {
   const featBonuses = getFeatBonuses();
   const synergyBonuses = calculateSynergyBonuses();
-  const prof = professions[parseInt(document.getElementById("profession").value)];
+  const professionElement = document.getElementById("profession");
+  const professionIndex = professionElement ? parseInt(professionElement.value) : 0;
+  const prof = professions[professionIndex] || professions[0]; // Default to first profession if invalid
 
   document.querySelectorAll("#skillsBody tr").forEach((row) => {
     const index = parseInt(row.dataset.skillIndex);
@@ -1832,6 +1928,22 @@ function updateSkillsTotals() {
     const total = ranks + misc + abilityMod + featBonus + synergyBonus;
     const totalCell = row.querySelector(".skill-total");
     totalCell.textContent = total >= 0 ? `+${total}` : `${total}`;
+
+    // Create detailed tooltip showing the math breakdown
+    const tooltipParts = [];
+    if (ranks > 0) tooltipParts.push(`${ranks} ranks`);
+    if (misc !== 0) tooltipParts.push(`${misc >= 0 ? '+' : ''}${misc} misc`);
+    if (abilityMod !== 0) tooltipParts.push(`${abilityMod >= 0 ? '+' : ''}${abilityMod} ${abilityCode} mod`);
+    if (featBonus !== 0) tooltipParts.push(`${featBonus >= 0 ? '+' : ''}${featBonus} feat bonus`);
+    if (synergyBonus !== 0) tooltipParts.push(`${synergyBonus >= 0 ? '+' : ''}${synergyBonus} synergy`);
+    
+    // If no components, show base calculation
+    if (tooltipParts.length === 0) {
+      tooltipParts.push('0 ranks', `${abilityMod >= 0 ? '+' : ''}${abilityMod} ${abilityCode} mod`);
+    }
+    
+    const tooltipText = `${skill.name}: ${tooltipParts.join(' ')} = ${total >= 0 ? '+' : ''}${total}`;
+    totalCell.title = tooltipText;
 
     // Add synergy indicator if applicable
     if (synergyBonus > 0) {
@@ -1865,6 +1977,8 @@ function updateSkillsTotals() {
  */
 function updateSkillsHighlight() {
   updateSkillsTotals();
+  updateSkillPointsTracker();
+  updateCoreSkillsLimit();
 }
 
 /**
@@ -1918,12 +2032,111 @@ function saveCharacter() {
   document.querySelectorAll("#featsContainer input[type=checkbox]").forEach((cb) => {
     if (cb.checked) character.feats.push(parseInt(cb.dataset.featIndex));
   });
+  // Equipment
+  character.weapons = weapons || [];
+  character.equipment = equipment || [];
+  character.armor = {
+    preset: document.getElementById("armorPreset").value,
+    name: document.getElementById("armorName").value,
+    bonus: document.getElementById("armorBonus").value,
+    maxDex: document.getElementById("armorMaxDex").value,
+    checkPenalty: document.getElementById("armorCheckPenalty").value,
+    weight: document.getElementById("armorWeight").value
+  };
+  character.shield = {
+    preset: document.getElementById("shieldPreset").value,
+    name: document.getElementById("shieldName").value,
+    bonus: document.getElementById("shieldBonus").value,
+    checkPenalty: document.getElementById("shieldCheckPenalty").value,
+    weight: document.getElementById("shieldWeight").value
+  };
+  character.speed = document.getElementById("speed").value;
+  character.currentMoney = document.getElementById("currentMoney").value;
+  character.sessionNotes = document.getElementById("sessionNotes").value;
   // Load existing storage, update and save
   const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
   stored[name] = character;
   localStorage.setItem("cocd20_characters", JSON.stringify(stored));
   populateSavedCharacters();
   alert(`Character '${name}' saved.`);
+}
+
+/**
+ * Save character silently (without alert popup) for auto-save functionality
+ */
+function saveCharacterSilent() {
+  updateAll();
+  const name = document.getElementById("charName").value.trim();
+  if (!name) {
+    return; // Don't save if no name
+  }
+  // Build character object (same as saveCharacter but without alert)
+  const character = {
+    playerName: document.getElementById("playerName").value,
+    age: document.getElementById("age").value,
+    ageCategory: document.getElementById("ageCategory").value,
+    gender: document.getElementById("gender").value,
+    profession: parseInt(document.getElementById("profession").value),
+    level: document.getElementById("level").value,
+    attackOption: document.getElementById("attackOption").value,
+    goodSaves: {
+      fort: document.getElementById("goodFort").checked,
+      ref: document.getElementById("goodRef").checked,
+      will: document.getElementById("goodWill").checked,
+    },
+    era: document.getElementById("era").value,
+    hitPoints: document.getElementById("hitPoints").value,
+    currentHP: document.getElementById("currentHP").value,
+    currentSanity: document.getElementById("currentSanity").value,
+    insanityState: document.getElementById("insanityState").value,
+    abilities: {},
+    skills: [],
+    feats: [],
+  };
+  // Abilities
+  document.querySelectorAll(".ability-score").forEach((input) => {
+    character.abilities[input.dataset.ability] = input.value;
+  });
+  // Skills
+  document.querySelectorAll("#skillsBody tr").forEach((row) => {
+    const index = parseInt(row.dataset.skillIndex);
+    const ranks = row.querySelector(".skill-ranks").value;
+    const misc = row.querySelector(".skill-misc").value;
+    const coreCheckbox = row.querySelector(".skill-core-checkbox");
+    const isCustomCore = coreCheckbox && coreCheckbox.checked && !coreCheckbox.disabled;
+    character.skills.push({ index, ranks, misc, isCustomCore });
+  });
+  // Feats
+  document.querySelectorAll("#featsContainer input[type=checkbox]").forEach((cb) => {
+    if (cb.checked) character.feats.push(parseInt(cb.dataset.featIndex));
+  });
+  // Equipment
+  character.weapons = weapons || [];
+  character.equipment = equipment || [];
+  character.armor = {
+    preset: document.getElementById("armorPreset").value,
+    name: document.getElementById("armorName").value,
+    bonus: document.getElementById("armorBonus").value,
+    maxDex: document.getElementById("armorMaxDex").value,
+    checkPenalty: document.getElementById("armorCheckPenalty").value,
+    weight: document.getElementById("armorWeight").value
+  };
+  character.shield = {
+    preset: document.getElementById("shieldPreset").value,
+    name: document.getElementById("shieldName").value,
+    bonus: document.getElementById("shieldBonus").value,
+    checkPenalty: document.getElementById("shieldCheckPenalty").value,
+    weight: document.getElementById("shieldWeight").value
+  };
+  character.speed = document.getElementById("speed").value;
+  character.currentMoney = document.getElementById("currentMoney").value;
+  character.sessionNotes = document.getElementById("sessionNotes").value;
+  // Load existing storage, update and save
+  const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+  stored[name] = character;
+  localStorage.setItem("cocd20_characters", JSON.stringify(stored));
+  populateSavedCharacters();
+  // No alert for silent save
 }
 
 /**
@@ -1979,6 +2192,35 @@ function loadCharacter() {
     const idx = parseInt(cb.dataset.featIndex);
     cb.checked = character.feats.includes(idx);
   });
+  // Equipment
+  weapons = character.weapons || [];
+  equipment = character.equipment || [];
+  if (character.armor) {
+    document.getElementById("armorPreset").value = character.armor.preset || "none";
+    document.getElementById("armorName").value = character.armor.name || "";
+    document.getElementById("armorBonus").value = character.armor.bonus || 0;
+    document.getElementById("armorMaxDex").value = character.armor.maxDex || 99;
+    document.getElementById("armorCheckPenalty").value = character.armor.checkPenalty || 0;
+    document.getElementById("armorWeight").value = character.armor.weight || 0;
+  }
+  if (character.shield) {
+    document.getElementById("shieldPreset").value = character.shield.preset || "none";
+    document.getElementById("shieldName").value = character.shield.name || "";
+    document.getElementById("shieldBonus").value = character.shield.bonus || 0;
+    document.getElementById("shieldCheckPenalty").value = character.shield.checkPenalty || 0;
+    document.getElementById("shieldWeight").value = character.shield.weight || 0;
+  }
+  document.getElementById("speed").value = character.speed || 30;
+  document.getElementById("currentMoney").value = character.currentMoney || 0;
+  document.getElementById("sessionNotes").value = character.sessionNotes || "";
+  // Render equipment (if equipment system is initialized)
+  if (typeof renderWeapons === "function") {
+    renderWeapons();
+    renderEquipment();
+    updateArmorClass();
+    updateInitiative();
+    updateEncumbrance();
+  }
   updateAll();
   updateSelectedFeatsSummary();
   alert(`Character '${name}' loaded.`);
@@ -2005,6 +2247,114 @@ function deleteCharacter() {
 }
 
 /**
+ * Export the current character to a downloadable JSON file
+ */
+function exportCharacterToFile() {
+  const name = document.getElementById("charName").value.trim();
+  if (!name) {
+    alert("Please enter a character name before exporting.");
+    return;
+  }
+  
+  // Use the silent save function to build the character object
+  saveCharacterSilent();
+  
+  // Get the character data from localStorage
+  const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+  const character = stored[name];
+  
+  if (!character) {
+    alert("Character not found. Please save the character first.");
+    return;
+  }
+  
+  // Add metadata to the export
+  const exportData = {
+    characterName: name,
+    exportDate: new Date().toISOString(),
+    appVersion: "Call of Cthulhu d20 Character Sheet v1.0",
+    character: character
+  };
+  
+  // Create and download the file
+  const dataStr = JSON.stringify(exportData, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(dataBlob);
+  link.download = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_character.json`;
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  alert(`Character '${name}' exported successfully!`);
+}
+
+/**
+ * Import a character from a JSON file
+ */
+function importCharacterFromFile() {
+  const fileInput = document.getElementById('importFileInput');
+  fileInput.click();
+}
+
+/**
+ * Handle the file selection for import
+ */
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  if (!file.name.endsWith('.json')) {
+    alert('Please select a valid JSON file.');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const importData = JSON.parse(e.target.result);
+      
+      // Validate the import data structure
+      if (!importData.character || !importData.characterName) {
+        alert('Invalid character file format.');
+        return;
+      }
+      
+      const characterName = importData.characterName;
+      const characterData = importData.character;
+      
+      // Check if character already exists
+      const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+      if (stored[characterName]) {
+        if (!confirm(`A character named '${characterName}' already exists. Do you want to overwrite it?`)) {
+          return;
+        }
+      }
+      
+      // Save the imported character
+      stored[characterName] = characterData;
+      localStorage.setItem("cocd20_characters", JSON.stringify(stored));
+      
+      alert(`Character '${characterName}' imported successfully!`);
+      
+      // Return to dashboard and refresh the character list
+      showCharacterSelection();
+      
+    } catch (error) {
+      alert('Error reading character file. Please ensure it is a valid character export.');
+      console.error('Import error:', error);
+    }
+  };
+  
+  reader.readAsText(file);
+  
+  // Clear the file input for future use
+  event.target.value = '';
+}
+
+/**
  * Update all calculated fields. Called after loading or saving characters and
  * when the page first loads.
  */
@@ -2016,6 +2366,7 @@ function updateAll() {
   updateSkillPointsTracker();
   updateFeatCounter();
   updateInsanityNotes();
+  updateGameplayDashboard();
 }
 
 /**
@@ -2407,6 +2758,29 @@ function initializeGameplayPanel() {
   });
   // Insanity state changes
   document.getElementById('insanityState').addEventListener('change', updateInsanityNotes);
+  
+  // Session notes save button
+  const saveSessionBtn = document.getElementById('saveSessionBtn');
+  if (saveSessionBtn) {
+    saveSessionBtn.addEventListener('click', () => {
+      const charName = document.getElementById("charName").value.trim();
+      if (charName) {
+        saveCharacterSilent();
+        
+        // Provide visual feedback
+        const originalText = saveSessionBtn.textContent;
+        saveSessionBtn.textContent = '✅ Saved!';
+        saveSessionBtn.style.backgroundColor = '#4caf50';
+        
+        setTimeout(() => {
+          saveSessionBtn.textContent = originalText;
+          saveSessionBtn.style.backgroundColor = '';
+        }, 2000);
+      } else {
+        alert('Please enter a character name to save session notes.');
+      }
+    });
+  }
 }
 
 /**
@@ -2498,6 +2872,12 @@ function applyDamage(amount) {
   const newHP = Math.max(0, current - amount);
   currentHPInput.value = newHP;
   updateGameplayPanel();
+  
+  // Auto-save the character with updated HP (silent)
+  const charName = document.getElementById("charName").value.trim();
+  if (charName) {
+    saveCharacterSilent();
+  }
 }
 
 /**
@@ -2510,6 +2890,12 @@ function healDamage(amount) {
   const newHP = Math.min(maxHP, current + amount);
   currentHPInput.value = newHP;
   updateGameplayPanel();
+  
+  // Auto-save the character with updated HP (silent)
+  const charName = document.getElementById("charName").value.trim();
+  if (charName) {
+    saveCharacterSilent();
+  }
 }
 
 /**
@@ -2522,6 +2908,12 @@ function applySanityLoss(amount) {
   currentSanityInput.value = newSanity;
   updateGameplayPanel();
   updateSanity();
+  
+  // Auto-save the character with updated Sanity (silent)
+  const charName = document.getElementById("charName").value.trim();
+  if (charName) {
+    saveCharacterSilent();
+  }
 }
 
 /**
@@ -2529,81 +2921,115 @@ function applySanityLoss(amount) {
  */
 function restoreSanity(amount) {
   const currentSanityInput = document.getElementById('currentSanity');
-  const maxSanity = parseInt(document.getElementById('sanityMax').textContent) || 99;
+  const maxSanity = parseInt(document.getElementById('sanityMax')?.textContent) || 
+                   parseInt(document.getElementById('sanityStarting')?.textContent) || 99;
   const current = parseInt(currentSanityInput.value) || 0;
   const newSanity = Math.min(maxSanity, current + amount);
   currentSanityInput.value = newSanity;
   updateGameplayPanel();
   updateSanity();
+  
+  // Auto-save the character with updated Sanity (silent)
+  const charName = document.getElementById("charName").value.trim();
+  if (charName) {
+    saveCharacterSilent();
+  }
 }
 
 /**
  * Update the gameplay panel with current stats
  */
 function updateGameplayPanel() {
+  // Update character name display in gameplay mode
+  const characterName = document.getElementById('charName')?.value?.trim() || 'Unknown Character';
+  const gameplayCharacterName = document.getElementById('gameplayCharacterName');
+  if (gameplayCharacterName) {
+    gameplayCharacterName.textContent = characterName;
+  }
+
   // Update HP display
-  const currentHP = parseInt(document.getElementById('currentHP').value) || 0;
-  const maxHP = parseInt(document.getElementById('hitPoints').value) || 0;
+  const currentHP = parseInt(document.getElementById('currentHP')?.value) || 0;
+  const maxHP = parseInt(document.getElementById('hitPoints')?.value) || 0;
 
-  document.getElementById('displayCurrentHP').textContent = currentHP;
-  document.getElementById('displayMaxHP').textContent = maxHP;
+  const displayCurrentHP = document.getElementById('displayCurrentHP');
+  const displayMaxHP = document.getElementById('displayMaxHP');
+  const hpPercentage = document.getElementById('hpPercentage');
+  const hpBar = document.getElementById('hpBar');
 
-  const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 100;
-  document.getElementById('hpPercentage').textContent = `${Math.round(hpPercentage)}%`;
+  if (displayCurrentHP) displayCurrentHP.textContent = currentHP;
+  if (displayMaxHP) displayMaxHP.textContent = maxHP;
+
+  const hpPercent = maxHP > 0 ? (currentHP / maxHP) * 100 : 100;
+  if (hpPercentage) hpPercentage.textContent = `${Math.round(hpPercent)}%`;
 
   // Update HP bar
-  const hpBar = document.getElementById('hpBar');
-  hpBar.style.width = `${hpPercentage}%`;
-  hpBar.className = 'vital-bar';
-
-  const hpCurrent = document.getElementById('displayCurrentHP');
-  hpCurrent.className = 'vital-current';
-
-  if (hpPercentage <= 25) {
-    hpBar.classList.add('danger');
-    hpCurrent.classList.add('danger');
-  } else if (hpPercentage <= 50) {
-    hpBar.classList.add('warning');
-    hpCurrent.classList.add('warning');
+  if (hpBar) {
+    hpBar.style.width = `${hpPercent}%`;
+    hpBar.className = 'vital-bar'; // Reset classes first
+    if (displayCurrentHP) displayCurrentHP.className = 'vital-current'; // Reset classes first
+    
+    if (hpPercent <= 25) {
+      hpBar.classList.add('danger');
+      if (displayCurrentHP) displayCurrentHP.classList.add('danger');
+    } else if (hpPercent <= 50) {
+      hpBar.classList.add('warning');
+      if (displayCurrentHP) displayCurrentHP.classList.add('warning');
+    }
   }
 
   // Update Sanity display
-  const currentSanity = parseInt(document.getElementById('currentSanity').value) || 0;
-  const maxSanity = parseInt(document.getElementById('sanityMax').textContent) || 99;
-  const sanity20 = parseInt(document.getElementById('sanity20').textContent) || 0;
+  const currentSanity = parseInt(document.getElementById('currentSanity')?.value) || 0;
+  const maxSanity = parseInt(document.getElementById('sanityMax')?.textContent) || 
+                   parseInt(document.getElementById('sanityStarting')?.textContent) || 99;
+  
+  const displayCurrentSanity = document.getElementById('displayCurrentSanity');
+  const displayMaxSanity = document.getElementById('displayMaxSanity');
+  const displaySanity20 = document.getElementById('displaySanity20');
+  const sanityPercentageElement = document.getElementById('sanityPercentage');
 
-  document.getElementById('displayCurrentSanity').textContent = currentSanity;
-  document.getElementById('displayMaxSanity').textContent = maxSanity;
-  document.getElementById('displaySanity20').textContent = sanity20;
+  if (displayCurrentSanity) displayCurrentSanity.textContent = currentSanity;
+  if (displayMaxSanity) displayMaxSanity.textContent = maxSanity;
+  if (displaySanity20) displaySanity20.textContent = Math.floor(maxSanity * 0.2);
 
-  const sanityPercentage = maxSanity > 0 ? (currentSanity / maxSanity) * 100 : 100;
-  document.getElementById('sanityPercentage').textContent = `${Math.round(sanityPercentage)}%`;
+  const sanityPercent = maxSanity > 0 ? (currentSanity / maxSanity) * 100 : 100;
+  if (sanityPercentageElement) sanityPercentageElement.textContent = `${Math.round(sanityPercent)}%`;
 
   // Update Sanity bar
   const sanityBar = document.getElementById('sanityBar');
-  sanityBar.style.width = `${sanityPercentage}%`;
-  sanityBar.className = 'vital-bar sanity';
+  if (sanityBar) {
+    sanityBar.style.width = `${sanityPercent}%`;
+    sanityBar.className = 'vital-bar sanity-bar';
+  }
 
   const sanityCurrent = document.getElementById('displayCurrentSanity');
-  sanityCurrent.className = 'vital-current';
+  if (sanityCurrent) {
+    sanityCurrent.className = 'vital-current';
+  }
 
   const thresholdDisplay = document.getElementById('sanityThresholdDisplay');
-  thresholdDisplay.className = 'sanity-threshold';
+  if (thresholdDisplay) {
+    thresholdDisplay.className = 'sanity-threshold';
+  }
 
-  if (currentSanity <= sanity20) {
-    sanityBar.classList.add('danger');
-    sanityCurrent.classList.add('danger');
-    thresholdDisplay.classList.add('below-threshold');
-  } else if (sanityPercentage <= 50) {
-    sanityBar.classList.add('warning');
-    sanityCurrent.classList.add('warning');
+  const sanity20Threshold = Math.floor(maxSanity * 0.2);
+  if (currentSanity <= sanity20Threshold) {
+    if (sanityBar) sanityBar.classList.add('danger');
+    if (sanityCurrent) sanityCurrent.classList.add('danger');
+    if (thresholdDisplay) thresholdDisplay.classList.add('below-threshold');
+  } else if (sanityPercent <= 50) {
+    if (sanityBar) sanityBar.classList.add('warning');
+    if (sanityCurrent) sanityCurrent.classList.add('warning');
   }
 
   // Update combat stats
-  const baseAttackText = document.getElementById('baseAttack').textContent;
-  document.getElementById('displayBaseAttack').textContent = baseAttackText;
+  const baseAttackElement = document.getElementById('baseAttackDisplay');
+  const displayBaseAttack = document.getElementById('displayBaseAttack');
+  if (baseAttackElement && displayBaseAttack) {
+    displayBaseAttack.textContent = baseAttackElement.textContent;
+  }
 
   // Calculate melee and ranged attack
+  const baseAttackText = baseAttackElement?.textContent || '+0';
   const baseAttackValue = parseInt(baseAttackText.replace(/[^0-9-]/g, '')) || 0;
   const strMod = abilityMods.Str || 0;
   const dexMod = abilityMods.Dex || 0;
@@ -2611,13 +3037,23 @@ function updateGameplayPanel() {
   const meleeAttack = baseAttackValue + strMod;
   const rangedAttack = baseAttackValue + dexMod;
 
-  document.getElementById('displayMeleeAttack').textContent = formatBonus(meleeAttack);
-  document.getElementById('displayRangedAttack').textContent = formatBonus(rangedAttack);
+  const displayMeleeAttack = document.getElementById('displayMeleeAttack');
+  const displayRangedAttack = document.getElementById('displayRangedAttack');
+  if (displayMeleeAttack) displayMeleeAttack.textContent = formatBonus(meleeAttack);
+  if (displayRangedAttack) displayRangedAttack.textContent = formatBonus(rangedAttack);
 
   // Update saves
-  document.getElementById('displayFortSave').textContent = document.getElementById('fortSave').textContent;
-  document.getElementById('displayRefSave').textContent = document.getElementById('refSave').textContent;
-  document.getElementById('displayWillSave').textContent = document.getElementById('willSave').textContent;
+  const fortSaveElement = document.getElementById('fortSaveDisplay');
+  const refSaveElement = document.getElementById('refSaveDisplay');
+  const willSaveElement = document.getElementById('willSaveDisplay');
+  
+  const displayFortSave = document.getElementById('displayFortSave');
+  const displayRefSave = document.getElementById('displayRefSave');
+  const displayWillSave = document.getElementById('displayWillSave');
+  
+  if (fortSaveElement && displayFortSave) displayFortSave.textContent = fortSaveElement.textContent;
+  if (refSaveElement && displayRefSave) displayRefSave.textContent = refSaveElement.textContent;
+  if (willSaveElement && displayWillSave) displayWillSave.textContent = willSaveElement.textContent;
 }
 
 /**
@@ -2672,16 +3108,24 @@ function filterSkills(searchTerm, filterType) {
     const skillName = row.querySelector('.skill-name').textContent.replace(/⚠/g, '').trim();
 
     // Check if this skill matches any profession core skill (comparing base names)
-    const isProfessionSkill = prof.coreSkills.some(profSkill => {
-      const baseSkillName = getBaseSkillName(profSkill);
-      return baseSkillName === skillName;
-    });
+    let isProfessionSkill = false;
+    if (prof && prof.coreSkills) {
+      isProfessionSkill = prof.coreSkills.some(profSkill => {
+        const baseSkillName = getBaseSkillName(profSkill);
+        return baseSkillName === skillName;
+      });
+    }
+    
+    // Also check if manually marked as core skill
+    const coreCheckbox = row.querySelector('.skill-core-checkbox');
+    const isUserMarkedCore = coreCheckbox && coreCheckbox.checked;
+    const isCoreSkill = isProfessionSkill || isUserMarkedCore;
 
     // Check if matches search
     const matchesSearch = searchTerm === '' || skillName.toLowerCase().includes(searchTerm);
 
     // Check if matches filter
-    const matchesFilter = filterType === 'all' || (filterType === 'profession' && isProfessionSkill);
+    const matchesFilter = filterType === 'all' || (filterType === 'profession' && isCoreSkill);
 
     // Show/hide row
     if (matchesSearch && matchesFilter) {
@@ -2734,11 +3178,819 @@ loadCharacter = function() {
   updateInsanityNotes();
 };
 
+// =====================================
+// ENHANCED DUAL MODE SYSTEM
+// =====================================
+
+let currentMode = 'creation'; // 'creation' or 'gameplay'
+let creationProgress = {
+  basics: false,
+  abilities: false,
+  skills: false,
+  feats: false,
+  equipment: false
+};
+
+function initializeDualModeSystem() {
+  const creationModeBtn = document.getElementById('creationModeBtn');
+  const gameplayModeBtn = document.getElementById('gameplayModeBtn');
+  const modeSlider = document.getElementById('modeSlider');
+  
+  if (!creationModeBtn || !gameplayModeBtn) return;
+  
+  // Initialize mode toggle buttons
+  creationModeBtn.addEventListener('click', function() {
+    if (currentMode !== 'creation') {
+      toggleMode();
+    }
+  });
+  
+  gameplayModeBtn.addEventListener('click', function() {
+    if (currentMode !== 'gameplay') {
+      toggleMode();
+    }
+  });
+  
+  // Initialize progress step navigation
+  const progressSteps = document.querySelectorAll('.progress-step');
+  progressSteps.forEach(step => {
+    step.addEventListener('click', function() {
+      if (currentMode === 'creation') {
+        const stepName = this.dataset.step;
+        navigateToStep(stepName);
+      }
+    });
+  });
+  
+  // Initialize character quick info update
+  updateCharacterQuickInfo();
+  updateCreationProgress();
+  updateGameplayDashboard();
+  
+  // Initialize gameplay panel event handlers
+  initializeGameplayPanel();
+  
+  // Update displays every 2 seconds when in gameplay mode
+  setInterval(() => {
+    if (currentMode === 'gameplay') {
+      updateGameplayDashboard();
+    }
+    updateCharacterQuickInfo();
+  }, 2000);
+}
+
+function toggleMode() {
+  currentMode = currentMode === 'creation' ? 'gameplay' : 'creation';
+  
+  const body = document.body;
+  const creationModeBtn = document.getElementById('creationModeBtn');
+  const gameplayModeBtn = document.getElementById('gameplayModeBtn');
+  const modeSlider = document.getElementById('modeSlider');
+  
+  if (currentMode === 'gameplay') {
+    body.classList.add('gameplay-mode');
+    creationModeBtn.classList.remove('active');
+    gameplayModeBtn.classList.add('active');
+    if (modeSlider) {
+      modeSlider.style.transform = 'translateX(100%)';
+    }
+    updateGameplayDashboard();
+  } else {
+    body.classList.remove('gameplay-mode');
+    creationModeBtn.classList.add('active');
+    gameplayModeBtn.classList.remove('active');
+    if (modeSlider) {
+      modeSlider.style.transform = 'translateX(0%)';
+    }
+    updateCreationProgress();
+  }
+  
+  // Save mode preference
+  localStorage.setItem('cocd20_currentMode', currentMode);
+}
+
+function navigateToStep(stepName) {
+  const section = document.querySelector(`section[data-step="${stepName}"]`);
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    // Update active step
+    document.querySelectorAll('.progress-step').forEach(step => {
+      step.classList.remove('active');
+    });
+    
+    const progressStep = document.querySelector(`.progress-step[data-step="${stepName}"]`);
+    if (progressStep) {
+      progressStep.classList.add('active');
+    }
+  }
+}
+
+function updateCharacterQuickInfo() {
+  const elements = {
+    level: document.getElementById('quickLevel'),
+    profession: document.getElementById('quickProfession'),
+    hp: document.getElementById('quickHP'),
+    sanity: document.getElementById('quickSanity')
+  };
+  
+  // Only update if all elements exist
+  if (!elements.level || !elements.profession || !elements.hp || !elements.sanity) return;
+  
+  const level = document.getElementById('level')?.value || '1';
+  const professionSelect = document.getElementById('profession');
+  const profession = professionSelect?.selectedOptions[0]?.textContent || 'No Profession';
+  const currentHP = document.getElementById('currentHP')?.value || '0';
+  const maxHP = document.getElementById('totalHP')?.textContent || '0';
+  const currentSanity = document.getElementById('currentSanity')?.value || '0';
+  const maxSanity = document.getElementById('sanityMax')?.textContent || '0';
+  
+  elements.level.textContent = level;
+  elements.profession.textContent = profession === 'No Profession' ? '—' : profession;
+  elements.hp.textContent = `${currentHP}/${maxHP}`;
+  elements.sanity.textContent = `${currentSanity}/${maxSanity}`;
+}
+
+function updateCreationProgress() {
+  // Check completion of each step
+  creationProgress.basics = checkBasicsComplete();
+  creationProgress.abilities = checkAbilitiesComplete();
+  creationProgress.skills = checkSkillsComplete();
+  creationProgress.feats = checkFeatsComplete();
+  creationProgress.equipment = checkEquipmentComplete();
+  
+  // Update visual progress indicators
+  Object.keys(creationProgress).forEach(stepName => {
+    const stepElement = document.querySelector(`.progress-step[data-step="${stepName}"]`);
+    if (stepElement) {
+      stepElement.classList.toggle('completed', creationProgress[stepName]);
+    }
+  });
+  
+  // Count total progress
+  const completedSteps = Object.values(creationProgress).filter(Boolean).length;
+  const totalSteps = Object.keys(creationProgress).length;
+  
+  // Update any progress indicators if they exist
+  const progressText = document.getElementById('progressText');
+  if (progressText) {
+    progressText.textContent = `${completedSteps}/${totalSteps} Complete`;
+  }
+}
+
+function checkBasicsComplete() {
+  const charName = document.getElementById('charName')?.value;
+  const profession = document.getElementById('profession')?.value;
+  const level = document.getElementById('level')?.value;
+  
+  return !!(charName && profession && level);
+}
+
+function checkAbilitiesComplete() {
+  const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+  return abilities.every(ability => {
+    const input = document.getElementById(ability);
+    return input && input.value && parseInt(input.value) >= 3;
+  });
+}
+
+function checkSkillsComplete() {
+  // Check if player has allocated some skill points
+  const skillInputs = document.querySelectorAll('#skillsTable input[type="number"]');
+  return Array.from(skillInputs).some(input => input.value && parseInt(input.value) > 0);
+}
+
+function checkFeatsComplete() {
+  // Feats are optional, so always return true
+  // But we could check if they've selected at least one if desired
+  return true;
+}
+
+function checkEquipmentComplete() {
+  // Check if they have at least one weapon or piece of equipment
+  const weapons = window.weapons || [];
+  const equipment = window.equipment || [];
+  return weapons.length > 0 || equipment.length > 0;
+}
+
+function updateGameplayDashboard() {
+  // Update character name display in gameplay mode
+  const characterName = document.getElementById('charName')?.value?.trim() || 'Unknown Character';
+  const gameplayCharacterName = document.getElementById('gameplayCharacterName');
+  if (gameplayCharacterName) {
+    gameplayCharacterName.textContent = characterName;
+  }
+  
+  updateVitalsDashboard();
+  updateCombatDashboard();
+  updateSkillsDashboard();
+  updateSessionDashboard();
+}
+
+function updateVitalsDashboard() {
+  // Update HP
+  const currentHP = document.getElementById('currentHP')?.value || 0;
+  const maxHP = document.getElementById('hitPoints')?.value || 0;
+  
+  const hpCurrentElement = document.getElementById('displayCurrentHP');
+  const hpMaxElement = document.getElementById('displayMaxHP');
+  const hpBar = document.getElementById('hpBar');
+  const hpPercentage = document.getElementById('hpPercentage');
+  
+  if (hpCurrentElement && hpMaxElement) {
+    hpCurrentElement.textContent = currentHP;
+    hpMaxElement.textContent = maxHP;
+    
+    const hpPercent = maxHP > 0 ? (currentHP / maxHP) * 100 : 100;
+    if (hpBar) {
+      hpBar.style.width = `${hpPercent}%`;
+      hpBar.className = 'vital-bar'; // Reset classes first
+      hpCurrentElement.className = 'vital-current'; // Reset classes first
+      
+      if (hpPercent <= 25) {
+        hpBar.classList.add('danger');
+        hpCurrentElement.classList.add('danger');
+      } else if (hpPercent <= 50) {
+        hpBar.classList.add('warning');
+        hpCurrentElement.classList.add('warning');
+      }
+    }
+    
+    if (hpPercentage) {
+      hpPercentage.textContent = `${Math.round(hpPercent)}%`;
+    }
+  }
+  
+  // Update Sanity
+  const currentSanity = document.getElementById('currentSanity')?.value || 0;
+  const maxSanity = document.getElementById('sanityMax')?.textContent || 
+                   document.getElementById('sanityStarting')?.textContent || 99;
+  
+  const sanityCurrentElement = document.getElementById('displayCurrentSanity');
+  const sanityMaxElement = document.getElementById('displayMaxSanity');
+  const sanityBar = document.getElementById('sanityBar');
+  const sanityPercentage = document.getElementById('sanityPercentage');
+  const sanity20Element = document.getElementById('quickSanity20');
+  
+  if (sanityCurrentElement && sanityMaxElement) {
+    sanityCurrentElement.textContent = currentSanity;
+    sanityMaxElement.textContent = maxSanity;
+    
+    const sanity20Threshold = Math.floor(maxSanity * 0.2);
+    if (sanity20Element) {
+      sanity20Element.textContent = sanity20Threshold;
+    }
+    
+    const sanityPercent = maxSanity > 0 ? (currentSanity / maxSanity) * 100 : 100;
+    if (sanityBar) {
+      sanityBar.style.width = `${sanityPercent}%`;
+      sanityBar.className = 'vital-bar sanity-bar'; // Reset classes first
+      sanityCurrentElement.className = 'vital-current'; // Reset classes first
+      
+      if (sanityPercent <= 25) {
+        sanityBar.classList.add('danger');
+        sanityCurrentElement.classList.add('danger');
+      } else if (sanityPercent <= 50) {
+        sanityBar.classList.add('warning');
+        sanityCurrentElement.classList.add('warning');
+      }
+    }
+    
+    if (sanityPercentage) {
+      sanityPercentage.textContent = `${Math.round(sanityPercent)}%`;
+    }
+  }
+}
+
+function updateCombatDashboard() {
+  const elements = {
+    ac: document.getElementById('quickAC'),
+    initiative: document.getElementById('quickInit'),
+    speed: document.getElementById('quickSpeed'),
+    baseAttack: document.getElementById('quickBAB'),
+    fortSave: document.getElementById('quickFort'),
+    refSave: document.getElementById('quickRef'),
+    willSave: document.getElementById('quickWill')
+  };
+  
+  if (elements.ac) {
+    const ac = document.getElementById('acValue')?.textContent || '10';
+    elements.ac.textContent = ac;
+  }
+  
+  if (elements.initiative) {
+    const dexMod = abilityMods.Dex || 0;
+    const initBonus = dexMod >= 0 ? `+${dexMod}` : `${dexMod}`;
+    elements.initiative.textContent = initBonus;
+  }
+  
+  if (elements.speed) {
+    const speed = document.getElementById('speed')?.value || '30';
+    elements.speed.textContent = speed + ' ft';
+  }
+  
+  if (elements.baseAttack) {
+    const baseAttack = document.getElementById('baseAttackDisplay')?.textContent || '+0';
+    elements.baseAttack.textContent = baseAttack;
+  }
+  
+  if (elements.fortSave) {
+    const fortSave = document.getElementById('fortSaveDisplay')?.textContent || '+0';
+    elements.fortSave.textContent = fortSave;
+  }
+  
+  if (elements.refSave) {
+    const refSave = document.getElementById('refSaveDisplay')?.textContent || '+0';
+    elements.refSave.textContent = refSave;
+  }
+  
+  if (elements.willSave) {
+    const willSave = document.getElementById('willSaveDisplay')?.textContent || '+0';
+    elements.willSave.textContent = willSave;
+  }
+  
+  // Update equipment display
+  updateEquipmentDisplay();
+}
+
+/**
+ * Update the equipment display in the gameplay combat panel
+ */
+function updateEquipmentDisplay() {
+  const weaponsList = document.getElementById('quickWeaponsList');
+  const armorList = document.getElementById('quickArmorList');
+  const inventoryList = document.getElementById('quickInventoryList');
+  
+  // Update Weapons
+  if (weaponsList && typeof weapons !== 'undefined' && weapons.length > 0) {
+    weaponsList.innerHTML = '';
+    weapons.forEach(weapon => {
+      if (weapon && weapon.name) {
+        const weaponItem = document.createElement('div');
+        weaponItem.className = 'equipment-item';
+        weaponItem.innerHTML = `
+          <span class="equipment-name">${weapon.name}</span>
+          <span class="equipment-details">(${weapon.damage} dmg)</span>
+        `;
+        weaponsList.appendChild(weaponItem);
+      }
+    });
+  } else if (weaponsList) {
+    weaponsList.innerHTML = '<span class="no-equipment">None equipped</span>';
+  }
+  
+  // Update Armor
+  if (armorList) {
+    const armorName = document.getElementById('armorName')?.value;
+    const armorBonus = document.getElementById('armorBonus')?.value;
+    const shieldName = document.getElementById('shieldName')?.value;
+    const shieldBonus = document.getElementById('shieldBonus')?.value;
+    
+    armorList.innerHTML = '';
+    
+    if (armorName && armorName.trim() && armorBonus && parseInt(armorBonus) > 0) {
+      const armorItem = document.createElement('div');
+      armorItem.className = 'equipment-item';
+      armorItem.innerHTML = `
+        <span class="equipment-name">${armorName}</span>
+        <span class="equipment-details">(+${armorBonus} AC)</span>
+      `;
+      armorList.appendChild(armorItem);
+    }
+    
+    if (shieldName && shieldName.trim() && shieldBonus && parseInt(shieldBonus) > 0) {
+      const shieldItem = document.createElement('div');
+      shieldItem.className = 'equipment-item';
+      shieldItem.innerHTML = `
+        <span class="equipment-name">${shieldName}</span>
+        <span class="equipment-details">(+${shieldBonus} AC)</span>
+      `;
+      armorList.appendChild(shieldItem);
+    }
+    
+    if (armorList.children.length === 0) {
+      armorList.innerHTML = '<span class="no-equipment">Unarmored</span>';
+    }
+  }
+  
+  // Update Inventory
+  if (inventoryList && typeof equipment !== 'undefined' && equipment.length > 0) {
+    inventoryList.innerHTML = '';
+    // Show first 3 items to avoid clutter
+    equipment.slice(0, 3).forEach(item => {
+      if (item && item.name) {
+        const inventoryItem = document.createElement('div');
+        inventoryItem.className = 'equipment-item';
+        inventoryItem.innerHTML = `
+          <span class="equipment-name">${item.name}</span>
+          ${item.quantity > 1 ? `<span class="equipment-details">(x${item.quantity})</span>` : ''}
+        `;
+        inventoryList.appendChild(inventoryItem);
+      }
+    });
+    
+    if (equipment.length > 3) {
+      const moreItem = document.createElement('div');
+      moreItem.className = 'equipment-item more-items';
+      moreItem.textContent = `... and ${equipment.length - 3} more items`;
+      inventoryList.appendChild(moreItem);
+    }
+  } else if (inventoryList) {
+    inventoryList.innerHTML = '<span class="no-equipment">Empty</span>';
+  }
+}
+
+function updateSkillsDashboard() {
+  const allSkillsContainer = document.getElementById('allSkillsList');
+  if (!allSkillsContainer) {
+    // Fallback to old container if new one doesn't exist yet
+    const keySkillsContainer = document.getElementById('keySkillsList');
+    if (!keySkillsContainer) return;
+    
+    // Clear and show message
+    keySkillsContainer.innerHTML = '<div class="key-skill-item">Updating skills display...</div>';
+    return;
+  }
+  
+  // Clear previous skills
+  allSkillsContainer.innerHTML = '';
+  
+  // Get all skills with their current bonuses
+  const skillRows = document.querySelectorAll("#skillsBody tr");
+  const skillsData = [];
+  
+  // Get profession core skills for comparison
+  const professionSelect = document.getElementById('profession');
+  let professionCoreSkills = [];
+  if (professionSelect) {
+    const professionIndex = parseInt(professionSelect.value);
+    if (!isNaN(professionIndex) && professionIndex >= 0 && professionIndex < professions.length) {
+      professionCoreSkills = professions[professionIndex].coreSkills || [];
+    }
+  }
+  
+  skillRows.forEach((row) => {
+    const index = parseInt(row.dataset.skillIndex);
+    if (isNaN(index) || !skills[index]) return;
+    
+    const skill = skills[index];
+    const totalCell = row.querySelector('.skill-total');
+    const total = totalCell ? totalCell.textContent : '+0';
+    const ranksCell = row.querySelector('.skill-ranks');
+    const ranks = ranksCell ? ranksCell.value : '0';
+    
+    // Check if it's a core skill (either user-selected or profession core)
+    const coreCheckbox = row.querySelector('.skill-core-checkbox');
+    const isUserCoreSkill = coreCheckbox && coreCheckbox.checked;
+    
+    // Check if it's a profession core skill
+    const isProfessionCoreSkill = professionCoreSkills.some(profSkill => {
+      const baseSkillName = getBaseSkillName(profSkill);
+      return baseSkillName === skill.name;
+    });
+    
+    const isCore = isUserCoreSkill || isProfessionCoreSkill;
+    
+    skillsData.push({
+      name: skill.name,
+      total: total,
+      ranks: parseInt(ranks) || 0,
+      isCore: isCore,
+      isProfessionCore: isProfessionCoreSkill
+    });
+  });
+  
+  // Sort skills: core skills first, then by name
+  skillsData.sort((a, b) => {
+    if (a.isCore && !b.isCore) return -1;
+    if (!a.isCore && b.isCore) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  
+  // Create skill items
+  skillsData.forEach(skillData => {
+    const skillItem = document.createElement('div');
+    skillItem.className = 'skill-item';
+    if (skillData.isCore) {
+      skillItem.classList.add('core-skill');
+    }
+    if (skillData.isProfessionCore) {
+      skillItem.classList.add('profession-core');
+    }
+    
+    const skillNameClass = skillData.isProfessionCore ? 'skill-name profession-skill' : 'skill-name';
+    
+    skillItem.innerHTML = `
+      <span class="${skillNameClass}">${skillData.name}</span>
+      <span class="skill-bonus">${skillData.total}</span>
+      ${skillData.ranks > 0 ? `<span class="skill-ranks">(${skillData.ranks} ranks)</span>` : ''}
+    `;
+    
+    allSkillsContainer.appendChild(skillItem);
+  });
+  
+  if (skillsData.length === 0) {
+    allSkillsContainer.innerHTML = '<div class="skill-item">No skills available</div>';
+  }
+}
+
+function updateSessionDashboard() {
+  // Session dashboard is mainly for notes and controls
+  // The sessionNotes textarea is already in the dashboard panel
+  // No additional sync needed as it's the same element
+}
+
+// =====================================
+// CHARACTER SELECTION LANDING SCREEN
+// =====================================
+
+function initializeCharacterSelection() {
+  populateCharacterCards();
+  
+  // Create new character button
+  const createNewBtn = document.getElementById('createNewCharacterBtn');
+  createNewBtn.addEventListener('click', function() {
+    startNewCharacterCreation();
+  });
+  
+  // Import character button
+  const importBtn = document.getElementById('importCharacterBtn');
+  importBtn.addEventListener('click', function() {
+    importCharacterFromFile();
+  });
+  
+  // File input for importing characters
+  const importFileInput = document.getElementById('importFileInput');
+  if (importFileInput) {
+    importFileInput.addEventListener('change', handleImportFile);
+  }
+  
+  // Always show character selection/dashboard on load
+  showCharacterSelection();
+}
+
+function populateCharacterCards() {
+  const container = document.getElementById('characterCardsContainer');
+  const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+  const characterNames = Object.keys(stored);
+  
+  if (characterNames.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🕵️</div>
+        <h3>No Characters Found</h3>
+        <p>Create your first investigator to begin exploring the mysteries of the Cthulhu Mythos</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = '';
+  
+  characterNames.forEach(name => {
+    const character = stored[name];
+    const card = createCharacterCard(name, character);
+    container.appendChild(card);
+  });
+}
+
+function createCharacterCard(name, character) {
+  const card = document.createElement('div');
+  card.className = 'character-card';
+  card.addEventListener('click', () => loadAndShowCharacter(name));
+  
+  // Calculate HP and Sanity values
+  const level = parseInt(character.level) || 1;
+  const conScore = parseInt(character.abilities?.con) || 10;
+  const wisScore = parseInt(character.abilities?.wis) || 10;
+  
+  const currentHP = parseInt(character.currentHP) || 0;
+  const maxHP = parseInt(character.hitPoints) || (conScore + level); // Use saved hitPoints or fallback calculation
+  const hpPercent = maxHP > 0 ? (currentHP / maxHP) * 100 : 100;
+  
+  const currentSanity = parseInt(character.currentSanity) || 0;
+  const maxSanity = wisScore * 5; // Starting sanity = WIS * 5
+  const sanityPercent = maxSanity > 0 ? (currentSanity / maxSanity) * 100 : 100;
+  
+  // Determine bar colors
+  const hpBarClass = hpPercent <= 25 ? 'danger' : hpPercent <= 50 ? 'warning' : '';
+  const sanityBarClass = sanityPercent <= 25 ? 'danger' : sanityPercent <= 50 ? 'warning' : '';
+  
+  card.innerHTML = `
+    <div class="character-actions">
+      <button class="action-btn duplicate" title="Duplicate Character" onclick="event.stopPropagation(); duplicateCharacter('${name}')">
+        📋
+      </button>
+      <button class="action-btn delete" title="Delete Character" onclick="event.stopPropagation(); confirmDeleteCharacter('${name}')">
+        🗑️
+      </button>
+    </div>
+    
+    <div class="character-card-header">
+      <h3 class="character-name">${name}</h3>
+      <span class="character-level">Level ${level}</span>
+    </div>
+    
+    <p class="character-profession">${getProfessionName(character.profession) || 'No Profession'}</p>
+    
+    <div class="character-stats">
+      <div class="stat-item">
+        <span class="stat-label">Hit Points</span>
+        <div class="stat-value">${currentHP}/${maxHP}</div>
+        <div class="stat-bar">
+          <div class="stat-bar-fill ${hpBarClass}" style="width: ${Math.max(0, Math.min(100, hpPercent))}%"></div>
+        </div>
+      </div>
+      
+      <div class="stat-item">
+        <span class="stat-label">Sanity</span>
+        <div class="stat-value">${currentSanity}/${maxSanity}</div>
+        <div class="stat-bar">
+          <div class="stat-bar-fill ${sanityBarClass}" style="width: ${Math.max(0, Math.min(100, sanityPercent))}%"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  return card;
+}
+
+function getProfessionName(professionIndex) {
+  const index = parseInt(professionIndex);
+  if (isNaN(index) || index < 0 || index >= professions.length) {
+    return 'No Profession';
+  }
+  return professions[index].name;
+}
+
+function loadAndShowCharacter(name) {
+  // Load the character
+  const select = document.getElementById("characterSelect");
+  select.value = name;
+  loadCharacter();
+  
+  // Hide character selection and show main app in gameplay mode
+  hideCharacterSelection();
+  
+  // Ensure we're in gameplay mode
+  if (!document.body.classList.contains('gameplay-mode')) {
+    toggleMode();
+  }
+}
+
+function startNewCharacterCreation() {
+  // Clear all form fields for new character
+  clearAllFormFields();
+  
+  // Hide character selection and show main app in creation mode
+  hideCharacterSelection();
+  
+  // Ensure we're in creation mode
+  if (document.body.classList.contains('gameplay-mode')) {
+    toggleMode();
+  }
+}
+
+function clearAllFormFields() {
+  // Clear character info
+  document.getElementById('charName').value = '';
+  document.getElementById('playerName').value = '';
+  document.getElementById('age').value = '';
+  document.getElementById('ageCategory').value = 'young';
+  document.getElementById('gender').value = '';
+  document.getElementById('profession').value = '0'; // Set to first profession instead of empty
+  document.getElementById('level').value = '1';
+  document.getElementById('attackOption').value = 'offense';
+  document.getElementById('era').value = '1921-1940';
+  
+  // Clear abilities
+  document.querySelectorAll('.ability-score').forEach(input => {
+    input.value = '';
+  });
+  
+  // Clear skills
+  document.querySelectorAll('.skill-ranks').forEach(input => {
+    input.value = '';
+  });
+  
+  // Clear feats
+  document.querySelectorAll('#featsContainer input[type="checkbox"]').forEach(checkbox => {
+    checkbox.checked = false;
+  });
+  
+  // Clear current HP and Sanity
+  document.getElementById('currentHP').value = '';
+  document.getElementById('currentSanity').value = '';
+  
+  // Clear equipment
+  if (typeof clearAllEquipment === 'function') {
+    clearAllEquipment();
+  }
+  
+  // Update all calculations
+  updateAll();
+}
+
+function showCharacterSelection() {
+  document.body.classList.add('show-character-selection');
+  populateCharacterCards();
+}
+
+function hideCharacterSelection() {
+  document.body.classList.remove('show-character-selection');
+}
+
+function shouldShowCharacterSelection() {
+  // Show character selection if explicitly requested or if there are characters
+  return localStorage.getItem('showCharacterSelection') === 'true';
+}
+
+function duplicateCharacter(name) {
+  const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+  const original = stored[name];
+  
+  if (!original) return;
+  
+  let copyNumber = 2;
+  let copyName = `${name} (Copy)`;
+  
+  // Find available copy name
+  while (stored[copyName]) {
+    copyName = `${name} (Copy ${copyNumber})`;
+    copyNumber++;
+  }
+  
+  // Create copy
+  stored[copyName] = JSON.parse(JSON.stringify(original));
+  localStorage.setItem("cocd20_characters", JSON.stringify(stored));
+  
+  // Refresh cards
+  populateCharacterCards();
+  populateSavedCharacters(); // Update the dropdown too
+}
+
+function confirmDeleteCharacter(name) {
+  if (confirm(`Are you sure you want to delete the character "${name}"? This action cannot be undone.`)) {
+    deleteCharacterByName(name);
+  }
+}
+
+function deleteCharacterByName(name) {
+  const stored = JSON.parse(localStorage.getItem("cocd20_characters") || "{}");
+  delete stored[name];
+  localStorage.setItem("cocd20_characters", JSON.stringify(stored));
+  
+  // Refresh cards
+  populateCharacterCards();
+  populateSavedCharacters(); // Update the dropdown too
+  
+  // If no characters left, show empty state
+  if (Object.keys(stored).length === 0) {
+    populateCharacterCards();
+  }
+}
+
+// Add "Back to Character Selection" functionality
+function addBackToSelectionButton() {
+  const modeToggle = document.querySelector('.mode-toggle-enhanced');
+  if (modeToggle && !document.getElementById('backToSelectionBtn')) {
+    // Create wrapper div if it doesn't exist
+    let wrapper = modeToggle.parentElement.querySelector('.mode-controls-wrapper');
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.className = 'mode-controls-wrapper';
+      modeToggle.parentElement.insertBefore(wrapper, modeToggle);
+      wrapper.appendChild(modeToggle);
+    }
+    
+    const backBtn = document.createElement('button');
+    backBtn.id = 'backToSelectionBtn';
+    backBtn.className = 'back-to-selection-btn';
+    backBtn.innerHTML = '← Characters';
+    backBtn.title = 'Back to Character Selection';
+    backBtn.addEventListener('click', showCharacterSelection);
+    
+    // Insert before the mode toggle
+    wrapper.insertBefore(backBtn, modeToggle);
+  }
+}
+
 // Initialize mode toggle when page loads
 window.addEventListener("DOMContentLoaded", () => {
-  // Wait for original initialization to complete
+  // Initialize character selection first
+  initializeCharacterSelection();
+  
+  // Then initialize dual mode system
   setTimeout(() => {
-    initializeModeToggle();
-    updateGameplayPanel();
+    initializeDualModeSystem();
+    
+    // Add back button to header
+    addBackToSelectionButton();
+    
+    // Restore saved mode if available and not in character selection
+    const savedMode = localStorage.getItem('cocd20_currentMode');
+    if (savedMode === 'gameplay' && !document.body.classList.contains('show-character-selection')) {
+      toggleMode();
+    }
   }, 100);
 });

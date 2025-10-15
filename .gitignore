@@ -1,0 +1,71 @@
+# Call of Cthulhu d20 Character Sheet - Git Ignore
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MD files
+TEST_SUITE_README.md
+UX_RECOMMENDATIONS.md
+EQUIPMENT_FEATURE_SUMMARY.md
+CLAUDE.md
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Local environment and settings
+.env
+.env.local
+.env.*.local
+
+# Claude AI settings (keep local only)
+.claude/settings.local.json
+
+# Debug and test files (project-specific)
+diagnostic_test.html
+sanity_debug.html
+load_test_debug.html
+simple_save_test.html
+quick_sanity_test.html
+
+# Documentation fragments (development artifacts)
+character_creation.txt
+feats_chapter.txt
+skills_chapter.txt
+sanity_chapter.txt
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Node.js (if ever added)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (if build process added later)
+dist/
+build/
+*.min.js
+*.min.css
+
+# Local storage and cache
+.cache/
+*.cache

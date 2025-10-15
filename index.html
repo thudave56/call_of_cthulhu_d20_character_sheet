@@ -8,111 +8,275 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header>
-      <h1>Call of Cthulhu d20 Character Sheet</h1>
-      <p class="subtitle">
-        Build and manage your investigator characters for the d20 adaptation of
-        <em>Call of Cthulhu</em>. Ability modifiers, saving throws, attack
-        bonuses and sanity values are calculated automatically. Save your
-        creations locally and reload them any time.
-      </p>
-      <div class="mode-toggle">
-        <button id="creationModeBtn" class="mode-btn active">📋 Creation Mode</button>
-        <button id="gameplayModeBtn" class="mode-btn">🎲 Gameplay Mode</button>
-      </div>
-    </header>
-
-    <!-- Game Session Panel (Gameplay Mode Only) -->
-    <section class="section gameplay-only" id="game-session-panel">
-      <h2>🎲 Game Session</h2>
-      <div class="session-grid">
-        <div class="vitals-group">
-          <h3>Hit Points</h3>
-          <div class="vital-display">
-            <div class="vital-numbers">
-              <span class="vital-current" id="displayCurrentHP">0</span>
-              <span class="vital-separator">/</span>
-              <span class="vital-max" id="displayMaxHP">0</span>
-            </div>
-            <div class="vital-bar-container">
-              <div class="vital-bar" id="hpBar"></div>
-            </div>
-            <div class="vital-percentage" id="hpPercentage">100%</div>
-          </div>
-          <div class="quick-modify">
-            <label>Take Damage:</label>
-            <input type="number" id="damageAmount" min="0" value="0" />
-            <button id="applyDamageBtn" class="quick-btn">Apply</button>
-            <button id="healBtn" class="quick-btn heal">Heal</button>
-          </div>
+    <!-- Character Selection Landing Screen -->
+    <section class="character-selection-screen" id="characterSelectionScreen">
+      <div class="selection-container">
+        <div class="selection-header">
+          <h1>Call of Cthulhu d20 Character Sheet</h1>
+          <p class="selection-subtitle">Select an existing character or create a new investigator</p>
         </div>
-
-        <div class="vitals-group">
-          <h3>Sanity</h3>
-          <div class="vital-display">
-            <div class="vital-numbers">
-              <span class="vital-current" id="displayCurrentSanity">0</span>
-              <span class="vital-separator">/</span>
-              <span class="vital-max" id="displayMaxSanity">0</span>
-            </div>
-            <div class="vital-bar-container">
-              <div class="vital-bar sanity" id="sanityBar"></div>
-            </div>
-            <div class="vital-percentage" id="sanityPercentage">100%</div>
-          </div>
-          <div class="sanity-threshold" id="sanityThresholdDisplay">
-            20% Threshold: <span id="displaySanity20">0</span>
-          </div>
-          <div class="quick-modify">
-            <label>Sanity Loss:</label>
-            <input type="number" id="sanityLossAmount" min="0" value="0" />
-            <button id="applySanityLossBtn" class="quick-btn">Apply</button>
-            <button id="restoreSanityBtn" class="quick-btn heal">Restore</button>
-          </div>
+        
+        <div class="character-cards-container" id="characterCardsContainer">
+          <!-- Character cards will be populated here -->
         </div>
-
-        <div class="combat-stats-group">
-          <h3>Combat Stats</h3>
-          <div class="stat-line">
-            <span class="stat-label">Base Attack:</span>
-            <span class="stat-value" id="displayBaseAttack">+0</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">Attack (Melee):</span>
-            <span class="stat-value" id="displayMeleeAttack">+0</span>
-            <span class="stat-detail">(BAB + STR)</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">Attack (Ranged):</span>
-            <span class="stat-value" id="displayRangedAttack">+0</span>
-            <span class="stat-detail">(BAB + DEX)</span>
-          </div>
-          <div class="saves-display">
-            <div class="save-item">
-              <span class="save-label">Fort:</span>
-              <span class="save-value" id="displayFortSave">+0</span>
-            </div>
-            <div class="save-item">
-              <span class="save-label">Ref:</span>
-              <span class="save-value" id="displayRefSave">+0</span>
-            </div>
-            <div class="save-item">
-              <span class="save-label">Will:</span>
-              <span class="save-value" id="displayWillSave">+0</span>
-            </div>
-          </div>
+        
+        <div class="selection-actions">
+          <button class="create-new-btn" id="createNewCharacterBtn">
+            <span class="btn-icon">➕</span>
+            <span class="btn-text">Create New Character</span>
+          </button>
+          <button class="import-btn" id="importCharacterBtn">
+            <span class="btn-icon">📁</span>
+            <span class="btn-text">Import Character</span>
+          </button>
         </div>
-      </div>
-
-      <!-- Session Notes -->
-      <div class="session-notes">
-        <h3>Session Notes</h3>
-        <textarea id="sessionNotes" placeholder="Track clues, NPCs, important events..."></textarea>
       </div>
     </section>
 
-    <!-- Character Info -->
-    <section class="section" id="character-info">
+    <!-- Enhanced Header with Mode Switching -->
+    <header class="main-header">
+      <div class="header-content">
+        <div class="title-section">
+          <h1>Call of Cthulhu d20 Character Sheet</h1>
+          <p class="subtitle creation-only">
+            Build and manage your investigator characters for the d20 adaptation of
+            <em>Call of Cthulhu</em>. Ability modifiers, saving throws, attack
+            bonuses and sanity values are calculated automatically.
+          </p>
+          <p class="subtitle gameplay-only">
+            <strong>Playing as: <span id="gameplayCharacterName">Unknown Character</span></strong><br>
+            <span id="characterSummary">Ready for investigation...</span>
+          </p>
+        </div>
+        
+        <div class="mode-control">
+          <div class="mode-toggle-enhanced">
+            <div class="mode-slider" id="modeSlider"></div>
+            <button id="creationModeBtn" class="mode-btn-enhanced active" data-mode="creation">
+              <span class="mode-icon">📋</span>
+              <span class="mode-label">
+                <strong>Creation</strong>
+                <small>Build Character</small>
+              </span>
+            </button>
+            <button id="gameplayModeBtn" class="mode-btn-enhanced" data-mode="gameplay">
+              <span class="mode-icon">🎲</span>
+              <span class="mode-label">
+                <strong>Gameplay</strong>
+                <small>Session Ready</small>
+              </span>
+            </button>
+          </div>
+          
+          <!-- Character Quick Info (Gameplay Mode) -->
+          <div class="character-quick-info gameplay-only">
+            <div class="quick-stat">
+              <span class="quick-label">Level</span>
+              <span class="quick-value" id="quickLevel">1</span>
+            </div>
+            <div class="quick-stat">
+              <span class="quick-label">Profession</span>
+              <span class="quick-value" id="quickProfession">—</span>
+            </div>
+            <div class="quick-stat">
+              <span class="quick-label">HP</span>
+              <span class="quick-value" id="quickHP">0/0</span>
+            </div>
+            <div class="quick-stat">
+              <span class="quick-label">Sanity</span>
+              <span class="quick-value" id="quickSanity">0/0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Creation Mode Progress Indicator -->
+    <div class="creation-progress creation-only">
+      <div class="progress-container">
+        <div class="progress-step active" data-step="basics">
+          <div class="step-number">1</div>
+          <div class="step-label">Basics</div>
+        </div>
+        <div class="progress-step" data-step="abilities">
+          <div class="step-number">2</div>
+          <div class="step-label">Abilities</div>
+        </div>
+        <div class="progress-step" data-step="skills">
+          <div class="step-number">3</div>
+          <div class="step-label">Skills</div>
+        </div>
+        <div class="progress-step" data-step="feats">
+          <div class="step-number">4</div>
+          <div class="step-label">Feats</div>
+        </div>
+        <div class="progress-step" data-step="equipment">
+          <div class="step-number">5</div>
+          <div class="step-label">Equipment</div>
+        </div>
+        <div class="progress-line" id="progressLine"></div>
+      </div>
+    </div>
+
+    <!-- Gameplay Dashboard (Gameplay Mode Only) -->
+    <section class="gameplay-dashboard gameplay-only">
+      <div class="dashboard-grid">
+        <!-- Vitals Panel -->
+        <div class="dashboard-panel vitals-panel">
+          <h3>
+            <span class="panel-icon">❤️</span>
+            Vitals
+          </h3>
+          <div class="vitals-grid">
+            <div class="vital-stat hp-stat">
+              <div class="vital-header">
+                <span class="vital-label">Hit Points</span>
+              </div>
+              <div class="vital-display">
+                <div class="vital-numbers">
+                  <span class="vital-current" id="displayCurrentHP">0</span>
+                  <span class="vital-separator">/</span>
+                  <span class="vital-max" id="displayMaxHP">0</span>
+                </div>
+                <div class="vital-bar-container">
+                  <div class="vital-bar" id="hpBar"></div>
+                </div>
+                <div class="vital-percentage" id="hpPercentage">100%</div>
+              </div>
+              <div class="quick-modify">
+                <div class="modify-controls">
+                  <input type="number" id="damageAmount" min="0" value="0" placeholder="0" />
+                  <button id="applyDamageBtn" class="quick-btn damage">Take Damage</button>
+                  <button id="healBtn" class="quick-btn heal">Heal</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="vital-stat sanity-stat">
+              <div class="vital-header">
+                <span class="vital-label">Sanity</span>
+              </div>
+              <div class="vital-display">
+                <div class="vital-numbers">
+                  <span class="vital-current" id="displayCurrentSanity">0</span>
+                  <span class="vital-separator">/</span>
+                  <span class="vital-max" id="displayMaxSanity">0</span>
+                </div>
+                <div class="vital-bar-container">
+                  <div class="vital-bar sanity-bar" id="sanityBar"></div>
+                </div>
+                <div class="vital-percentage" id="sanityPercentage">100%</div>
+              </div>
+              <div class="sanity-thresholds">
+                <div class="threshold-info">
+                  <span class="threshold-label">20% Threshold:</span>
+                  <span class="threshold-value" id="quickSanity20">0</span>
+                </div>
+                <div class="insanity-status" id="quickInsanityStatus">Sane</div>
+              </div>
+              <div class="quick-modify">
+                <div class="modify-controls">
+                  <input type="number" id="sanityLossAmount" min="0" value="0" placeholder="0" />
+                  <button id="applySanityLossBtn" class="quick-btn damage">Lose Sanity</button>
+                  <button id="restoreSanityBtn" class="quick-btn heal">Restore</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Combat Panel -->
+        <div class="dashboard-panel combat-panel">
+          <h3>
+            <span class="panel-icon">⚔️</span>
+            Combat
+          </h3>
+          <div class="combat-quick-stats">
+            <div class="quick-combat-stat">
+              <span class="combat-label">AC</span>
+              <span class="combat-value" id="quickAC">10</span>
+            </div>
+            <div class="quick-combat-stat">
+              <span class="combat-label">Initiative</span>
+              <span class="combat-value" id="quickInit">+0</span>
+            </div>
+            <div class="quick-combat-stat">
+              <span class="combat-label">Speed</span>
+              <span class="combat-value" id="quickSpeed">30 ft</span>
+            </div>
+            <div class="quick-combat-stat">
+              <span class="combat-label">Base Attack</span>
+              <span class="combat-value" id="quickBAB">+0</span>
+            </div>
+          </div>
+          <div class="saves-display">
+            <div class="save-stat">
+              <span class="save-label">Fort</span>
+              <span class="save-value" id="quickFort">+0</span>
+            </div>
+            <div class="save-stat">
+              <span class="save-label">Ref</span>
+              <span class="save-value" id="quickRef">+0</span>
+            </div>
+            <div class="save-stat">
+              <span class="save-label">Will</span>
+              <span class="save-value" id="quickWill">+0</span>
+            </div>
+          </div>
+          
+          <!-- Equipment Display -->
+          <div class="equipment-display">
+            <h4>Equipment</h4>
+            <div class="equipment-section">
+              <div class="equipment-category">
+                <span class="equipment-category-label">Weapons:</span>
+                <div class="equipment-list" id="quickWeaponsList">
+                  <span class="no-equipment">None equipped</span>
+                </div>
+              </div>
+              <div class="equipment-category">
+                <span class="equipment-category-label">Armor:</span>
+                <div class="equipment-list" id="quickArmorList">
+                  <span class="no-equipment">Unarmored</span>
+                </div>
+              </div>
+              <div class="equipment-category">
+                <span class="equipment-category-label">Inventory:</span>
+                <div class="equipment-list" id="quickInventoryList">
+                  <span class="no-equipment">Empty</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skills Panel -->
+        <div class="dashboard-panel skills-panel">
+          <h3>
+            <span class="panel-icon">🎯</span>
+            All Skills
+          </h3>
+          <div class="all-skills-list" id="allSkillsList">
+            <!-- Populated by script with all skills and bonuses -->
+          </div>
+        </div>
+
+        <!-- Session Panel -->
+        <div class="dashboard-panel session-panel">
+          <h3>
+            <span class="panel-icon">📝</span>
+            Session Notes
+          </h3>
+          <textarea id="sessionNotes" placeholder="Investigation notes, clues discovered, contacts made..." rows="4"></textarea>
+          <div class="session-actions">
+            <button class="session-btn" id="saveSessionBtn">💾 Save Progress</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Character Information (Creation Mode) -->
+    <section class="section creation-only" id="character-info" data-step="basics">
       <h2>Character Information</h2>
       <div class="grid two-col">
         <div class="form-group">
@@ -178,8 +342,8 @@
       <div id="profession-info" class="profession-info"></div>
     </section>
 
-    <!-- Abilities -->
-    <section class="section" id="abilities-section">
+    <!-- Abilities (Creation Mode) -->
+    <section class="section creation-only" id="abilities-section" data-step="abilities">
       <h2>Ability Scores</h2>
       <div id="ageModifiersNote" class="age-modifiers-note"></div>
       <div class="ability-reroll-section">
@@ -238,7 +402,7 @@
             <label for="currentSanity">Current Sanity</label>
             <input type="number" id="currentSanity" min="0" />
           </div>
-          <div class="insanity-tracker">
+          <div class="insanity-tracker gameplay-only">
             <label>Insanity State:</label>
             <select id="insanityState">
               <option value="sane">Sane</option>
@@ -261,7 +425,8 @@
     </section>
 
     <!-- Feats -->
-    <section class="section" id="feats-section">
+    <!-- Feats (Creation Mode) -->
+    <section class="section creation-only" id="feats-section" data-step="feats">
       <h2>Feats</h2>
       <p>Select any feats your character possesses. Some feats apply
         automatic bonuses to saves or hit points.</p>
@@ -285,8 +450,8 @@
       </div>
     </section>
 
-    <!-- Skills -->
-    <section class="section" id="skills-section">
+    <!-- Skills (Creation Mode) -->
+    <section class="section creation-only" id="skills-section" data-step="skills">
       <h2>Skills</h2>
       <p>Enter your ranks in each skill. The total column includes your
         ranks plus the relevant ability modifier and any miscellaneous
@@ -320,11 +485,174 @@
       </table>
     </section>
 
+    <!-- Equipment & Combat (Creation Mode) -->
+    <section class="section creation-only" id="equipment-section" data-step="equipment">
+      <h2>Equipment & Combat</h2>
+
+      <!-- Combat Overview -->
+      <div class="combat-overview">
+        <div class="combat-stat-cards">
+          <div class="stat-card ac-card">
+            <h4>Armor Class</h4>
+            <div class="big-number" id="acValue">10</div>
+            <div class="calculation" id="acBreakdown">Base: 10</div>
+          </div>
+          <div class="stat-card initiative-card">
+            <h4>Initiative</h4>
+            <div class="big-number" id="initValue">+0</div>
+            <div class="calculation">Dex modifier</div>
+          </div>
+          <div class="stat-card speed-card">
+            <h4>Speed</h4>
+            <div class="big-number">
+              <input type="number" id="speed" min="0" value="30" class="speed-input" />
+              <span class="unit">ft</span>
+            </div>
+            <div class="calculation" id="speedStatus">Normal</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weapons Section -->
+      <div class="weapons-section">
+        <h3>
+          <span>Weapons</span>
+          <button type="button" id="addWeaponBtn" class="inline-add-btn">+ Add Weapon</button>
+        </h3>
+        <div class="weapons-grid" id="weaponsGrid">
+          <!-- Populated by script -->
+        </div>
+        <div class="no-weapons-message" id="noWeaponsMessage">
+          <p>No weapons added yet. Click "Add Weapon" to add your first weapon.</p>
+        </div>
+      </div>
+
+      <!-- Defense Section -->
+      <div class="defense-section">
+        <h3>Armor & Defense</h3>
+        <div class="armor-shield-grid">
+          <div class="armor-panel">
+            <h4>
+              <span>Armor</span>
+              <button type="button" class="toggle-details" id="armorToggle">⚙️</button>
+            </h4>
+            <select class="armor-preset" id="armorPreset">
+              <option value="none">No Armor</option>
+              <option value="leather">Leather Jacket (+1 AC)</option>
+              <option value="kevlar">Kevlar Vest (+3 AC)</option>
+              <option value="riot">Riot Gear (+5 AC)</option>
+              <option value="custom">Custom...</option>
+            </select>
+            <div class="armor-details" id="armorDetails">
+              <div class="form-group">
+                <label for="armorName">Name</label>
+                <input type="text" id="armorName" placeholder="Custom armor name" />
+              </div>
+              <div class="armor-stats-grid">
+                <div class="form-group">
+                  <label for="armorBonus">AC Bonus</label>
+                  <input type="number" id="armorBonus" min="0" value="0" />
+                </div>
+                <div class="form-group">
+                  <label for="armorMaxDex">Max Dex</label>
+                  <input type="number" id="armorMaxDex" min="0" value="99" />
+                </div>
+                <div class="form-group">
+                  <label for="armorCheckPenalty">Check Penalty</label>
+                  <input type="number" id="armorCheckPenalty" max="0" value="0" />
+                </div>
+                <div class="form-group">
+                  <label for="armorWeight">Weight (lbs)</label>
+                  <input type="number" id="armorWeight" min="0" step="0.1" value="0" />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="shield-panel">
+            <h4>
+              <span>Shield</span>
+              <button type="button" class="toggle-details" id="shieldToggle">⚙️</button>
+            </h4>
+            <select class="shield-preset" id="shieldPreset">
+              <option value="none">No Shield</option>
+              <option value="small">Small Shield (+1 AC)</option>
+              <option value="large">Large Shield (+2 AC)</option>
+              <option value="riot">Riot Shield (+3 AC)</option>
+              <option value="custom">Custom...</option>
+            </select>
+            <div class="shield-details" id="shieldDetails">
+              <div class="form-group">
+                <label for="shieldName">Name</label>
+                <input type="text" id="shieldName" placeholder="Custom shield name" />
+              </div>
+              <div class="shield-stats-grid">
+                <div class="form-group">
+                  <label for="shieldBonus">AC Bonus</label>
+                  <input type="number" id="shieldBonus" min="0" value="0" />
+                </div>
+                <div class="form-group">
+                  <label for="shieldCheckPenalty">Check Penalty</label>
+                  <input type="number" id="shieldCheckPenalty" max="0" value="0" />
+                </div>
+                <div class="form-group">
+                  <label for="shieldWeight">Weight (lbs)</label>
+                  <input type="number" id="shieldWeight" min="0" step="0.1" value="0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equipment Section -->
+      <div class="equipment-section">
+        <h3>
+          <span>Equipment & Gear</span>
+          <button type="button" id="addEquipmentBtn" class="inline-add-btn">+ Add Item</button>
+        </h3>
+        <div class="equipment-quick-add">
+          <input type="text" placeholder="Add item..." class="quick-add-input" id="quickAddInput">
+          <button class="quick-add-btn" id="quickAddBtn">Add</button>
+        </div>
+        <div class="equipment-list" id="equipmentList">
+          <!-- Populated by script -->
+        </div>
+        <div class="no-equipment-message" id="noEquipmentMessage">
+          <p>No equipment added yet. Use the quick add above or click "Add Item".</p>
+        </div>
+      </div>
+
+      <!-- Encumbrance Panel -->
+      <div class="encumbrance-panel">
+        <h3>Encumbrance & Weight</h3>
+        <div class="weight-bar-container">
+          <div class="weight-bar">
+            <div class="weight-progress" id="weightProgress"></div>
+            <div class="weight-thresholds">
+              <span class="threshold light" id="lightThreshold">Light</span>
+              <span class="threshold medium" id="mediumThreshold">Med</span>
+              <span class="threshold heavy" id="heavyThreshold">Heavy</span>
+            </div>
+          </div>
+        </div>
+        <div class="weight-summary">
+          <span class="current-weight"><span id="totalWeight">0</span> lbs</span>
+          <span class="weight-status" id="encumbranceStatus">Light Load</span>
+          <span class="weight-limit" id="weightLimit">(max 0 lbs)</span>
+        </div>
+        <div class="encumbrance-effects" id="encumbranceEffects">
+          <small>No movement or skill penalties</small>
+        </div>
+      </div>
+    </section>
+
     <!-- Save/Load Buttons -->
     <section class="section" id="storage-section">
       <h2>Manage Characters</h2>
       <div class="button-group">
         <button id="saveButton">Save Character</button>
+        <button id="exportButton">Export to File</button>
         <button id="loadButton">Load Character</button>
         <button id="deleteButton">Delete Character</button>
       </div>
@@ -332,6 +660,8 @@
         <label for="characterSelect">Saved Characters</label>
         <select id="characterSelect"></select>
       </div>
+      <!-- Hidden file input for importing -->
+      <input type="file" id="importFileInput" accept=".json" style="display: none;">
     </section>
 
     <footer>
@@ -347,7 +677,8 @@
       </p>
     </footer>
 
-    <!-- Link the script -->
-    <script src="script.js"></script>
+    <!-- Link the scripts -->
+    <script src="script.js?v=3"></script>
+    <script src="equipment_functions.js?v=3"></script>
   </body>
 </html>
