@@ -7,11 +7,14 @@
 *.swo
 *~
 
-# MD files
-TEST_SUITE_README.md
-UX_RECOMMENDATIONS.md
-EQUIPMENT_FEATURE_SUMMARY.md
-CLAUDE.md
+# Documentation files (now in docs/)
+docs/TEST_SUITE_README.md
+docs/UX_RECOMMENDATIONS.md
+docs/EQUIPMENT_FEATURE_SUMMARY.md
+docs/CLAUDE.md
+docs/*.txt
+docs/*.pdf
+docs/Rulebook_Split/
 
 # Operating System files
 .DS_Store
@@ -29,20 +32,11 @@ desktop.ini
 .env.*.local
 
 # Claude AI settings (keep local only)
-.claude/settings.local.json
+.claude/
 
-# Debug and test files (project-specific)
-diagnostic_test.html
-sanity_debug.html
-load_test_debug.html
-simple_save_test.html
-quick_sanity_test.html
+# Debug and test files (now in tests/)
+tests/
 
-# Documentation fragments (development artifacts)
-character_creation.txt
-feats_chapter.txt
-skills_chapter.txt
-sanity_chapter.txt
 
 # Temporary files
 *.tmp
@@ -68,4 +62,4 @@ build/
 
 # Local storage and cache
 .cache/
-*.cache
+*.cache.claude/
