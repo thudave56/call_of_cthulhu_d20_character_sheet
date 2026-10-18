@@ -1,0 +1,17 @@
+name: Rules tests
+
+on:
+  push:
+    paths: ["v2/**", ".github/workflows/rules-tests.yml"]
+  pull_request:
+    paths: ["v2/**", ".github/workflows/rules-tests.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test v2/tests/*.test.js

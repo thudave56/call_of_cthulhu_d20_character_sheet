@@ -35,7 +35,7 @@ desktop.ini
 .claude/
 
 # Debug and test files (now in tests/)
-tests/
+/tests/
 
 
 # Temporary files

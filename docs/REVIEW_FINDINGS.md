@@ -46,7 +46,7 @@ The sheet is usable for a quick game, but several numbers players would read off
 | C18 | S2 | Synergy table | Balance→Jump/Tumble, Bluff→Diplomacy, Climb→Use Rope, Craft→Appraise, Jump→Tumble, Knowledge→Research, Use Rope→Climb/Escape Artist (D&D values) | Table 2-4 (p.22): Animal Empathy→Handle Animal; Bluff→Intimidate, Sleight of Hand; Handle Animal→Ride; Knowledge (medicine)→Heal; Knowledge (psychology)→Psychoanalysis; Sense Motive→Diplomacy; Tumble→Balance, Jump | `script.js:1098-1109`; skill descriptions repeat the wrong synergies |
 | C19 | S3 | Noncore half ranks | Noncore ranks are whole numbers at 2 pts each, so an odd leftover point can't be spent | 1 pt = ½ rank; half ranks give no bonus (p.10, p.18). Acceptable simplification; the tracker should allow 0.5 steps. | `script.js:2478-2507` |
 | C20 | S3 | Skill points at higher levels | `(8+Int)×(L+3)` uses the **current** Int for every level | Int increases aren't retroactive (p.9). Fine for a one-shot; note only. | `script.js:2461-2470` |
-| C21 | S2 | Feat count | `2 + floor(L/3)` is correct, but the Offense option's **bonus Weapon Proficiency feat** isn't counted, and over-limit is only shown in red, not blocked | p.10, p.15 | `script.js:2515-2545` |
+| C21 | S3 | Feat count | `2 + floor(L/3)` is correct. Going over the limit is only shown in red, not blocked. _(Correction: the Offense bonus Weapon Proficiency is part of the optional Defense Bonus variant on p.15, not the core rules.)_ | p.11, p.15 | `script.js:2515-2545` |
 | C22 | S2 | Sanity gain on level-up | Rolls 1d6 on every `input` keystroke (typing "12" fires 1→12 with an alert). In creation mode the gain is then overwritten by C24. `previousLevel` isn't reset on load. | +1d6 current Sanity per level gained, up to max (p.50-51) | `script.js:1429-1442`, `1836-1850` |
 | C23 | S2 | "20% threshold" concept | Shows a fixed 20% of **max** Sanity as a danger line | Indefinite insanity comes from losing **20% of current Sanity within 1 hour**. Temporary insanity is a Sanity check after losing ≥ ½ Wis in one roll. (p.47-48) | `script.js:1808`, `2849`, `3041`, `3466` |
 | C24 | S1 | Sanity overwritten | In creation mode `updateSanity()` forces current = starting on every recalculation. `loadAndShowCharacter()` loads while still in creation mode, so **saved current Sanity is lost on open**. | — | `script.js:1817-1829`, `3865-3877` |
@@ -133,3 +133,24 @@ Since you'd like to compare before committing to a single fix:
 - Keep the **localStorage key compatible**, or have B read A's key and write its own (`cocd20_characters_v2`), so testers can open the same character in both without corrupting A's data. Feat-index storage (F10) makes this important: B should migrate on read, not write back to A's key.
 - Suggested B scope: section 5.1 items 1–4 only, so the comparison isolates correctness and print. Structural work can be a later C.
 - A side-by-side check: build 2–3 reference investigators by hand from the book, enter them in A and B, and compare against the expected numbers. The test tables from 5.2 can double as the expected values.
+
+---
+
+## 6. Browser test results (variant A)
+
+These came from driving the original app in headless Chromium at desktop, tablet (768 px) and phone (390 px) widths. They confirm D1–D5, C3, C8, C24 and C25, and add:
+
+| # | Sev | Defect | Where |
+|---|---|---|---|
+| B1 | S1 | **Losing all Sanity restores it to full.** `applySanityLoss` clamps at 0, then `updateSanity()` treats 0 as "empty" and refills it. | `script.js:2934`, `1826-1833` |
+| B2 | S1 | Imported characters open the wrong character: the card click shows "Select a character to load", because the hidden dropdown isn't refreshed after import. | `script.js:2344`, `3865` |
+| B3 | S1 | Names with an apostrophe throw on Duplicate/Delete, and the card opens instead | `script.js:3818-3823` |
+| B4 | S2 | Take Damage / Heal / Lose / Restore buttons have invisible text (red on red, green on green); gameplay save values are white on white | `style.css:756-769`, `1578-1596`, `2146` |
+| B5 | S2 | Phone: the page scrolls sideways (scrollWidth 635 at 390 px); skill Misc/Total columns are cut off; the header takes about 400 px | `style.css` |
+| B6 | S2 | Printing gives 7 pages of raw form controls (creation) or 3 pages with invisible saves and clipped skills (gameplay) | no `@media print` |
+| B7 | S2 | Accessibility: 157 of 236 inputs have no label; character cards and progress steps can't be reached by keyboard; icon buttons have no names | various |
+| B8 | S3 | Sanity bar colour thresholds disagree (20% vs 25%), so the colour flips every 2 s | `script.js:3042`, `3474` |
+
+## 7. Status
+
+A rebuilt sheet in `v2/` addresses every item above. It does so as a separate variant (B), so the original (A) stays deployable for comparison. See `v2/DESIGNS.md` for the design review, a hand-worked sample character, the rule-by-rule checklist, and the 7 rulebook ambiguities that need a decision. The calculations are covered by `node --test v2/tests/*.test.js`.

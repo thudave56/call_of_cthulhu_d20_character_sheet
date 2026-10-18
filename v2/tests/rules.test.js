@@ -1,0 +1,280 @@
+// Run with: node --test v2/tests/*.test.js
+// Expected values are transcribed from the Call of Cthulhu d20 core rulebook
+// (printed page numbers in comments).
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const CoC = require("../js/rules.js");
+
+const L = (n) => Array.from({ length: n }, (_, i) => i + 1);
+
+test("Table 1-9 Offense base attack (p.10)", () => {
+  const expected = [1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 12, 13, 14, 15, 15];
+  assert.deepEqual(L(20).map((l) => CoC.baseAttackBonus(l, "offense")), expected);
+});
+
+test("Table 1-8 Defense base attack (p.10)", () => {
+  const expected = [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10];
+  assert.deepEqual(L(20).map((l) => CoC.baseAttackBonus(l, "defense")), expected);
+});
+
+test("Iterative attacks (p.10)", () => {
+  assert.deepEqual(CoC.attackSequence(6), [6, 1]);
+  assert.deepEqual(CoC.attackSequence(5), [5]);
+  assert.deepEqual(CoC.attackSequence(15), [15, 10, 5]);
+  assert.deepEqual(CoC.attackSequence(0), [0]);
+});
+
+test("Save progressions (Tables 1-8/1-9)", () => {
+  const good = [2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12];
+  const bad = [0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6];
+  assert.deepEqual(L(20).map((l) => CoC.baseSave(l, true)), good);
+  assert.deepEqual(L(20).map((l) => CoC.baseSave(l, false)), bad);
+  assert.equal(CoC.goodSaveCount("offense"), 1);
+  assert.equal(CoC.goodSaveCount("defense"), 2);
+});
+
+test("Table 1-10 max ranks and feats (p.11)", () => {
+  assert.equal(CoC.coreMaxRanks(1), 4);
+  assert.equal(CoC.noncoreMaxRanks(1), 2);
+  assert.equal(CoC.noncoreMaxRanks(2), 2.5);
+  assert.equal(CoC.coreMaxRanks(20), 23);
+  const feats = L(20).map((l) => CoC.featSlots({ level: l }));
+  assert.deepEqual(feats.slice(0, 7), [2, 2, 3, 3, 3, 4, 4]);
+  assert.equal(feats[17], 8);
+  assert.deepEqual(CoC.abilityIncreaseLevels(20), [4, 8, 12, 16, 20]);
+});
+
+test("Variant defense bonus Table 1-15 (p.15)", () => {
+  assert.equal(CoC.defenseBonus(1, "defense"), 2);
+  assert.equal(CoC.defenseBonus(5, "defense"), 3);
+  assert.equal(CoC.defenseBonus(20, "defense"), 6);
+  assert.equal(CoC.defenseBonus(4, "offense"), 0);
+  assert.equal(CoC.defenseBonus(10, "offense"), 2);
+  assert.equal(CoC.defenseBonus(20, "offense"), 4);
+  // Offense option gets a bonus Weapon Proficiency only under this variant
+  assert.equal(CoC.featSlots({ level: 1, attackOption: "offense", options: { defenseBonus: true } }), 3);
+  assert.equal(CoC.featSlots({ level: 1, attackOption: "offense", options: { defenseBonus: false } }), 2);
+});
+
+test("Aging Table 1-11 (p.13) is cumulative and floors at 1", () => {
+  assert.equal(CoC.agingCategory(49).key, "young");
+  assert.equal(CoC.agingCategory(50).key, "middle");
+  assert.equal(CoC.agingCategory(65).key, "old");
+  assert.equal(CoC.agingCategory(80).key, "venerable");
+  const c = CoC.newCharacter({ age: 66, abilities: { Str: 3, Dex: 10, Con: 10, Int: 10, Wis: 10, Cha: 10 } });
+  const s = CoC.abilityScores(c);
+  assert.equal(s.Str.permanent, 1);
+  assert.equal(s.Dex.permanent, 7);
+  assert.equal(s.Int.permanent, 12);
+});
+
+test("Money Tables 1-13/1-14 (p.15) — Dave's 1930s detective example", () => {
+  const c = CoC.newCharacter({ profession: "Detective", era: "1921-1940", money: { roll: 5 } });
+  const m = CoC.money(c);
+  assert.equal(m.mult, 4);
+  assert.equal(m.savings, 8000);
+  assert.equal(m.income, 4000);
+  const modern = CoC.money(Object.assign({}, c, { era: "1981+" }));
+  assert.equal(modern.savings, 24000);
+  assert.equal(modern.income, 40000);
+  const wealthy = CoC.money(Object.assign({}, c, { feats: [{ name: "Wealth" }] }));
+  assert.equal(wealthy.windfall, 8000);
+  assert.equal(wealthy.income, 6000);
+  const poor = CoC.money(CoC.newCharacter({ profession: "Soldier", money: { roll: 1 } }));
+  assert.equal(poor.mult, 1); // minimum 1
+});
+
+test("Profession money modifiers (Table 1-13)", () => {
+  const mods = Object.fromEntries(CoC.PROFESSIONS.map((p) => [p.name, p.moneyMod]));
+  assert.deepEqual(mods, {
+    Agent: -1, Antiquarian: -1, Archaeologist: 0, "Artist/Musician": -2, "Blue-Collar Worker": -1,
+    Criminal: -1, Detective: -1, Dilettante: 1, "Doctor/Nurse": 2, Parapsychologist: -2,
+    "Priest/Clergyman": -1, Professor: 0, Psychologist: 0, Soldier: -2, Technician: 2,
+    "White-Collar Worker": 1, "Writer/Reporter": -1,
+  });
+  for (const p of CoC.PROFESSIONS) {
+    assert.equal(p.core.length, 9, p.name);
+    for (const id of p.core) assert.ok(CoC.skillDef(id), `${p.name}: ${id}`);
+  }
+});
+
+test("Skill list Table 2-1 (p.18)", () => {
+  assert.equal(CoC.SKILLS.length, 46);
+  const trainedOnly = CoC.SKILLS.filter((s) => !s.untrained).map((s) => s.name).sort();
+  assert.deepEqual(trainedOnly, [
+    "Animal Empathy", "Craft", "Cthulhu Mythos", "Demolitions", "Disable Device", "Handle Animal", "Knowledge",
+    "Open Lock", "Operate Heavy Machinery", "Performance", "Pilot", "Psychic Focus", "Psychoanalysis",
+    "Read Lips", "Repair", "Sleight of Hand", "Speak Other Language", "Spellcraft", "Tumble",
+  ]);
+  assert.equal(CoC.SKILL_BY_NAME.Repair.ability, "Int");
+  assert.equal(CoC.SKILL_BY_NAME.Forgery.untrained, true);
+  const acp = CoC.SKILLS.filter((s) => s.acp).map((s) => s.name).sort();
+  assert.deepEqual(acp, ["Balance", "Climb", "Escape Artist", "Hide", "Jump", "Move Silently", "Swim", "Tumble"]);
+});
+
+function professor() {
+  return CoC.normalize({
+    name: "Kristof", profession: "Professor", attackOption: "defense", goodSaves: ["will", "ref"],
+    abilities: { Str: 10, Dex: 8, Con: 12, Int: 15, Wis: 14, Cha: 13 }, age: 30,
+    coreSkills: ["Concentration", "Diplomacy", "Gather Information", "Knowledge (history)", "Knowledge (occult)",
+      "Knowledge (local)", "Research", "Speak Other Language (Latin)", "Spot", "Hide", "Move Silently", "Knowledge (philosophy)"],
+  });
+}
+
+test("Skill points (p.16-18): (8+Int)×4 at 1st, 8+Int per level, min 1", () => {
+  const c = professor();
+  assert.equal(CoC.skillPoints(c).available, 40); // Int 15 (+2): 10×4
+  const dull = CoC.normalize({ abilities: { Int: 1 } }); // −5 → 3 per level
+  assert.equal(CoC.skillPoints(dull).available, 12);
+  const dumber = CoC.normalize({ abilities: { Int: 1 }, age: 20 });
+  dumber.abilityDamage.Int = 0;
+  const lv3 = CoC.syncLevelLog(Object.assign(CoC.clone(c), { level: 3 }));
+  assert.equal(CoC.skillPoints(lv3).available, 60);
+});
+
+test("Core vs noncore costs and half ranks", () => {
+  const c = professor();
+  c.skills = { Research: { ranks: 4 }, Listen: { ranks: 1.5 } };
+  const sp = CoC.skillPoints(c);
+  assert.equal(sp.spent, 4 + 3);
+  const listen = CoC.skillTable(c).find((r) => r.id === "Listen");
+  assert.equal(listen.effRanks, 1);           // half rank gives no bonus
+  assert.equal(listen.total, 1 + 2);          // Wis 14
+  assert.equal(listen.max, 2);
+  const issues = CoC.validate(Object.assign(CoC.clone(c), { skills: { Listen: { ranks: 2.5 } } }));
+  assert.ok(issues.some((i) => /Listen.*exceeds/.test(i.msg)));
+});
+
+test("Synergy Table 2-4 (p.22)", () => {
+  const c = professor();
+  c.coreSkills = c.coreSkills.slice(0, 11).concat(["Sense Motive"]);
+  c.level = 2; Object.assign(c, CoC.syncLevelLog(c));
+  c.skills = { "Sense Motive": { ranks: 5 } };
+  const rows = CoC.skillTable(c);
+  assert.equal(rows.find((r) => r.id === "Diplomacy").parts.synergy, 2);
+  assert.equal(rows.find((r) => r.id === "Spot").parts.synergy, 0);
+});
+
+test("Feat bonuses: aptitude, saves, Skill Emphasis, Improved Initiative, Toughness", () => {
+  const c = professor();
+  c.feats = [{ name: "Sharp-Eyed" }, { name: "Skill Emphasis", choice: "Research" }, { name: "Improved Initiative" }, { name: "Toughness" }, { name: "Iron Will" }];
+  const rows = CoC.skillTable(c);
+  assert.equal(rows.find((r) => r.id === "Sense Motive").parts.feat, 2);
+  assert.equal(rows.find((r) => r.id === "Spot").parts.feat, 0);
+  assert.equal(rows.find((r) => r.id === "Research").parts.emphasis, 3);
+  assert.equal(CoC.combat(c).init, -1 + 4);
+  assert.equal(CoC.hitPoints(c).max, 6 + 1 + 3);
+  assert.equal(CoC.saves(c).will.total, 2 + 2 + 2);
+});
+
+test("Feat prerequisites are enforced", () => {
+  const c = professor();
+  c.feats = [{ name: "Mobility" }, { name: "Mind Reading" }];
+  const msgs = CoC.validate(c).map((i) => i.msg).join("\n");
+  assert.match(msgs, /Mobility needs Dex 13/);
+  assert.match(msgs, /Mobility needs Dodge/);
+  assert.match(msgs, /Mind Reading needs Cha 15/);
+  assert.match(msgs, /Mind Reading needs Sensitive/);
+});
+
+test("Hit points (p.11): 6+Con, then 1d6+Con (min 1) per level", () => {
+  const c = CoC.normalize({ level: 3, abilities: { Con: 6 } }); // −2
+  c.levelLog[1].hpRoll = 1; c.levelLog[2].hpRoll = 6;
+  const hp = CoC.hitPoints(c);
+  assert.equal(hp.first, 4);
+  assert.deepEqual(hp.perLevel, [1, 4]);
+  assert.equal(hp.max, 9);
+});
+
+test("HP states (p.68-69)", () => {
+  assert.equal(CoC.hpState(1).key, "ok");
+  assert.equal(CoC.hpState(0).key, "disabled");
+  assert.equal(CoC.hpState(-9).key, "dying");
+  assert.equal(CoC.hpState(-10).key, "dead");
+});
+
+test("Sanity (p.46-51)", () => {
+  let c = professor(); // Wis 14
+  let s = CoC.sanity(c);
+  assert.equal(s.starting, 70);
+  assert.equal(s.max, 99);
+  assert.equal(s.current, 70);
+  assert.equal(s.tempThreshold, 7);
+  assert.equal(s.indefiniteThreshold, 14);
+  let r = CoC.loseSanity(c, 7, "ghoul");
+  assert.deepEqual(r.triggers, ["temporary"]);
+  r = CoC.loseSanity(r.character, 7, "corpse");
+  assert.ok(r.triggers.includes("indefinite"));
+  assert.equal(CoC.sanity(r.character).current, 56);
+  c = CoC.newSanityHour(r.character);
+  assert.equal(CoC.sanity(c).hourLoss, 0);
+  r = CoC.loseSanity(c, 60);
+  assert.ok(r.triggers.includes("zero"));
+  assert.equal(CoC.sanity(r.character).current, -4); // not clamped at 0
+  r = CoC.loseSanity(r.character, 6);
+  assert.ok(r.triggers.includes("permanent"));
+  // Mythos: +2 first insanity, +1 after; max drops accordingly
+  c = CoC.mythosInsanity(professor());
+  assert.equal(c.mythos, 2);
+  assert.equal(CoC.sanity(c).max, 97);
+  c = CoC.mythosInsanity(c);
+  assert.equal(c.mythos, 3);
+  // Therapy cannot exceed starting Sanity; level gain can exceed starting up to max
+  c = professor(); c.sanity.current = 65;
+  assert.equal(CoC.sanity(CoC.gainSanity(c, 10, "therapy")).current, 70);
+  assert.equal(CoC.sanity(CoC.gainSanity(c, 40, "level")).current, 99);
+});
+
+test("Weapon attacks: proficiency, finesse, focus, armor penalty, iterative", () => {
+  const c = professor();
+  c.level = 7; Object.assign(c, CoC.syncLevelLog(c));
+  c.attackOption = "offense"; c.goodSaves = ["will"];
+  const pistol = { name: "Handgun (9mm)", category: "pistol", damage: "1d10", critical: "×3" };
+  c.weapons = [pistol];
+  let a = CoC.weaponAttack(c, pistol);
+  assert.equal(a.bonus, 6 - 1 - 4);           // BAB 6, Dex −1, nonproficient −4
+  assert.deepEqual(a.sequence, [1, -4]);
+  c.feats = [{ name: "Weapon Proficiency", choice: "pistol" }, { name: "Weapon Focus", choice: "Handgun (9mm)" }];
+  a = CoC.weaponAttack(c, pistol);
+  assert.equal(a.bonus, 6 - 1 + 1);
+  c.armor = "Flak vest";
+  assert.equal(CoC.weaponAttack(c, pistol).bonus, 6 - 1 + 1 - 3);
+  const knife = { name: "Knife, combat", category: "melee", damage: "1d4", critical: "19-20/×2", finesseAs: "Knife (any)" };
+  c.armor = "None";
+  c.feats.push({ name: "Weapon Proficiency", choice: "melee" }, { name: "Weapon Finesse", choice: "Knife (any)" }, { name: "Improved Critical", choice: "Knife, combat" });
+  a = CoC.weaponAttack(c, knife);
+  assert.equal(a.ability, "Dex");
+  assert.equal(a.critical, "17-20/×2");
+});
+
+test("Armor Table 6-4 (p.95) and AC = 10 + Dex + armor", () => {
+  const c = professor();
+  c.armor = "Reinforced vest";
+  const cb = CoC.combat(c);
+  assert.equal(cb.ac, 10 - 1 + 5);
+  assert.equal(cb.acp, -2);
+  const hide = CoC.skillTable(c).find((r) => r.id === "Hide");
+  assert.equal(hide.parts.armor, -2);
+  const swim = CoC.skillTable(c).find((r) => r.id === "Swim");
+  assert.equal(swim.parts.armor, -2); // Table 2-1 †† (the p.94 sidebar omits Swim)
+  const spot = CoC.skillTable(c).find((r) => r.id === "Spot");
+  assert.equal(spot.parts.armor, 0);
+});
+
+test("Creation validation catches the common mistakes", () => {
+  const c = professor();
+  c.goodSaves = ["will"];
+  c.mythos = 1;
+  const msgs = CoC.validate(c).map((i) => i.msg).join("\n");
+  assert.match(msgs, /exactly 2 good saves/);
+  assert.match(msgs, /Cthulhu Mythos/);
+  assert.match(msgs, /skill points unspent/);
+  assert.match(msgs, /feat slot/);
+});
+
+test("normalize() repairs partial data", () => {
+  const c = CoC.normalize({ name: "X", level: 5 });
+  assert.equal(c.levelLog.length, 5);
+  assert.ok(Array.isArray(c.feats));
+  assert.equal(c.schemaVersion, CoC.SCHEMA_VERSION);
+});

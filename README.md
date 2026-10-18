@@ -2,6 +2,8 @@
 
 A comprehensive, interactive web-based character sheet for the Call of Cthulhu d20 system. This application runs entirely in the browser with no server or build process required, featuring automatic calculations, character persistence, and dual modes for character creation and active gameplay.
 
+> **New: Investigator Sheets (v2)** — a rebuilt, rules-checked sheet lives in [`v2/`](v2/index.html) alongside this original version for A/B comparison. It has saved-character listing per browser, three play designs (Table Tracker, Classic Sheet with clean printing, Pocket for phones) and unit tests against the rulebook tables. See [v2/DESIGNS.md](v2/DESIGNS.md) for the designs, a worked example to confirm accuracy, and the rule-by-rule checklist; [docs/REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) lists the defects found in this original version.
+
 ![Version](https://img.shields.io/badge/version-1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Browser](https://img.shields.io/badge/browser-modern-orange)

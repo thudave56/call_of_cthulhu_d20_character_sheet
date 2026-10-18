@@ -1,0 +1,163 @@
+/*
+ * store.js — saved characters for this browser.
+ *
+ * Each character lives in its own localStorage entry (`cocd20v2:char:<id>`) so
+ * one bad record can't take the rest with it. A small index (`cocd20v2:index`)
+ * powers the character list. Cookies remember the last character opened and
+ * the chosen play design, so returning to the page picks up where you left off.
+ * localStorage is used for the data itself because cookies are limited to ~4 KB.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("./rules.js"));
+  else root.Store = factory(root.CoC);
+})(typeof self !== "undefined" ? self : this, function (CoC) {
+  "use strict";
+
+  const PREFIX = "cocd20v2:";
+  const INDEX_KEY = PREFIX + "index";
+  const LEGACY_KEY = "cocd20_characters";
+  const LEGACY_DONE_KEY = PREFIX + "legacyImported";
+
+  // Legacy (v1) array orders, used to translate index-based saves.
+  const LEGACY_FEATS = "Acrobatic|Alertness|Ambidexterity|Animal Affinity|Athletic|Blind-Fight|Cautious|Combat Casting|Dodge|Mobility|Spring Attack|Drive-By Attack|Endurance|Expertise|Gearhead|Great Fortitude|Improved Critical|Improved Initiative|Iron Will|Lightning Reflexes|Martial Artist|Nimble|Persuasive|Point Blank Shot|Far Shot|Precise Shot|Rapid Shot|Multishot|Shot on the Run|Rolling Shot|Power Attack|Cleave|Quick Draw|Run|Sharp-Eyed|Skill Emphasis|Stealthy|Toughness|Track|Trustworthy|Two-Weapon Fighting|Wealth|Weapon Finesse|Sensitive|Biofeedback Trance|Remote Viewing|Dowsing|Mind Reading|Mind Probe|Psychokinesis|Psychometry|Second Sight|Telepathy".split("|");
+  const LEGACY_SKILLS = "Animal Empathy|Appraise|Balance|Bluff|Climb|Computer Use|Concentration|Craft|Cthulhu Mythos|Demolitions|Diplomacy|Disguise|Drive|Escape Artist|Forgery|Gather Information|Handle Animal|Heal|Hide|Innuendo|Intimidate|Jump|Knowledge|Listen|Move Silently|Open Lock|Operate Heavy Machinery|Performance|Pilot|Psychic Focus|Psychoanalysis|Read Lips|Repair|Research|Ride|Search|Sense Motive|Sleight of Hand|Spellcraft|Spot|Swim|Tumble|Use Rope|Wilderness Lore".split("|");
+
+  let storage = null;
+  try { storage = root_localStorage(); } catch (e) { storage = null; }
+  const memory = {};
+  function root_localStorage() { const ls = (typeof localStorage !== "undefined") ? localStorage : null; if (ls) { ls.setItem(PREFIX + "probe", "1"); ls.removeItem(PREFIX + "probe"); } return ls; }
+  const get = (k) => { try { return storage ? storage.getItem(k) : (k in memory ? memory[k] : null); } catch (e) { return memory[k] ?? null; } };
+  const set = (k, v) => { try { if (storage) storage.setItem(k, v); else memory[k] = v; return true; } catch (e) { memory[k] = v; return false; } };
+  const del = (k) => { try { if (storage) storage.removeItem(k); } catch (e) { /* ignore */ } delete memory[k]; };
+  const persistent = () => !!storage;
+
+  // --- cookies -------------------------------------------------------------
+  function setCookie(name, value, days = 365) {
+    if (typeof document === "undefined") return;
+    try { document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${days * 86400}; path=/; SameSite=Lax`; } catch (e) { /* ignore */ }
+  }
+  function getCookie(name) {
+    if (typeof document === "undefined") return null;
+    const m = document.cookie.split("; ").find((p) => p.startsWith(name + "="));
+    return m ? decodeURIComponent(m.slice(name.length + 1)) : null;
+  }
+
+  // --- index ---------------------------------------------------------------
+  function readIndex() {
+    try { const v = JSON.parse(get(INDEX_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function writeIndex(idx) { set(INDEX_KEY, JSON.stringify(idx)); }
+  function summary(c) {
+    const d = CoC.derive(c);
+    return {
+      id: c.id, name: c.name || "Unnamed investigator", profession: c.profession, level: c.level, era: c.era,
+      hp: d.hp.current, hpMax: d.hp.max, san: d.sanity.current, sanMax: d.sanity.max, updated: c.updated,
+    };
+  }
+
+  function list() {
+    return readIndex().sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+  }
+  function load(id) {
+    try { const raw = JSON.parse(get(PREFIX + "char:" + id) || "null"); return raw ? CoC.normalize(raw) : null; } catch (e) { return null; }
+  }
+  function save(c) {
+    const ch = CoC.normalize(c);
+    ch.updated = new Date().toISOString();
+    const ok = set(PREFIX + "char:" + ch.id, JSON.stringify(ch));
+    const idx = readIndex().filter((e) => e.id !== ch.id);
+    idx.push(summary(ch));
+    writeIndex(idx);
+    return { character: ch, persisted: ok && persistent() };
+  }
+  function remove(id) {
+    del(PREFIX + "char:" + id);
+    writeIndex(readIndex().filter((e) => e.id !== id));
+    if (getCookie("cocd20_last") === id) setCookie("cocd20_last", "", -1);
+  }
+  function duplicate(id) {
+    const c = load(id);
+    if (!c) return null;
+    const copy = CoC.clone(c);
+    copy.id = CoC.uid();
+    copy.name = (c.name || "Investigator") + " (copy)";
+    copy.created = new Date().toISOString();
+    return save(copy).character;
+  }
+
+  function rememberLast(id) { setCookie("cocd20_last", id); set(PREFIX + "last", id); }
+  function lastOpened() { return getCookie("cocd20_last") || get(PREFIX + "last"); }
+  function setPref(name, value) { setCookie("cocd20_" + name, value); set(PREFIX + "pref:" + name, value); }
+  function getPref(name, fallback) { return getCookie("cocd20_" + name) || get(PREFIX + "pref:" + name) || fallback; }
+
+  // --- import / export -----------------------------------------------------
+  function exportData(ids) {
+    const chars = (ids || list().map((e) => e.id)).map(load).filter(Boolean);
+    return JSON.stringify({ format: "cocd20-characters", schemaVersion: CoC.SCHEMA_VERSION, exported: new Date().toISOString(), characters: chars }, null, 2);
+  }
+  /** Accepts v2 bundles, single v2 characters, and v1 exports. Returns imported characters. */
+  function importData(text) {
+    const data = JSON.parse(text);
+    let raws = [];
+    if (data && data.format === "cocd20-characters" && Array.isArray(data.characters)) raws = data.characters;
+    else if (data && data.character && data.characterName) raws = [fromLegacy(data.characterName, data.character)];
+    else if (data && data.schemaVersion && data.abilities) raws = [data];
+    else throw new Error("Not a character file.");
+    const out = [];
+    const existing = new Set(list().map((e) => e.id));
+    for (const raw of raws) {
+      if (!raw || typeof raw !== "object") continue;
+      const c = CoC.normalize(raw);
+      if (existing.has(c.id)) c.id = CoC.uid();  // never overwrite silently
+      out.push(save(c).character);
+    }
+    return out;
+  }
+
+  /** Convert a v1 (original sheet) character to the v2 model. */
+  function fromLegacy(name, old) {
+    const prof = CoC.PROFESSIONS[parseInt(old.profession, 10)] || CoC.PROFESSIONS[0];
+    const c = CoC.newCharacter({
+      name, player: old.playerName || "", gender: old.gender || "", age: parseInt(old.age, 10) || 30,
+      era: CoC.ERAS[old.era] ? old.era : "1921-1940", profession: prof.name,
+      level: parseInt(old.level, 10) || 1, attackOption: old.attackOption === "offense" ? "offense" : "defense",
+    });
+    c.goodSaves = ["fort", "ref", "will"].filter((k) => old.goodSaves && old.goodSaves[k]);
+    for (const a of CoC.ABILITIES) c.abilities[a] = parseInt(old.abilities && old.abilities[a], 10) || 10;
+    // Skills: v1 had a single Knowledge/Craft/Performance row; keep ranks under a "(general)" specialty.
+    for (const s of old.skills || []) {
+      const base = LEGACY_SKILLS[parseInt(s.index, 10)];
+      if (!base) continue;
+      const def = CoC.SKILL_BY_NAME[base];
+      const id = def && def.specialty ? `${base} (general)` : base;
+      const ranks = parseFloat(s.ranks) || 0;
+      if (base === "Cthulhu Mythos") { c.mythos = ranks; continue; }
+      if (ranks || parseInt(s.misc, 10)) c.skills[id] = { ranks, misc: parseInt(s.misc, 10) || 0 };
+    }
+    c.coreSkills = CoC.templateCore(prof.name).filter((id) => !id.includes("*"));
+    c.feats = (old.feats || []).map((i) => LEGACY_FEATS[parseInt(i, 10)]).filter(Boolean).map((n) => ({ name: n }));
+    c.hp.current = old.currentHP === "" || old.currentHP === undefined ? null : parseInt(old.currentHP, 10);
+    c.sanity.current = old.currentSanity === "" || old.currentSanity === undefined ? null : parseInt(old.currentSanity, 10);
+    c.weapons = (old.weapons || []).map((w) => ({ id: CoC.uid(), name: w.name || "Weapon", category: w.type === "ranged" ? "pistol" : "melee", damage: w.damage || "", critical: w.critical || "×2", range: w.range || "", weight: parseFloat(w.weight) || 0 }));
+    c.equipment = (old.equipment || []).map((e) => ({ id: CoC.uid(), name: e.name || "", qty: parseInt(e.quantity, 10) || 1, weight: parseFloat(e.weight) || 0, notes: e.notes || "" }));
+    c.money.cash = old.currentMoney ? parseFloat(old.currentMoney) : null;
+    c.sessionNotes = old.sessionNotes || "";
+    c.notes = "Imported from the original sheet. Review: specialty skills were merged into \"(general)\", core-skill choices, HP rolls and starting money need re-entering.";
+    return CoC.normalize(c);
+  }
+
+  /** One-time copy of characters saved by the original sheet (they are left untouched). */
+  function importLegacyOnce() {
+    if (get(LEGACY_DONE_KEY)) return [];
+    let old = {};
+    try { old = JSON.parse(get(LEGACY_KEY) || "{}"); } catch (e) { old = {}; }
+    const out = [];
+    for (const [name, data] of Object.entries(old || {})) {
+      try { out.push(save(fromLegacy(name, data)).character); } catch (e) { /* skip bad record */ }
+    }
+    set(LEGACY_DONE_KEY, new Date().toISOString());
+    return out;
+  }
+
+  return { list, load, save, remove, duplicate, exportData, importData, fromLegacy, importLegacyOnce, rememberLast, lastOpened, setPref, getPref, persistent };
+});
