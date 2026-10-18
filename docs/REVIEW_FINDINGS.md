@@ -2,7 +2,7 @@
 
 _Review date: 2026-10-18 · Scope: `index.html`, `script.js`, `equipment_functions.js`, `style.css`, README, checked against the Call of Cthulhu d20 core rulebook (`docs/`). No code has been changed._
 
-Page references are **printed** page numbers (PDF page = printed + 2). The rulebook text extraction used to check them is in `docs/rulebook/` (see `EXTRACTION_REVIEW.md` there for verified tables).
+Page references are **printed** page numbers (PDF page = printed + 2). The verified rule tables used to check them are in `docs/rulebook/` (see `EXTRACTION_REVIEW.md` there for verified tables).
 
 Severity: **S1** = the sheet shows a wrong number or loses data in normal use · **S2** = a rules error a GM would notice, or a broken feature · **S3** = minor, cosmetic, or cleanup.
 

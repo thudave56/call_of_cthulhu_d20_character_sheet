@@ -447,6 +447,8 @@
     const o = c.options || {};
     return c.attackOption === "offense" && !!(o.defenseBonus || o.offenseWeaponProficiency);
   }
+  /** XP needed to reach a level — Table 1-10 (p.11): 1,000 × L × (L−1) / 2. */
+  function xpForLevel(level) { const L = Math.max(1, toInt(level, 1)); return 1000 * L * (L - 1) / 2; }
   function abilityIncreaseLevels(level) {
     const out = [];
     for (let l = 4; l <= toInt(level, 1); l += 4) out.push(l);
@@ -492,27 +494,103 @@
       weapons: [],
       equipment: [],
       notes: "", sessionNotes: "",
-      options: { defenseBonus: false, offenseWeaponProficiency: false },
+      options: { defenseBonus: false, offenseWeaponProficiency: false, unmasteredMagic: false },
+      abilityDrain: {},        // permanent ability loss from spells (p.128): lowers the score for good
+      spells: [],              // spells known (Ch. 7)
+      tomes: [],               // Mythos tomes being read or already read (p.119-122)
       armorWeight: 0,          // lb, entered by the player (Table 6-4 lists no weights)
+      levelLogArchive: {},     // level -> entry removed by lowering the level, restored on raising it
+      xp: 0,                   // experience points (Table 1-10)
+      alerts: [],              // rule alerts shown on the play screen until dismissed
+      conditions: [],          // keys from CONDITIONS (p.91)
+      encounter: null,         // { round, init } while a combat is being tracked
+      rev: 0,                  // save revision, used to detect edits from another tab
       log: [],
       created: now, updated: now,
     };
     return Object.assign(c, overrides);
   }
 
-  /** Effective ability scores: rolled + aging + level increases − damage (min 1 before damage). */
+  // ---------------------------------------------------------------------------
+  // Magic (Ch. 7). Spells cost only Sanity and ability damage — there are no
+  // magic points (p.126). Damage is temporary unless marked permanent ("drain").
+  // ---------------------------------------------------------------------------
+  /**
+   * Read a spell's Cost line as printed, e.g. "4 Str damage and 1d3 Sanity points",
+   * "2 Con drain (permanent) and 3d6 Sanity points", "2 Str + 2 Wis damage".
+   * Returns { abilities: [{ ability, amount, permanent }], sanity: "1d3" | null }.
+   */
+  function parseSpellCost(text) {
+    const out = { abilities: [], sanity: null };
+    for (const seg of String(text || "").split(/\s+and\s+|[,;]/i)) {
+      if (/sanity/i.test(seg)) {
+        const m = seg.match(/(\d*d\d+(?:\s*[+-]\s*\d+)?|\d+)/i);
+        if (m) out.sanity = m[1].replace(/\s+/g, "");
+        continue;
+      }
+      const permanent = /drain|permanent/i.test(seg);
+      for (const m of seg.matchAll(/(\d*d\d+(?:\s*[+-]\s*\d+)?|\d+)\s*(Str|Dex|Con|Int|Wis|Cha)\b/gi)) {
+        const ability = m[2][0].toUpperCase() + m[2].slice(1, 3).toLowerCase();
+        out.abilities.push({ ability, amount: m[1].replace(/\s+/g, ""), permanent });
+      }
+    }
+    return out;
+  }
+  /** Saving throw DC against your spells: 15 + Intelligence bonus (p.127). */
+  function spellSaveDC(c) { return 15 + Math.max(0, mods(c).Int); }
+  /** Tome study check bonus: level + Int modifier + earlier study checks with it (p.119). */
+  function tomeStudyBonus(c, tome) { return toInt(c.level, 1) + mods(c).Int + Math.max(0, toInt(tome && tome.studyChecks, 0)); }
+
+  // ---------------------------------------------------------------------------
+  // Conditions — Character Condition Summary (p.91). Effects the sheet applies:
+  // str/dex: effective ability penalty; attack/melee: attack-roll penalty;
+  // init: initiative; loseDex: no positive Dex bonus to AC; helpless: Dex
+  // modifier to AC counts as −5; halfSpeed. When effects can't combine, the
+  // most severe applies (p.91), so ability penalties don't stack.
+  // Disabled, staggered and unconscious come from hit points, not this list.
+  // ---------------------------------------------------------------------------
+  const CONDITIONS = [
+    { key: "blinded", name: "Blinded", loseDex: true, halfSpeed: true, text: "Everything has full concealment (50% miss chance); enemies get +2 to hit; half speed; −4 on most Str- and Dex-based skills; no Spot checks or reading." },
+    { key: "cowering", name: "Cowering", loseDex: true, text: "Frozen in fear: no actions; foes get +2 to hit." },
+    { key: "deafened", name: "Deafened", init: -4, text: "−4 initiative; 20% spell failure with verbal components; no Listen checks." },
+    { key: "entangled", name: "Entangled", attack: -2, dex: -4, halfSpeed: true, text: "−2 attacks, −4 effective Dex; half speed (none if anchored), no running or charging; casting needs Concentration DC 15." },
+    { key: "exhausted", name: "Exhausted", str: -6, dex: -6, halfSpeed: true, text: "Half speed, −6 effective Str and Dex. 1 hour of complete rest → fatigued." },
+    { key: "fatigued", name: "Fatigued", str: -2, dex: -2, text: "Can't run or charge, −2 effective Str and Dex. 8 hours of complete rest ends it." },
+    { key: "flatFooted", name: "Flat-footed", loseDex: true, text: "Hasn't acted yet this combat: loses Dex bonus to AC." },
+    { key: "grappled", name: "Grappled", loseDex: true, text: "Can't move, cast, fire a ranged weapon or use more than a barehanded attack or a Tiny/Small weapon; loses Dex bonus to AC against others." },
+    { key: "helpless", name: "Helpless", helpless: true, text: "Bound, asleep, paralyzed or unconscious: melee attacks against you get +4; coup de grace possible; Dex counts as 0 (−5 to AC)." },
+    { key: "nauseated", name: "Nauseated", text: "Can't attack, cast or concentrate; only a single move action per turn." },
+    { key: "paralyzed", name: "Paralyzed", helpless: true, text: "Rigid and helpless; effective Str and Dex 0, but purely mental actions are possible." },
+    { key: "prone", name: "Prone", melee: -4, text: "−4 melee attacks (firearms unaffected). Foes get +4 in melee, −4 at range. Standing is a move action." },
+    { key: "stunned", name: "Stunned", loseDex: true, text: "No actions; loses Dex bonus to AC; attackers get +2; drops anything held." },
+  ];
+  const CONDITION_BY_KEY = Object.fromEntries(CONDITIONS.map((x) => [x.key, x]));
+  /** Combined effects of the character's conditions. */
+  function conditionEffects(c) {
+    const list = (c.conditions || []).map((k) => CONDITION_BY_KEY[k]).filter(Boolean);
+    const min = (k) => Math.min(0, ...list.map((x) => x[k] || 0));
+    return {
+      list, str: min("str"), dex: min("dex"), attack: min("attack"), melee: min("melee"), init: min("init"),
+      loseDex: list.some((x) => x.loseDex || x.helpless), helpless: list.some((x) => x.helpless), halfSpeed: list.some((x) => x.halfSpeed),
+    };
+  }
+
+  /** Effective ability scores: rolled + aging + level increases − damage (min 1 before damage) − condition penalties. */
   function abilityScores(c) {
     const aging = agingCategory(c.age);
     const inc = {};
     for (const e of c.levelLog || []) if (e && e.abilityIncrease) inc[e.abilityIncrease] = (inc[e.abilityIncrease] || 0) + 1;
     const out = {};
+    const cond = conditionEffects(c);
     for (const a of ABILITIES) {
       const base = toInt(c.abilities && c.abilities[a], 10);
       const ageMod = ["Str", "Dex", "Con"].includes(a) ? aging.physical : aging.mental;
-      const permanent = Math.max(1, base + ageMod + (inc[a] || 0));
+      const drained = Math.max(0, toInt(c.abilityDrain && c.abilityDrain[a], 0));
+      const permanent = Math.max(0, Math.max(1, base + ageMod + (inc[a] || 0)) - drained);
       const dmg = Math.max(0, toInt(c.abilityDamage && c.abilityDamage[a], 0));
-      const score = Math.max(0, permanent - dmg);
-      out[a] = { base, ageMod, increases: inc[a] || 0, permanent, damage: dmg, score, mod: abilityMod(score) };
+      const condition = a === "Str" ? cond.str : a === "Dex" ? cond.dex : 0;
+      const score = Math.max(0, permanent - dmg + condition);
+      out[a] = { base, ageMod, increases: inc[a] || 0, drained, permanent, damage: dmg, condition, score, mod: abilityMod(score) };
     }
     return out;
   }
@@ -548,15 +626,19 @@
     const bab = baseAttackBonus(c.level, c.attackOption);
     const armor = armorDef(c);
     const defBonus = c.options && c.options.defenseBonus ? defenseBonus(c.level, c.attackOption) : 0;
-    const ac = 10 + m.Dex + armor.bonus + defBonus;
+    const cond = conditionEffects(c);
+    // Conditions (p.91): helpless counts Dex as 0 (−5); others lose only a positive Dex bonus.
+    const dexAC = cond.helpless ? -5 : cond.loseDex ? Math.min(0, m.Dex) : m.Dex;
+    const ac = 10 + dexAC + armor.bonus + defBonus;
     const initFeat = featCount(c, "Improved Initiative") ? 4 : 0;
     return {
       bab, sequence: attackSequence(bab),
-      melee: bab + m.Str, ranged: bab + m.Dex,
-      ac, acParts: { base: 10, dex: m.Dex, armor: armor.bonus, defense: defBonus },
-      flatFooted: ac - Math.max(0, m.Dex), touch: 10 + m.Dex + defBonus,
-      init: m.Dex + initFeat, initParts: { dex: m.Dex, feat: initFeat },
-      speed: 30, armor, acp: armor.acp,
+      melee: bab + m.Str + cond.attack + cond.melee, ranged: bab + m.Dex + cond.attack,
+      ac, acParts: { base: 10, dex: dexAC, armor: armor.bonus, defense: defBonus },
+      flatFooted: ac - Math.max(0, dexAC), touch: 10 + dexAC + defBonus,
+      init: m.Dex + initFeat + cond.init, initParts: { dex: m.Dex, feat: initFeat, condition: cond.init },
+      speed: cond.halfSpeed ? 15 : 30, armor, acp: armor.acp,
+      conditions: cond,
     };
   }
 
@@ -584,20 +666,22 @@
     const finesse = !ranged && (c.feats || []).some((f) => f.name === "Weapon Finesse" && f.choice && weapon.finesseAs === f.choice);
     const abil = ranged ? "Dex" : finesse ? "Dex" : "Str";
     const prof = isProficient(c, weapon) ? 0 : -4;
-    const focus = (c.feats || []).some((f) => f.name === "Weapon Focus" && f.choice && f.choice === weapon.name) ? 1 : 0;
+    const chosen = (f) => f.choice && (f.choice === weapon.id || f.choice === weapon.name);
+    const focus = (c.feats || []).some((f) => f.name === "Weapon Focus" && chosen(f)) ? 1 : 0;
     const acp = cb.acp; // armor check penalty also applies to attack rolls (p.94)
-    const bonus = cb.bab + m[abil] + prof + focus + acp;
-    const seq = cb.sequence.map((b) => b + m[abil] + prof + focus + acp);
+    const cond = cb.conditions.attack + (ranged ? 0 : cb.conditions.melee);
+    const bonus = cb.bab + m[abil] + prof + focus + acp + cond;
+    const seq = cb.sequence.map((b) => b + m[abil] + prof + focus + acp + cond);
     let dmgBonus = 0;
     if (!ranged && weapon.category !== "thrown") dmgBonus = weapon.twoHanded ? Math.floor(m.Str * 1.5) : m.Str;
     if (weapon.category === "thrown") dmgBonus = m.Str;
     if (weapon.category === "unarmed" && hasFeat(c, "Martial Artist")) weapon = Object.assign({}, weapon, { damage: "1d4" });
-    const improved = (c.feats || []).some((f) => f.name === "Improved Critical" && f.choice === weapon.name);
+    const improved = (c.feats || []).some((f) => f.name === "Improved Critical" && chosen(f));
     const threat = threatRange(weapon.critical, improved);
     const mult = (String(weapon.critical || "").match(/[×x](\d)/) || [0, 2])[1];
     return {
       ranged, ability: abil, bonus, sequence: seq,
-      parts: { bab: cb.bab, ability: m[abil], nonproficient: prof, focus, armor: acp },
+      parts: { bab: cb.bab, ability: m[abil], nonproficient: prof, focus, armor: acp, condition: cond },
       damage: weapon.damage, damageBonus: dmgBonus,
       critical: `${threat < 20 ? threat + "-20" : "20"}/×${mult}`, threat, multiplier: +mult,
       pointBlank: ranged && hasFeat(c, "Point Blank Shot"),
@@ -746,7 +830,8 @@
   function isCore(c, id) { return (c.coreSkills || []).includes(id); }
 
   function skillPoints(c) {
-    const m = mods(c);
+    // Temporary Int damage does not reduce skill points (p.63): use the permanent score.
+    const m = { Int: abilityMod(abilityScores(c).Int.permanent) };
     const perLevel = (c.levelLog || []).map((e, i) => {
       const intMod = e && e.intMod !== null && e.intMod !== undefined ? toInt(e.intMod) : m.Int;
       const base = Math.max(1, 8 + intMod);
@@ -842,70 +927,73 @@
     for (const f of p.feats || []) if (!hasFeat(c, f)) out.push(`${d.name} needs ${f}`);
     if (p.bab && baseAttackBonus(c.level, c.attackOption) < p.bab) out.push(`${d.name} needs base attack +${p.bab}`);
     if (d.choice && !feat.choice) out.push(`${d.name}: choose a ${d.choice}`);
-    if (p.proficient && feat.choice && d.choice === "weapon") {
-      const w = (c.weapons || []).find((x) => x.name === feat.choice);
-      if (w && !isProficient(c, w)) out.push(`${d.name} (${feat.choice}) needs Weapon Proficiency (${WEAPON_CATEGORIES[w.category] || w.category})`);
+    if (feat.choice && d.choice === "weapon") {
+      const w = (c.weapons || []).find((x) => x.id === feat.choice || x.name === feat.choice);
+      if (!w) out.push(`${d.name}: pick one of your weapons (the chosen weapon is gone)`);
+      else if (p.proficient && !isProficient(c, w)) out.push(`${d.name} (${w.name}) needs Weapon Proficiency (${WEAPON_CATEGORIES[w.category] || w.category})`);
     }
+    if (feat.choice && d.choice === "skill" && !skillIds(c).includes(feat.choice)) out.push(`${d.name}: "${feat.choice}" is no longer one of your skills`);
     return out;
   }
 
   function validate(c, { creation = true } = {}) {
     const issues = [];
-    const err = (msg) => issues.push({ level: "error", msg });
-    const warn = (msg) => issues.push({ level: "warn", msg });
-    if (!String(c.name || "").trim()) err("Character needs a name.");
+    const err = (msg, step) => issues.push({ level: "error", msg, step });
+    const warn = (msg, step) => issues.push({ level: "warn", msg, step });
+    if (!String(c.name || "").trim()) err("Character needs a name.", "basics");
     for (const a of ABILITIES) {
       const v = toInt(c.abilities && c.abilities[a], NaN);
-      if (!Number.isFinite(v) || v < 3 || v > 18) warn(`${ABILITY_NAMES[a]} ${c.abilities && c.abilities[a]} is outside the 3–18 rolled range.`);
+      if (!Number.isFinite(v) || v < 3 || v > 18) warn(`${ABILITY_NAMES[a]} ${c.abilities && c.abilities[a]} is outside the 3–18 rolled range.`, "abilities");
     }
     // Saves (Tables 1-8/1-9)
     const need = goodSaveCount(c.attackOption);
     const got = (c.goodSaves || []).length;
-    if (got !== need) err(`${c.attackOption === "offense" ? "Offense" : "Defense"} option needs exactly ${need} good save${need > 1 ? "s" : ""} (have ${got}).`);
+    if (got !== need) err(`${c.attackOption === "offense" ? "Offense" : "Defense"} option needs exactly ${need} good save${need > 1 ? "s" : ""} (have ${got}).`, "basics");
     // Core skills: 9 template + 3 choice = 12 (p.11)
     const core = c.coreSkills || [];
-    if (core.length !== 12) err(`Choose 12 core skills (have ${core.length}): the 9 template skills plus 3 of your choice.`);
-    if (core.some((id) => String(id).includes("*"))) err("Pick a specialty for every \"any one\" template skill.");
-    if (core.includes("Cthulhu Mythos")) err("Cthulhu Mythos can never be a core skill.");
-    if (new Set(core).size !== core.length) err("Core skills must all be different.");
+    if (core.length !== 12) err(`Choose 12 core skills (have ${core.length}): the 9 template skills plus 3 of your choice.`, "skills");
+    if (core.some((id) => String(id).includes("*"))) err("Pick a specialty for every \"any one\" template skill.", "skills");
+    if (core.includes("Cthulhu Mythos")) err("Cthulhu Mythos can never be a core skill.", "skills");
+    const dups = [...new Set(core.filter((id, i) => core.indexOf(id) !== i))];
+    if (dups.length) err(`Core skills must all be different: ${dups.join(", ")} is chosen twice${dups.some((x) => x.includes("*")) ? " (fill in the specialties)" : ""}.`, "skills");
     const tmpl = templateCore(c.profession).filter((id) => !id.includes("*"));
     const missingTmpl = tmpl.filter((id) => !core.includes(id));
-    if (missingTmpl.length) warn(`Template core skill(s) swapped out: ${missingTmpl.join(", ")} (needs GM approval, p.11).`);
+    if (missingTmpl.length) warn(`Template core skill(s) swapped out: ${missingTmpl.join(", ")} (needs GM approval, p.11).`, "skills");
     // Skill points and maximum ranks
     const sp = skillPoints(c);
-    if (sp.remaining < 0) err(`Skill points overspent by ${-sp.remaining}.`);
-    else if (sp.remaining > 0 && creation) warn(`${sp.remaining} skill point${sp.remaining > 1 ? "s" : ""} unspent (all points must be spent, p.18).`);
+    if (sp.remaining < 0) err(`Skill points overspent by ${-sp.remaining}.`, "skills");
+    else if (sp.remaining > 0 && creation) warn(`${sp.remaining} skill point${sp.remaining > 1 ? "s" : ""} unspent (all points must be spent, p.18).`, "skills");
     for (const row of skillTable(c)) {
       if (row.def.mythos) continue;
-      if (row.ranks > row.max) err(`${row.id}: ${row.ranks} ranks exceeds the ${row.core ? "core" : "noncore"} maximum of ${row.max}.`);
-      if (row.core && row.ranks % 1 !== 0) err(`${row.id}: core skills take whole ranks.`);
-      if (!row.core && (row.ranks * 2) % 1 !== 0) err(`${row.id}: noncore ranks go in ½ steps.`);
+      if (row.ranks > row.max) err(`${row.id}: ${row.ranks} ranks exceeds the ${row.core ? "core" : "noncore"} maximum of ${row.max}.`, "skills");
+      if (row.core && row.ranks % 1 !== 0) err(`${row.id}: core skills take whole ranks.`, "skills");
+      if (!row.core && (row.ranks * 2) % 1 !== 0) err(`${row.id}: noncore ranks go in ½ steps.`, "skills");
     }
-    if (creation && toInt(c.mythos) > 0) warn("Starting characters cannot have Cthulhu Mythos ranks (p.18); ranks come from play.");
+    if (creation && toInt(c.mythos) > 0) warn("Starting characters cannot have Cthulhu Mythos ranks (p.18); ranks come from play.", "basics");
     // Feats
     const slots = featSlots(c);
-    if ((c.feats || []).length > slots) err(`Too many feats: ${c.feats.length} of ${slots}.`);
-    else if ((c.feats || []).length < slots && creation) warn(`${slots - c.feats.length} feat slot(s) unused.`);
+    if ((c.feats || []).length > slots) err(`Too many feats: ${c.feats.length} of ${slots}.`, "feats");
+    else if ((c.feats || []).length < slots && creation) warn(`${slots - c.feats.length} feat slot(s) unused.`, "feats");
     const seen = new Set();
     for (const f of c.feats || []) {
       const d = FEAT_BY_NAME[f.name];
       const key = f.name + "|" + (f.choice || "");
-      if (d && !d.multi && seen.has(f.name)) err(`${f.name} can only be taken once.`);
-      if (d && d.multi && !d.stack && seen.has(key)) err(`${f.name} (${f.choice}) taken twice — pick a different ${d.choice}.`);
+      if (d && !d.multi && seen.has(f.name)) err(`${f.name} can only be taken once.`, "feats");
+      if (d && d.multi && !d.stack && seen.has(key)) err(`${f.name} (${f.choice}) taken twice — pick a different ${d.choice}.`, "feats", "feats");
       seen.add(f.name); seen.add(key);
-      for (const m of featPrereqIssues(c, f)) err(m);
+      for (const m of featPrereqIssues(c, f)) err(m, "feats");
     }
-    if (offenseBonusFeat(c) && !hasFeat(c, "Weapon Proficiency")) warn("The Offense option's bonus feat must be a Weapon Proficiency (p.15) — pick one.");
+    if (offenseBonusFeat(c) && !hasFeat(c, "Weapon Proficiency")) warn("The Offense option's bonus feat must be a Weapon Proficiency (p.15) — pick one.", "feats");
     // Level log
     const L = toInt(c.level, 1);
-    if ((c.levelLog || []).length !== L) err(`Level history has ${(c.levelLog || []).length} entries for level ${L}.`);
+    if ((c.levelLog || []).length !== L) err(`Level history has ${(c.levelLog || []).length} entries for level ${L}.`, "basics");
     const hp = hitPoints(c);
-    if (hp.missingRolls) warn(`${hp.missingRolls} hit-die roll(s) missing (1d6 per level after 1st).`);
+    if (hp.missingRolls) warn(`${hp.missingRolls} hit-die roll(s) missing (1d6 per level after 1st).`, "hp");
     for (const l of abilityIncreaseLevels(L)) {
       const e = (c.levelLog || [])[l - 1];
-      if (!e || !e.abilityIncrease) warn(`Level ${l}: choose an ability score to increase.`);
+      if (!e || !e.abilityIncrease) warn(`Level ${l}: choose an ability score to increase.`, "abilities");
     }
-    if (!money(c).rolled) warn("Starting money not rolled yet.");
+    if (!money(c).rolled) warn("Starting money not rolled yet.", "hp");
     return issues;
   }
 
@@ -914,8 +1002,18 @@
     const next = clone(c);
     const L = Math.max(1, Math.min(20, toInt(next.level, 1)));
     next.level = L;
-    const log = (next.levelLog || []).slice(0, L);
-    while (log.length < L) log.push({ level: log.length + 1, intMod: null, hpRoll: null, abilityIncrease: null });
+    // Entries above the new level are archived, so lowering the level and raising
+    // it again brings back the recorded hit-die rolls and ability increases.
+    const archive = Object.assign({}, next.levelLogArchive || {});
+    const full = next.levelLog || [];
+    full.slice(L).forEach((e, i) => { if (e) archive[L + i + 1] = e; });
+    const log = full.slice(0, L);
+    while (log.length < L) {
+      const lvl = log.length + 1;
+      log.push(archive[lvl] ? Object.assign({}, archive[lvl]) : { level: lvl, intMod: null, hpRoll: null, abilityIncrease: null });
+      delete archive[lvl];
+    }
+    next.levelLogArchive = archive;
     log.forEach((e, i) => { e.level = i + 1; if (i === 0) e.hpRoll = null; if ((i + 1) % 4 !== 0) e.abilityIncrease = null; });
     next.levelLog = log;
     return next;
@@ -936,20 +1034,124 @@
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
   /** Normalise a stored/imported character (fills missing fields, upgrades schema). */
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const numOrNull = (v) => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+  const str = (v, max = 2000) => (v === null || v === undefined ? "" : String(v).slice(0, max));
+  const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+  /**
+   * Normalise a stored or imported character: fill missing fields, upgrade the
+   * schema, and coerce every field to its expected type so hostile or malformed
+   * files can't inject markup or crash the views.
+   */
   function normalize(raw) {
     const base = newCharacter();
-    const c = Object.assign(base, clone(raw || {}));
-    c.abilities = Object.assign({}, base.abilities, c.abilities || {});
-    c.abilityDamage = Object.assign({ Str: 0, Dex: 0, Con: 0, Int: 0, Wis: 0, Cha: 0 }, c.abilityDamage || {});
-    c.sanity = Object.assign(newCharacter().sanity, c.sanity || {});
-    c.hp = Object.assign({ current: null, subdual: 0, stable: false }, c.hp || {});
-    c.money = Object.assign({ roll: null, cash: null, notes: "" }, c.money || {});
-    c.options = Object.assign({ defenseBonus: false, offenseWeaponProficiency: false }, c.options || {});
-    for (const k of ["feats", "weapons", "equipment", "coreSkills", "goodSaves", "log"]) if (!Array.isArray(c[k])) c[k] = [];
-    if (!c.skills || typeof c.skills !== "object") c.skills = {};
+    const src = isObj(raw) ? clone(raw) : {};
+    delete src.__proto__; delete src.constructor; delete src.prototype;
+    const c = Object.assign(base, src);
+    if (!ID_RE.test(String(c.id || ""))) c.id = uid();
+    for (const k of ["name", "player", "gender", "height", "weight", "notes", "sessionNotes"]) c[k] = str(c[k], k.endsWith("otes") ? 20000 : 200);
+    c.age = Math.max(0, Math.min(200, toInt(c.age, 30)));
+    if (!PROFESSION_BY_NAME[c.profession]) c.profession = "Professor";
+    if (!ERAS[c.era]) c.era = "1921-1940";
+    if (c.attackOption !== "offense") c.attackOption = "defense";
+    if (!ARMOR.some((a) => a.name === c.armor)) c.armor = "None";
+    c.level = Math.max(1, Math.min(20, toInt(c.level, 1)));
+    c.mythos = Math.max(0, toInt(c.mythos, 0));
+    c.armorWeight = Math.max(0, toNum(c.armorWeight, 0));
+    const abil = isObj(c.abilities) ? c.abilities : {};
+    const dmg = isObj(c.abilityDamage) ? c.abilityDamage : {};
+    c.abilities = {}; c.abilityDamage = {};
+    for (const a of ABILITIES) { c.abilities[a] = toInt(abil[a], 10); c.abilityDamage[a] = Math.max(0, toInt(dmg[a], 0)); }
+    const san = isObj(c.sanity) ? c.sanity : {};
+    c.sanity = Object.assign(newCharacter().sanity, {
+      current: numOrNull(san.current), hourStart: numOrNull(san.hourStart), hourLoss: Math.max(0, toInt(san.hourLoss, 0)),
+      insanity: ["sane", "temporary", "indefinite", "permanent"].includes(san.insanity) ? san.insanity : "sane",
+      mythosInsanities: Math.max(0, toInt(san.mythosInsanities, 0)),
+      log: Array.isArray(san.log) ? san.log.filter(isObj).slice(-200).map((l) => ({ t: str(l.t, 40), delta: toInt(l.delta, 0), reason: str(l.reason, 200) })) : [],
+    });
+    const hp = isObj(c.hp) ? c.hp : {};
+    c.hp = { current: numOrNull(hp.current), subdual: Math.max(0, toInt(hp.subdual, 0)), stable: !!hp.stable };
+    const money = isObj(c.money) ? c.money : {};
+    const roll = toInt(money.roll, 0);
+    c.money = { roll: roll >= 1 && roll <= 6 ? roll : null, cash: numOrNull(money.cash), notes: str(money.notes, 500) };
+    const opt = isObj(c.options) ? c.options : {};
+    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency, unmasteredMagic: !!opt.unmasteredMagic };
+    const arr = (v) => (Array.isArray(v) ? v : []);
+    c.goodSaves = [...new Set(arr(c.goodSaves).filter((k) => ["fort", "ref", "will"].includes(k)))];
+    c.coreSkills = arr(c.coreSkills).filter((x) => typeof x === "string").map((x) => str(x, 120)).slice(0, 12);
+    c.feats = arr(c.feats).filter((f) => isObj(f) && FEAT_BY_NAME[f.name]).map((f) => ({ name: f.name, choice: f.choice === null || f.choice === undefined || f.choice === "" ? null : str(f.choice, 120) }));
+    c.weapons = arr(c.weapons).filter(isObj).map((w) => ({
+      id: ID_RE.test(String(w.id || "")) ? String(w.id) : uid(), name: str(w.name, 120) || "Weapon",
+      category: WEAPON_CATEGORIES[w.category] ? w.category : "melee", damage: str(w.damage, 60), critical: str(w.critical, 20) || "×2",
+      range: str(w.range, 30), rof: str(w.rof, 30), notes: str(w.notes, 300), finesseAs: FINESSE_WEAPONS.includes(w.finesseAs) ? w.finesseAs : "",
+      twoHanded: !!w.twoHanded, capacity: numOrNull(w.capacity) === null ? null : Math.max(0, toInt(w.capacity)),
+      ammo: numOrNull(w.ammo) === null ? null : Math.max(0, toInt(w.ammo)), weight: Math.max(0, toNum(w.weight, 0)),
+    }));
+    for (const w of c.weapons) if (w.capacity !== null && w.ammo !== null && w.ammo > w.capacity) w.ammo = w.capacity;
+    c.equipment = arr(c.equipment).filter(isObj).map((e) => ({
+      id: ID_RE.test(String(e.id || "")) ? String(e.id) : uid(), name: str(e.name, 200), qty: Math.max(1, toInt(e.qty, 1)),
+      weight: Math.max(0, toNum(e.weight, 0)), notes: str(e.notes, 300),
+    }));
+    c.log = arr(c.log).filter(isObj).slice(0, 60).map((l) => ({ t: str(l.t, 40), text: str(l.text, 300) }));
+    const skills = isObj(c.skills) ? c.skills : {};
+    c.skills = {};
+    for (const [id, v] of Object.entries(skills)) {
+      if (!skillDef(id) || !isObj(v)) continue;
+      c.skills[str(id, 120)] = { ranks: Math.max(0, Math.min(40, toNum(v.ranks, 0))), misc: toInt(v.misc, 0) };
+    }
+    const lvlEntry = (e, i) => ({
+      level: i + 1, intMod: numOrNull(e && e.intMod), hpRoll: (() => { const r = toInt(e && e.hpRoll, 0); return r >= 1 && r <= 6 ? r : null; })(),
+      abilityIncrease: e && ABILITIES.includes(e.abilityIncrease) ? e.abilityIncrease : null,
+    });
+    c.levelLog = arr(c.levelLog).map((e, i) => lvlEntry(isObj(e) ? e : {}, i));
+    const archive = isObj(c.levelLogArchive) ? c.levelLogArchive : {};
+    c.levelLogArchive = {};
+    for (const [k, e] of Object.entries(archive)) { const n = toInt(k, 0); if (n >= 2 && n <= 20 && isObj(e)) c.levelLogArchive[n] = lvlEntry(e, n - 1); }
+    for (const k of ["created", "updated"]) c[k] = str(c[k], 40) || new Date().toISOString();
+    c.rev = Math.max(0, toInt(c.rev, 0));
+    c.xp = Math.max(0, toInt(c.xp, 0));
+    const ALERT_ACTIONS = ["", "roll-temp-insanity", "roll-indef-insanity"];
+    c.alerts = arr(c.alerts).filter(isObj).slice(0, 6).map((a) => ({
+      kind: a.kind === "danger" ? "danger" : "warn", title: str(a.title, 200), text: str(a.text, 600),
+      action: ALERT_ACTIONS.includes(a.action) ? a.action : "",
+    }));
+    const drain = isObj(c.abilityDrain) ? c.abilityDrain : {};
+    c.abilityDrain = {};
+    for (const a of ABILITIES) c.abilityDrain[a] = Math.max(0, toInt(drain[a], 0));
+    c.spells = arr(c.spells).filter(isObj).slice(0, 200).map((sp) => ({
+      id: ID_RE.test(String(sp.id || "")) ? sp.id : uid(), name: str(sp.name, 120) || "Spell", cost: str(sp.cost, 200),
+      castingTime: str(sp.castingTime, 80), range: str(sp.range, 80), duration: str(sp.duration, 80), save: str(sp.save, 80),
+      components: str(sp.components, 40), notes: str(sp.notes, 2000), casts: Math.max(0, toInt(sp.casts, 0)),
+    }));
+    c.tomes = arr(c.tomes).filter(isObj).slice(0, 100).map((t) => ({
+      id: ID_RE.test(String(t.id || "")) ? t.id : uid(), name: str(t.name, 160) || "Tome", language: str(t.language, 80),
+      exam: str(t.exam, 60), dc: Math.max(1, Math.min(60, toInt(t.dc, 20))),
+      sanityInitial: str(t.sanityInitial, 30), sanityComplete: str(t.sanityComplete, 30), mythos: Math.max(0, Math.min(20, toInt(t.mythos, 0))),
+      spells: str(t.spells, 1000), status: ["unread", "examining", "read"].includes(t.status) ? t.status : "unread",
+      initialDone: !!t.initialDone, studyChecks: Math.max(0, toInt(t.studyChecks, 0)), notes: str(t.notes, 2000),
+    }));
+    c.conditions = [...new Set(arr(c.conditions).filter((k) => CONDITION_BY_KEY[k]))];
+    const enc = isObj(c.encounter) ? c.encounter : null;
+    c.encounter = enc ? { round: Math.max(1, Math.min(9999, toInt(enc.round, 1))), init: numOrNull(enc.init) } : null;
     c.schemaVersion = SCHEMA_VERSION;
-    return syncLevelLog(c);
+    const out = syncLevelLog(c);
+    // Current Sanity can never exceed maximum Sanity (p.50).
+    const s = sanity(out);
+    if (out.sanity.current !== null && out.sanity.current > s.max) out.sanity.current = s.max;
+    return out;
   }
+
+  /** What an ability score of 0 means (p.62). Ability scores never drop below 0. */
+  const ABILITY_ZERO = {
+    Str: "Strength 0: cannot move at all; lies helpless on the ground.",
+    Dex: "Dexterity 0: cannot move at all; stands motionless, rigid and helpless.",
+    Con: "Constitution 0: the character is dead.",
+    Int: "Intelligence 0: cannot think; helpless and unconscious in a comalike stupor.",
+    Wis: "Wisdom 0: helpless, withdrawn into a deep sleep filled with nightmares.",
+    Cha: "Charisma 0: helpless, withdrawn into a catatonic, comalike stupor.",
+  };
+  const UNARMED = { id: "unarmed", name: "Unarmed strike", category: "unarmed", damage: "1d3 subdual", critical: "×2", range: "" };
 
   /** Full derived sheet in one call — what every UI design renders from. */
   function derive(c) {
@@ -961,6 +1163,9 @@
       sanity: sanity(c), skills: skillTable(c), skillPoints: skillPoints(c), featSlots: featSlots(c),
       money: money(c), aging: agingCategory(c.age), gearWeight: gearWeight(c),
       weapons: (c.weapons || []).map((w) => Object.assign({ weapon: w }, weaponAttack(c, w))),
+      unarmed: Object.assign({ weapon: UNARMED }, weaponAttack(c, UNARMED)),
+      abilityZero: ABILITIES.filter((a) => scores[a].score === 0).map((a) => ({ ability: a, text: ABILITY_ZERO[a], dead: a === "Con" })),
+      xp: { current: toInt(c.xp, 0), level: xpForLevel(c.level), next: c.level >= 20 ? null : xpForLevel(toInt(c.level, 1) + 1) },
       profession: PROFESSION_BY_NAME[c.profession] || null,
     };
   }
@@ -1037,6 +1242,30 @@
     const rolls = Array.from({ length: n }, () => rollDie(sides, rng));
     return { total: Math.max(0, rolls.reduce((a, b) => a + b, 0) + bonus), rolls, bonus };
   }
+  /**
+   * General dice roller: "3d6+2", "1d20+1d4-1", "d%", "2d10". Up to 100 dice of
+   * up to 1000 sides. Returns { total, detail, terms } or null if unreadable.
+   */
+  function rollDiceExpr(expr, rng = Math.random) {
+    const e = String(expr || "").toLowerCase().replace(/\s+/g, "").replace(/d%/g, "d100");
+    if (!e || e.length > 60 || !/^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/.test(e)) return null;
+    const terms = [];
+    let dice = 0;
+    for (const [, sign, body] of e.matchAll(/([+-]?)(\d*d\d+|\d+)/g)) {
+      const k = sign === "-" ? -1 : 1;
+      const m = body.match(/^(\d*)d(\d+)$/);
+      if (!m) { terms.push({ text: sign + body, rolls: [], value: k * +body }); continue; }
+      const n = +(m[1] || 1), sides = +m[2];
+      dice += n;
+      if (n < 1 || sides < 2 || sides > 1000 || dice > 100) return null;
+      const rolls = Array.from({ length: n }, () => rollDie(sides, rng));
+      terms.push({ text: sign + body, rolls, value: k * rolls.reduce((a, b) => a + b, 0) });
+    }
+    const total = terms.reduce((a, t) => a + t.value, 0);
+    const detail = terms.map((t, i) => `${i && t.value >= 0 ? "+ " : t.value < 0 ? "− " : ""}${t.rolls.length ? `${t.text.replace(/^[+-]/, "")} [${t.rolls.join(", ")}]` : Math.abs(t.value)}`).join(" ");
+    return { total, detail, terms };
+  }
+
   /** Parse Sanity loss notation "success/failure", e.g. "0/1d6" or "1/1d4+1". */
   function parseSanityLoss(text) {
     const parts = String(text || "").split("/").map((x) => x.trim());
@@ -1099,9 +1328,9 @@
     toInt, toNum, fmt, abilityMod, rollDie, uid, clone,
     skillBase, skillSpecialty, skillDef,
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
-    abilityIncreaseLevels, defenseBonus, agingCategory, offenseBonusFeat, gearWeight, sampleCharacter,
+    abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    firearmFullAttack, lookup, rollExpr, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    firearmFullAttack, lookup, rollExpr, rollDiceExpr, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,

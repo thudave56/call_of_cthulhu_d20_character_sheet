@@ -1,6 +1,20 @@
 # Call of Cthulhu d20 Character Sheet - AI Coding Agent Instructions
 
-## Project Architecture
+## Two versions — work in v2 unless asked otherwise
+
+- **v2 (default, `v2/`)**: Investigator Sheets. The site root redirects here (see `version-switch.js`).
+  - `v2/js/rules.js` is the rules engine. It is a pure UMD module with no DOM: every table and calculation lives here, with printed page references in comments.
+  - Everything the UI shows comes from `CoC.derive(character)`. Stored data goes through `CoC.normalize()`, which coerces every field to its type, so new fields need a default in `newCharacter()` and a coercion line in `normalize()`.
+  - `v2/js/store.js` handles saving: one localStorage key per character (`cocd20v2:char:<id>`), revision numbers that refuse stale saves, import/export, and copying characters from v1.
+  - `v2/js/app.js` handles routing (`#/`, `#/edit/<id>/<step>`, `#/play/<id>`), the editor, undo, and focus-preserving re-renders.
+  - `v2/js/designs.js` holds the three play layouts and their actions.
+  - **Escape** every user-provided string with `esc()` in templates.
+  - Tests: `node --test v2/tests/*.test.js` for the engine and storage, and `v2/tests/browser/smoke.js` (Playwright) in CI. Add a test with every rule change. `v2/DESIGNS.md` maps each rule to its page, code and test.
+  - The rulebook PDF and its text extraction are local only and git-ignored. Never commit them.
+- **v1 (original, repo root)**: the notes below describe it. It is kept for players who prefer it (`?v1`).
+
+
+## v1: Project Architecture
 
 This is a **client-side web application** for Call of Cthulhu d20 character management with **no build process, dependencies, or server**. Simply open `index.html` in a browser to run.
 

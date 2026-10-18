@@ -1,0 +1,13 @@
+{
+  "name": "Investigator Sheets — Call of Cthulhu d20",
+  "short_name": "Investigators",
+  "description": "Rules-checked Call of Cthulhu d20 character sheets that work offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ec",
+  "theme_color": "#2f5d50",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

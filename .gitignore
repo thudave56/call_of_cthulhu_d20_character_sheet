@@ -63,3 +63,10 @@ build/
 # Local storage and cache
 .cache/
 *.cache.claude/
+
+# Copyrighted rulebook and its full-text extraction: keep local copies only,
+# never publish them (the repo and GitHub Pages are public).
+docs/*.pdf
+docs/Rulebook_Split/
+docs/rulebook/rulebook.md
+docs/rulebook/rulebook_layout.txt

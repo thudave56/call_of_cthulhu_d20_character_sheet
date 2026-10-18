@@ -5,9 +5,8 @@
  * Usage: <script src="version-switch.js" data-current="v1"
  *                 data-v1="index.html" data-v2="v2/index.html"></script>
  *
- * The choice is remembered in this browser. Opening the original page
- * redirects to v2 when v2 was the last choice; add ?v1 to the URL to stay
- * on the original regardless.
+ * v2 is the default: opening the original page (the site root) redirects to
+ * v2 unless this browser chose the original sheet, or the URL has ?v1.
  */
 (function () {
   "use strict";
@@ -20,8 +19,8 @@
   function getPref() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function setPref(v) { try { localStorage.setItem(KEY, v); } catch (e) { /* storage blocked */ } }
 
-  // The original page follows the remembered choice unless ?v1 is given.
-  if (current === "v1" && getPref() === "v2" && !/[?&]v1\b/.test(location.search)) {
+  // The original page sends everyone to v2 unless they chose v1 or asked for it with ?v1.
+  if (current === "v1" && getPref() !== "v1" && !/[?&]v1\b/.test(location.search)) {
     location.replace(urls.v2);
     return;
   }
@@ -50,7 +49,7 @@
     label.textContent = "Version";
     var select = document.createElement("select");
     select.id = "vswitchSelect";
-    [["v2", "New: Investigator Sheets (v2)"], ["v1", "Original sheet (v1)"]].forEach(function (o) {
+    [["v2", "Investigator Sheets (v2)"], ["v1", "Original sheet (v1)"]].forEach(function (o) {
       var opt = document.createElement("option");
       opt.value = o[0];
       opt.textContent = o[1];
@@ -67,7 +66,7 @@
     var note = document.createElement("span");
     note.className = "vnote";
     note.textContent = current === "v1"
-      ? "Try the new version: rules-checked, three play layouts."
+      ? "You're on the original sheet. Investigator Sheets (v2) is the default."
       : "Each version keeps its own saved characters in this browser.";
 
     bar.appendChild(label);

@@ -420,3 +420,103 @@ test("Two-weapon penalties Table 5-1 (p.67)", () => {
   assert.deepEqual(CoC.TWO_WEAPON[0].slice(1), ["−6", "−10"]);
   assert.deepEqual(CoC.TWO_WEAPON[7].slice(1), ["−2", "−2"]);
 });
+
+test("XP thresholds Table 1-10 (p.11)", () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 10, 20].map(CoC.xpForLevel), [0, 1000, 3000, 6000, 10000, 15000, 45000, 190000]);
+});
+
+test("Weapon feats follow the chosen weapon's id; missing choices are flagged", () => {
+  const c = CoC.sampleCharacter();
+  const gun = c.weapons[0];
+  c.feats.push({ name: "Weapon Focus", choice: gun.id });
+  assert.equal(CoC.weaponAttack(c, gun).parts.focus, 1);
+  const twin = Object.assign({}, gun, { id: "other" });
+  assert.equal(CoC.weaponAttack(c, twin).parts.focus, 0);   // same name, different weapon
+  c.weapons = [];
+  assert.ok(CoC.featPrereqIssues(c, c.feats[c.feats.length - 1]).some((m) => /weapon is gone/.test(m)));
+  const e = CoC.sampleCharacter();
+  e.feats.push({ name: "Skill Emphasis", choice: "Knowledge (alchemy)" });
+  assert.ok(CoC.featPrereqIssues(e, e.feats[e.feats.length - 1]).some((m) => /no longer one of your skills/.test(m)));
+});
+
+test("Ability score 0 states (p.62): Con 0 is dead, others helpless", () => {
+  const c = CoC.sampleCharacter();
+  assert.deepEqual(CoC.derive(c).abilityZero, []);
+  c.abilityDamage.Con = 99;
+  c.abilityDamage.Wis = 99;
+  const z = CoC.derive(c).abilityZero;
+  assert.deepEqual(z.map((x) => x.ability), ["Con", "Wis"]);
+  assert.equal(z[0].dead, true);
+  assert.equal(z[1].dead, false);
+});
+
+test("Unarmed line is always derived, with Str damage and the armor check penalty (p.94)", () => {
+  const c = CoC.sampleCharacter();
+  c.abilities.Str = 14;
+  c.armor = CoC.ARMOR.find((a) => a.acp < 0).name;
+  const d = CoC.derive(c);
+  assert.equal(d.unarmed.damageBonus, d.scores.Str.mod);
+  assert.ok(d.combat.acp < 0);
+  assert.equal(d.unarmed.bonus, d.combat.melee + d.combat.acp);
+  assert.equal(d.unarmed.weapon.damage, "1d3 subdual");
+  c.feats.push({ name: "Martial Artist" });
+  assert.equal(CoC.derive(c).unarmed.damage, "1d4");
+});
+
+test("Conditions (p.91): penalties apply and don't stack; Dex to AC is lost", () => {
+  const c = CoC.sampleCharacter();
+  c.abilities.Dex = 16;
+  const base = CoC.derive(c);
+  c.conditions = ["fatigued", "exhausted"];          // most severe applies: −6, not −8
+  let d = CoC.derive(c);
+  assert.equal(d.scores.Dex.score, base.scores.Dex.score - 6);
+  assert.equal(d.combat.speed, 15);
+  c.conditions = ["flatFooted"];
+  d = CoC.derive(c);
+  assert.equal(d.combat.ac, base.combat.ac - Math.max(0, base.scores.Dex.mod));
+  c.conditions = ["helpless"];
+  assert.equal(CoC.derive(c).combat.acParts.dex, -5);
+  c.conditions = ["prone", "deafened"];
+  d = CoC.derive(c);
+  assert.equal(d.combat.melee, base.combat.melee - 4);
+  assert.equal(d.combat.ranged, base.combat.ranged);
+  assert.equal(d.combat.init, base.combat.init - 4);
+  assert.equal(d.weapons[0].bonus, base.weapons[0].bonus);          // firearms unaffected by prone
+  assert.equal(d.unarmed.bonus, base.unarmed.bonus - 4);
+  assert.deepEqual(CoC.normalize({ conditions: ["prone", "bogus", "prone"] }).conditions, ["prone"]);
+});
+
+test("Dice roller reads NdM±K expressions and rejects junk", () => {
+  const max = () => 0.999999, min = () => 0;
+  assert.equal(CoC.rollDiceExpr("3d6+2", max).total, 20);
+  assert.equal(CoC.rollDiceExpr("3d6+2", min).total, 5);
+  assert.equal(CoC.rollDiceExpr("1d20+1d4-1", max).total, 23);
+  assert.equal(CoC.rollDiceExpr("d%", max).total, 100);
+  assert.equal(CoC.rollDiceExpr("2d10 - 3", min).total, -1);
+  for (const bad of ["", "abc", "3d", "d1", "200d6", "1d6+<script>"]) assert.equal(CoC.rollDiceExpr(bad), null, bad);
+});
+
+test("Spell costs are read from the printed Cost line (p.128-146)", () => {
+  assert.deepEqual(CoC.parseSpellCost("4 Str damage and 1d3 Sanity points"), { abilities: [{ ability: "Str", amount: "4", permanent: false }], sanity: "1d3" });
+  assert.deepEqual(CoC.parseSpellCost("2 Con drain (permanent) and 3d6 Sanity points"), { abilities: [{ ability: "Con", amount: "2", permanent: true }], sanity: "3d6" });
+  assert.deepEqual(CoC.parseSpellCost("2 Str + 2 Wis damage").abilities.map((x) => x.ability), ["Str", "Wis"]);
+  assert.deepEqual(CoC.parseSpellCost("1d4+1 Con damage, 1/1d6 Sanity").abilities[0].amount, "1d4+1");
+  assert.deepEqual(CoC.parseSpellCost(""), { abilities: [], sanity: null });
+});
+
+test("Permanent drain lowers the score, HP and saves; study bonus and spell DC", () => {
+  const c = CoC.sampleCharacter();
+  const before = CoC.derive(c);
+  c.abilityDrain.Con = 4;
+  const after = CoC.derive(c);
+  assert.equal(after.scores.Con.permanent, before.scores.Con.permanent - 4);
+  assert.ok(after.hp.max < before.hp.max);
+  assert.ok(after.saves.fort.total < before.saves.fort.total);
+  const intMod = before.scores.Int.mod;
+  assert.equal(CoC.spellSaveDC(c), 15 + Math.max(0, intMod));
+  assert.equal(CoC.tomeStudyBonus(c, { studyChecks: 2 }), c.level + intMod + 2);
+  const n = CoC.normalize({ spells: [{ name: "<b>x</b>", cost: 5 }], tomes: [{ status: "weird", dc: "abc" }] });
+  assert.equal(n.spells[0].cost, "5");
+  assert.equal(n.tomes[0].status, "unread");
+  assert.equal(n.tomes[0].dc, 20);
+});
