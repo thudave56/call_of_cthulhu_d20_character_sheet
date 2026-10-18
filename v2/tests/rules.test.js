@@ -420,3 +420,21 @@ test("Two-weapon penalties Table 5-1 (p.67)", () => {
   assert.deepEqual(CoC.TWO_WEAPON[0].slice(1), ["−6", "−10"]);
   assert.deepEqual(CoC.TWO_WEAPON[7].slice(1), ["−2", "−2"]);
 });
+
+test("XP thresholds Table 1-10 (p.11)", () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 10, 20].map(CoC.xpForLevel), [0, 1000, 3000, 6000, 10000, 15000, 45000, 190000]);
+});
+
+test("Weapon feats follow the chosen weapon's id; missing choices are flagged", () => {
+  const c = CoC.sampleCharacter();
+  const gun = c.weapons[0];
+  c.feats.push({ name: "Weapon Focus", choice: gun.id });
+  assert.equal(CoC.weaponAttack(c, gun).parts.focus, 1);
+  const twin = Object.assign({}, gun, { id: "other" });
+  assert.equal(CoC.weaponAttack(c, twin).parts.focus, 0);   // same name, different weapon
+  c.weapons = [];
+  assert.ok(CoC.featPrereqIssues(c, c.feats[c.feats.length - 1]).some((m) => /weapon is gone/.test(m)));
+  const e = CoC.sampleCharacter();
+  e.feats.push({ name: "Skill Emphasis", choice: "Knowledge (alchemy)" });
+  assert.ok(CoC.featPrereqIssues(e, e.feats[e.feats.length - 1]).some((m) => /no longer one of your skills/.test(m)));
+});

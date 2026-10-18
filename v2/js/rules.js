@@ -447,6 +447,8 @@
     const o = c.options || {};
     return c.attackOption === "offense" && !!(o.defenseBonus || o.offenseWeaponProficiency);
   }
+  /** XP needed to reach a level — Table 1-10 (p.11): 1,000 × L × (L−1) / 2. */
+  function xpForLevel(level) { const L = Math.max(1, toInt(level, 1)); return 1000 * L * (L - 1) / 2; }
   function abilityIncreaseLevels(level) {
     const out = [];
     for (let l = 4; l <= toInt(level, 1); l += 4) out.push(l);
@@ -494,7 +496,9 @@
       notes: "", sessionNotes: "",
       options: { defenseBonus: false, offenseWeaponProficiency: false },
       armorWeight: 0,          // lb, entered by the player (Table 6-4 lists no weights)
-      levelLogArchive: {},     // level -> entry removed by lowering the level, restored on raising it
+      levelLogArchive: {},
+      xp: 0,                   // experience points (Table 1-10)
+      alerts: [],              // rule alerts shown on the play screen until dismissed     // level -> entry removed by lowering the level, restored on raising it
       rev: 0,                  // save revision, used to detect edits from another tab
       log: [],
       created: now, updated: now,
@@ -586,7 +590,8 @@
     const finesse = !ranged && (c.feats || []).some((f) => f.name === "Weapon Finesse" && f.choice && weapon.finesseAs === f.choice);
     const abil = ranged ? "Dex" : finesse ? "Dex" : "Str";
     const prof = isProficient(c, weapon) ? 0 : -4;
-    const focus = (c.feats || []).some((f) => f.name === "Weapon Focus" && f.choice && f.choice === weapon.name) ? 1 : 0;
+    const chosen = (f) => f.choice && (f.choice === weapon.id || f.choice === weapon.name);
+    const focus = (c.feats || []).some((f) => f.name === "Weapon Focus" && chosen(f)) ? 1 : 0;
     const acp = cb.acp; // armor check penalty also applies to attack rolls (p.94)
     const bonus = cb.bab + m[abil] + prof + focus + acp;
     const seq = cb.sequence.map((b) => b + m[abil] + prof + focus + acp);
@@ -594,7 +599,7 @@
     if (!ranged && weapon.category !== "thrown") dmgBonus = weapon.twoHanded ? Math.floor(m.Str * 1.5) : m.Str;
     if (weapon.category === "thrown") dmgBonus = m.Str;
     if (weapon.category === "unarmed" && hasFeat(c, "Martial Artist")) weapon = Object.assign({}, weapon, { damage: "1d4" });
-    const improved = (c.feats || []).some((f) => f.name === "Improved Critical" && f.choice === weapon.name);
+    const improved = (c.feats || []).some((f) => f.name === "Improved Critical" && chosen(f));
     const threat = threatRange(weapon.critical, improved);
     const mult = (String(weapon.critical || "").match(/[×x](\d)/) || [0, 2])[1];
     return {
@@ -845,10 +850,12 @@
     for (const f of p.feats || []) if (!hasFeat(c, f)) out.push(`${d.name} needs ${f}`);
     if (p.bab && baseAttackBonus(c.level, c.attackOption) < p.bab) out.push(`${d.name} needs base attack +${p.bab}`);
     if (d.choice && !feat.choice) out.push(`${d.name}: choose a ${d.choice}`);
-    if (p.proficient && feat.choice && d.choice === "weapon") {
-      const w = (c.weapons || []).find((x) => x.name === feat.choice);
-      if (w && !isProficient(c, w)) out.push(`${d.name} (${feat.choice}) needs Weapon Proficiency (${WEAPON_CATEGORIES[w.category] || w.category})`);
+    if (feat.choice && d.choice === "weapon") {
+      const w = (c.weapons || []).find((x) => x.id === feat.choice || x.name === feat.choice);
+      if (!w) out.push(`${d.name}: pick one of your weapons (the chosen weapon is gone)`);
+      else if (p.proficient && !isProficient(c, w)) out.push(`${d.name} (${w.name}) needs Weapon Proficiency (${WEAPON_CATEGORIES[w.category] || w.category})`);
     }
+    if (feat.choice && d.choice === "skill" && !skillIds(c).includes(feat.choice)) out.push(`${d.name}: "${feat.choice}" is no longer one of your skills`);
     return out;
   }
 
@@ -870,7 +877,8 @@
     if (core.length !== 12) err(`Choose 12 core skills (have ${core.length}): the 9 template skills plus 3 of your choice.`);
     if (core.some((id) => String(id).includes("*"))) err("Pick a specialty for every \"any one\" template skill.");
     if (core.includes("Cthulhu Mythos")) err("Cthulhu Mythos can never be a core skill.");
-    if (new Set(core).size !== core.length) err("Core skills must all be different.");
+    const dups = [...new Set(core.filter((id, i) => core.indexOf(id) !== i))];
+    if (dups.length) err(`Core skills must all be different: ${dups.join(", ")} is chosen twice${dups.some((x) => x.includes("*")) ? " (fill in the specialties)" : ""}.`);
     const tmpl = templateCore(c.profession).filter((id) => !id.includes("*"));
     const missingTmpl = tmpl.filter((id) => !core.includes(id));
     if (missingTmpl.length) warn(`Template core skill(s) swapped out: ${missingTmpl.join(", ")} (needs GM approval, p.11).`);
@@ -1025,6 +1033,12 @@
     for (const [k, e] of Object.entries(archive)) { const n = toInt(k, 0); if (n >= 2 && n <= 20 && isObj(e)) c.levelLogArchive[n] = lvlEntry(e, n - 1); }
     for (const k of ["created", "updated"]) c[k] = str(c[k], 40) || new Date().toISOString();
     c.rev = Math.max(0, toInt(c.rev, 0));
+    c.xp = Math.max(0, toInt(c.xp, 0));
+    const ALERT_ACTIONS = ["", "roll-temp-insanity", "roll-indef-insanity"];
+    c.alerts = arr(c.alerts).filter(isObj).slice(0, 6).map((a) => ({
+      kind: a.kind === "danger" ? "danger" : "warn", title: str(a.title, 200), text: str(a.text, 600),
+      action: ALERT_ACTIONS.includes(a.action) ? a.action : "",
+    }));
     c.schemaVersion = SCHEMA_VERSION;
     const out = syncLevelLog(c);
     // Current Sanity can never exceed maximum Sanity (p.50).
@@ -1181,7 +1195,7 @@
     toInt, toNum, fmt, abilityMod, rollDie, uid, clone,
     skillBase, skillSpecialty, skillDef,
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
-    abilityIncreaseLevels, defenseBonus, agingCategory, offenseBonusFeat, gearWeight, sampleCharacter,
+    abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
     firearmFullAttack, lookup, rollExpr, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
