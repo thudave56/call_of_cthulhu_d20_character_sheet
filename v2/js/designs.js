@@ -150,7 +150,12 @@
         <td>${ammo}</td>
       </tr>`;
     }).join("");
-    const pbs = C.hasFeat(ch, "Point Blank Shot") ? `<p class="hint">Point Blank Shot: +1 attack and damage with ranged weapons within 30 ft (not included).</p>` : "";
+    const fa = d.weapons.filter((w) => w.fullAttack && w.fullAttack.normal).map((w) => {
+      const f = w.fullAttack.normal, rp = w.fullAttack.rapid;
+      return `<li><strong>${esc(w.weapon.name)}</strong> — full attack (${f.mode}): ${f.sequence.map(fmt).join("/")}${rp ? `; with Rapid Shot: ${rp.sequence.map(fmt).join("/")}` : ""}${f.bulletsPerAttack > 1 ? " · 3 bullets per attack" : ""}</li>`;
+    }).join("");
+    const pbs = (fa ? `<ul class="hint full-attacks">${fa}</ul><p class="hint">Firearm full attacks are a full-round action (p.80–81, Table 5-12). Reloading to capacity takes a full-round action.</p>` : "")
+      + (C.hasFeat(ch, "Point Blank Shot") ? `<p class="hint">Point Blank Shot: +1 attack and damage with ranged weapons within 30 ft (not included).</p>` : "");
     return `<section class="panel weapons" aria-label="Weapons"><h2>Weapons</h2>
       <div class="table-wrap"><table class="wtable"><thead><tr><th>Weapon</th><th>Attack</th><th>Damage</th><th>Crit</th>${opts.compact ? "" : "<th>Range</th>"}<th>Ammo</th></tr></thead><tbody>${rows}</tbody></table></div>${pbs}</section>`;
   }
@@ -218,6 +223,7 @@
         <p class="hint">A natural 20 is not an automatic success on a skill check, and a natural 1 is not an automatic failure (p.19). With 10+ ranks, beating the DC by 20 is an extraordinary success (p.23).</p>
         ${t(["Task", "Ability"], C.ABILITY_CHECK_EXAMPLES)}</details>
       <details><summary>Attack modifiers (Table 5-4)</summary>${t(["Circumstance", "Melee", "Ranged"], C.ATTACK_MODIFIERS)}<p class="hint">† The defender loses any Dex bonus to AC. Attack rolls: a natural 1 always misses; a natural 20 always hits and threatens a critical (p.66).</p></details>
+      <details><summary>Two-weapon fighting (Table 5-1)</summary>${t(["Circumstances", "Primary hand", "Off hand"], C.TWO_WEAPON)}<p class="hint">An unarmed strike always counts as light.</p></details>
       <details><summary>Cover (Table 5-5) and concealment (Table 5-6)</summary>${t(["Cover", "AC bonus", "Reflex bonus"], C.COVER)}${t(["Concealment", "Miss chance", "Example"], C.CONCEALMENT)}</details>
       <details><summary>Shotgun damage by gauge (Table 6-8)</summary>${t(["Gauge", "Buckshot*", "Birdshot*", "Slug", "Crit"], Object.entries(C.SHOTGUN_DAMAGE).map(([g, v]) => [g, v.buckshot, v.birdshot, v.slug, v.critical]))}<p class="hint">* First, second, and further range increments.</p></details>
     </section>`;

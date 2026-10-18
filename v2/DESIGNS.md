@@ -109,6 +109,8 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 | Insanity: Table 4-1 duration, 4-2/4-3 effects (00 on 4-2 goes to 4-3), 4-4 disorder plus 1d6 months; Sanity checks with "success/failure" loss notation and the p.48 examples | Tables 4-1 to 4-4, p.48–50 | `sanityCheck`, `rollTemporaryInsanity`, `rollIndefiniteInsanity` | ✓ |
 | Specific firearms; shotgun damage by gauge | Tables 6-5 and 6-8, p.98–99 and p.107 | `SPECIFIC_FIREARMS`, `SHOTGUN_DAMAGE` | ✓ |
 | Random height and weight | Table 1-12, p.14 | `rollHeightWeight` | ✓ |
+| Firearm full attacks: standard/multifire/autofire extra attacks and penalties, Rapid Shot, Multishot, 3 bullets per autofire attack | p.80–81, Table 5-12 | `firearmFullAttack` | ✓ |
+| Two-weapon penalties | Table 5-1, p.67 | `TWO_WEAPON` | ✓ |
 | Natural 20/1 on attack rolls only | p.19, p.66 | `rollD20` (app.js) | — |
 | Play reference: DCs, ability checks, attack modifiers, cover, concealment | Tables 2-2, 2-5, 5-4, 5-5, 5-6 | `DC_EXAMPLES`, `ATTACK_MODIFIERS`, `COVER`, `CONCEALMENT` | ✓ |
 | Variant defense bonus (+ Offense bonus Weapon Proficiency; house-rule switch to grant it always) | Table 1-15, p.15 | `defenseBonus`, `offenseBonusFeat`, `featSlots` | ✓ |
@@ -117,8 +119,7 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 - Tables 1-8 to 1-15, the profession templates, 2-1, 2-4, 3-1, 3-2, 6-1, 6-3, 6-4 and 6-5, plus the Sanity and combat rules, are in `docs/rulebook/EXTRACTION_REVIEW.md` §2.
 - Tables 1-12, 2-2, 2-5, 4-1 to 4-4, 5-4, 5-5, 5-6 and 6-8, plus the Sanity Loss Examples and the Helpless Defenders rules, are in the addendum (§5).
 
-The only 5-x tables not on the sheet are GM tables, not character-sheet rules:
-- two-weapon penalties (5-1; the Two-Weapon Fighting feat text gives the numbers)
+Tables 5-1 (two-weapon penalties) and 5-12 (firearm full attacks) were also checked and are on the sheet. The only 5-x tables not on the sheet are GM tables, not character-sheet rules:
 - actions (5-2)
 - size (5-3)
 - objects (5-7 to 5-11)
@@ -144,7 +145,8 @@ The source has a few inconsistencies. Each one below is resolved from the rulebo
 | 8 | **Natural 20 / natural 1** | **Attack rolls only:** a natural 1 always misses; a natural 20 always hits and is a critical threat; any roll in the weapon's threat range is a threat. Skill, ability and save rolls show the plain total. | Skills: "A natural 20 is not an automatic success, and a natural 1 is not an automatic failure" (p.19). Attacks: p.66. The book gives no automatic results for saves. |
 | 9 | **Shotgun critical:** the generic 12-gauge in Table 6-3 is ×3, but Table 6-8 gives 12-gauge ×4 | Each preset keeps its own table's value: the generic shotgun ×3; the specific shotguns (12-gauge buckshot) ×4, with slug and birdshot damage in their notes. | p.95, p.107 |
 | 10 | **Table 1-12 example:** Sam's 2d4 roll is printed as 5, but the arithmetic uses 6 (12 × 6 = 72 lb) | The formula is applied as written: base + (height roll × weight roll). | p.14 |
-| 11 | **Offense option's extra Weapon Proficiency** is printed only inside the Defense Bonus variant box (p.15) | **Rules as written: it comes with the variant.** The sentence sits inside the variant box and says it is there "to balance the two options" once Defense characters get the bigger AC bonus. Groups that prefer otherwise can switch on a clearly labelled **house rule** on the Basics step. | p.15 |
+| 11 | **Offense option's extra Weapon Proficiency** is printed only inside the Defense Bonus variant box (p.15) | **Rules as written: it comes with the variant** (confirmed by the project owner). The sentence sits inside the variant box and says it is there "to balance the two options" once Defense characters get the bigger AC bonus. A clearly labelled **house rule** on the Basics step grants it always, for groups that want that. | p.15 |
+| 12 | **Multishot with standard fire:** the feat text (p.41) mentions only autofire and multifire, but the Standard rule (p.81) and Table 5-12 also reduce the standard full-attack penalty by 2 | **Table 5-12 and p.81 are followed:** Multishot reduces every firearm full-attack penalty by 2. The feat text in the sheet says so. | p.41, p.80–81 |
 
 ## A/B deployment
 

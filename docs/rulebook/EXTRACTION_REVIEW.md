@@ -758,6 +758,8 @@ These were checked while building v2 (`v2/js/rules.js`). They close most of the 
 | 5-4 Attack Roll Modifiers | 74 (72) | Values as in `ATTACK_MODIFIERS`, including the † (defender loses Dex bonus) and †† (grapple) marks. |
 | 5-5 Cover | 74 (72) | ¼ +2/+1, ½ +4/+2, ¾ +7/+3, 9/10 +10/+4 (half damage on a failed save, none on a success), total: can't be attacked. |
 | 5-6 Concealment | 75 (73) | ¼ 10%, ½ 20%, ¾ 30%, 9/10 40%, total 50% and must guess the location. Helpless defenders: +4 melee, Dex treated as 0 (modifier −5), coup de grace. |
+| 5-1 Two-Weapon Fighting Penalties | 69 (67) | Normal −6/−10; light off-hand −4/−8; Ambidexterity −6/−6; Two-Weapon Fighting −4/−8; light + Ambidexterity −4/−4; light + TWF −2/−6; Ambidexterity + TWF −4/−4; all three −2/−2. |
+| 5-12 Multiple Ranged Attacks | 82 (80), rules on 83 (81) | Standard: 1 extra attack, all at −6. Multifire: 1 extra, −4. Autofire: 2 extra, −6, 3 bullets each. Rapid Shot: +1 extra attack, −2. Multishot: penalty −2 lower, including standard fire (p.81), although the feat text on p.41 names only autofire and multifire. Spot-checked rows +0, +6/+1 and +10/+5 in all columns. Reload to capacity is a full-round action. |
 | 6-8 Shotgun Damage | 109 (107) | 10g 3d8/2d8/1d8, 3d4/2d4/1d4, slug 2d10, ×3. 12g 3d6/2d6/1d6, 3d3/2d3/1d3, 2d10, **×4**. 16g 3d6/2d6/1d6, 2d3/2d3/1d3, 2d10, ×3. 20g 2d6/1d6/1d4, 2d3/1d3/1d2, 2d8, ×3. 28g 2d4/1d4/1d3, 2d2/1d2/1, 2d6, ×3. .410 1d8/1d3/1d2, 1d4/1/1, 1d10, ×3. |
 
 Natural 20s and 1s: attack rolls always hit on a natural 20 (a threat) and always miss on a natural 1 (PDF 68, printed 66). A search of the text found no automatic-result rule for saving throws.

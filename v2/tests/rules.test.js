@@ -392,3 +392,31 @@ test("Reference tables: 1-12, 2-2, 5-5, 5-6, 6-8 (checked against page images)",
   const spas = CoC.WEAPON_PRESETS.find((w) => w.name.startsWith("Franchi SPAS-12"));
   assert.deepEqual([spas.capacity, spas.critical, spas.category], [7, "×4", "shotgun"]);
 });
+
+test("Firearm full attacks match Table 5-12 (p.80)", () => {
+  const f = (bab, rof, o) => CoC.firearmFullAttack(CoC.attackSequence(bab), rof, o).sequence;
+  // BAB +0 row
+  assert.deepEqual(f(0, "Standard"), [-6, -6]);
+  assert.deepEqual(f(0, "Standard", { rapid: true }), [-8, -8, -8]);
+  assert.deepEqual(f(0, "Standard", { multishot: true }), [-4, -4]);
+  assert.deepEqual(f(0, "Standard", { rapid: true, multishot: true }), [-6, -6, -6]);
+  assert.deepEqual(f(0, "Multifire"), [-4, -4]);
+  assert.deepEqual(f(0, "Multifire", { multishot: true }), [-2, -2]);
+  assert.deepEqual(f(0, "Autofire"), [-6, -6, -6]);
+  assert.deepEqual(f(0, "Autofire", { rapid: true }), [-8, -8, -8, -8]);
+  // BAB +6/+1 row
+  assert.deepEqual(f(6, "Standard"), [0, 0, -5]);
+  assert.deepEqual(f(6, "Standard", { rapid: true }), [-2, -2, -2, -7]);
+  assert.deepEqual(f(6, "Multifire"), [2, 2, -3]);
+  assert.deepEqual(f(6, "Autofire", { multishot: true }), [2, 2, 2, -3]);
+  // BAB +10/+5 row
+  assert.deepEqual(f(10, "Multifire", { rapid: true, multishot: true }), [6, 6, 6, 1]);
+  assert.deepEqual(f(10, "Autofire", { rapid: true }), [2, 2, 2, 2, -3]);
+  assert.equal(CoC.firearmFullAttack([0], "Autofire").bulletsPerAttack, 3);
+  assert.equal(CoC.firearmFullAttack([0], ""), null);
+});
+
+test("Two-weapon penalties Table 5-1 (p.67)", () => {
+  assert.deepEqual(CoC.TWO_WEAPON[0].slice(1), ["−6", "−10"]);
+  assert.deepEqual(CoC.TWO_WEAPON[7].slice(1), ["−2", "−2"]);
+});

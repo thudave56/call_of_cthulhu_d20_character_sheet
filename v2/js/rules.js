@@ -172,7 +172,7 @@
     { name: "Far Shot", prereq: { feats: ["Point Blank Shot"] }, text: "Projectile range increment ×1.5; thrown ×2." },
     { name: "Precise Shot", prereq: { feats: ["Point Blank Shot"] }, text: "No −4 penalty shooting into melee." },
     { name: "Rapid Shot", prereq: { abil: { Dex: 13 }, feats: ["Point Blank Shot"] }, text: "One extra ranged attack per round at highest BAB; all attacks −2 (full-round action)." },
-    { name: "Multishot", prereq: { abil: { Dex: 13 }, feats: ["Point Blank Shot", "Rapid Shot"] }, text: "Autofire penalty −4 (normally −6); multifire penalty −2 (normally −4)." },
+    { name: "Multishot", prereq: { abil: { Dex: 13 }, feats: ["Point Blank Shot", "Rapid Shot"] }, text: "Firearm full-attack penalty reduced by 2: autofire −4 (normally −6), multifire −2 (normally −4), standard −4 (normally −6; p.81 and Table 5-12)." },
     { name: "Shot on the Run", prereq: { abil: { Dex: 13 }, feats: ["Point Blank Shot", "Dodge", "Mobility"] }, text: "Move before and after a ranged attack (total ≤ speed)." },
     { name: "Rolling Shot", prereq: { abil: { Dex: 13 }, feats: ["Point Blank Shot", "Shot on the Run", "Dodge", "Mobility"] }, text: "+2 dodge AC vs ranged attacks in a round you attack at range and move 20+ ft." },
     { name: "Power Attack", prereq: { abil: { Str: 13 } }, text: "Trade melee attack bonus for equal melee damage (max BAB)." },
@@ -373,6 +373,12 @@
     ["Defender surprised or flat-footed", "+0†", "+0†"], ["Defender running", "+0†", "−2†"],
     ["Defender grappling (attacker not)", "+0†", "+0† (roll which grappler you hit)"], ["Defender pinned", "+4†", "−4†"],
     ["Defender helpless", "+4 (Dex treated as 0)", "Dex treated as 0; coup de grace possible"],
+  ];
+  const TWO_WEAPON = [ // Table 5-1 (p.67): primary hand / off hand
+    ["Normal penalties", "−6", "−10"], ["Off-hand weapon is light", "−4", "−8"], ["Ambidexterity feat", "−6", "−6"],
+    ["Two-Weapon Fighting feat", "−4", "−8"], ["Off-hand light + Ambidexterity", "−4", "−4"],
+    ["Off-hand light + Two-Weapon Fighting", "−2", "−6"], ["Ambidexterity + Two-Weapon Fighting", "−4", "−4"],
+    ["Off-hand light + Ambidexterity + Two-Weapon Fighting", "−2", "−2"],
   ];
   const COVER = [ // Table 5-5 (p.72)
     ["One-quarter", "+2", "+1"], ["One-half", "+4", "+2"], ["Three-quarters", "+7", "+3"],
@@ -595,7 +601,32 @@
       damage: weapon.damage, damageBonus: dmgBonus,
       critical: `${threat < 20 ? threat + "-20" : "20"}/×${mult}`, threat, multiplier: +mult,
       pointBlank: ranged && hasFeat(c, "Point Blank Shot"),
+      fullAttack: ["pistol", "rifle", "shotgun", "smg"].includes(weapon.category) ? {
+        normal: firearmFullAttack(seq, weapon.rof, { multishot: hasFeat(c, "Multishot") }),
+        rapid: hasFeat(c, "Rapid Shot") ? firearmFullAttack(seq, weapon.rof, { rapid: true, multishot: hasFeat(c, "Multishot") }) : null,
+      } : null,
     };
+  }
+
+  /**
+   * Firearm full attack — p.80-81 and Table 5-12. As a full-round action a firearm
+   * gets extra attacks at the highest base attack bonus, and every attack takes a
+   * penalty: standard 1 extra at −6, multifire 1 extra at −4, autofire 2 extra at
+   * −6 (3 bullets each). Rapid Shot adds one more extra attack and −2; Multishot
+   * reduces the penalty by 2. `bonuses` is the normal attack sequence including
+   * ability and other modifiers. Returns null for non-firearms.
+   */
+  function firearmFullAttack(bonuses, rof, { rapid = false, multishot = false } = {}) {
+    const r = String(rof || "").toLowerCase();
+    const mode = r.includes("autofire") ? "autofire" : r.includes("multifire") ? "multifire" : r.includes("standard") ? "standard" : null;
+    if (!mode) return null;
+    let extra = mode === "autofire" ? 2 : 1;
+    let penalty = mode === "multifire" ? 4 : 6;
+    if (rapid) { extra += 1; penalty += 2; }
+    if (multishot) penalty -= 2;
+    const [first, ...rest] = bonuses;
+    const seq = Array(1 + extra).fill(first - penalty).concat(rest.map((b) => b - penalty));
+    return { mode, sequence: seq, penalty, bulletsPerAttack: mode === "autofire" ? 3 : 1 };
   }
 
   // ---------------------------------------------------------------------------
@@ -1070,8 +1101,8 @@
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    lookup, rollExpr, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
-    SHOTGUN_DAMAGE, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
+    firearmFullAttack, lookup, rollExpr, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,
