@@ -28,7 +28,7 @@
     { key: "review", label: "Review" },
   ];
 
-  const state = { ch: null, route: { view: "list" }, saveTimer: null, design: S.getPref("design", "tracker"), pocketTab: "vitals", skillFilter: "", skillMode: "all", banners: [] };
+  const state = { ch: null, dirty: false, route: { view: "list" }, saveTimer: null, design: S.getPref("design", "tracker"), pocketTab: "vitals", skillFilter: "", skillMode: "all", banners: [] };
 
   // ---------------------------------------------------------------------------
   // Utilities
@@ -43,13 +43,25 @@
   function pushLog(ch, text) {
     ch.log = [{ t: new Date().toISOString(), text }, ...(ch.log || [])].slice(0, 60);
   }
+  /** Save the open character if it has unsaved changes (debounced unless immediate). */
   function persist(immediate = false) {
     clearTimeout(state.saveTimer);
     const run = () => {
-      if (!state.ch) return;
+      if (!state.ch || !state.dirty) return;
       const res = S.save(state.ch);
+      if (res.conflict) {
+        // Another tab saved a newer version: keep it rather than overwrite it.
+        state.dirty = false;
+        if (res.character) state.ch = res.character;
+        toast("This character was changed in another tab. Showing the newer version; your last change here was not saved.", 7000);
+        render();
+        return;
+      }
+      state.dirty = false;
+      state.ch.rev = res.character.rev;
       state.ch.updated = res.character.updated;
-      if (!res.persisted) toast("⚠ This browser is not keeping data (private mode?). Export your character to keep it.");
+      if (res.failed) toast("⚠ Couldn't save: this browser's storage is full or blocked. Export your character to keep it.", 7000);
+      else if (!res.persisted) toast("⚠ This browser is not keeping data (private mode?). Export your character to keep it.");
       const el = document.getElementById("saveState");
       if (el) el.textContent = "Saved " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     };
@@ -60,6 +72,7 @@
     const next = C.clone(state.ch);
     const result = fn(next);
     state.ch = C.normalize(result || next);
+    state.dirty = true;
     persist();
     if (doRender) render();
   }
@@ -112,8 +125,10 @@
     const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
     if (!parts.length) return { view: "list" };
     if (parts[0] === "new") return { view: "new" };
-    if (parts[0] === "edit" && parts[1]) return { view: "edit", id: parts[1], step: parts[2] || "basics" };
-    if (parts[0] === "play" && parts[1]) return { view: "play", id: parts[1] };
+    let id = "";
+    try { id = decodeURIComponent(parts[1] || ""); } catch (e) { id = ""; }
+    if (parts[0] === "edit" && id) return { view: "edit", id, step: parts[2] || "basics" };
+    if (parts[0] === "play" && id) return { view: "play", id };
     return { view: "list" };
   }
   function go(hash) { if (location.hash === hash) onRoute(); else location.hash = hash; }
@@ -122,14 +137,20 @@
     if (r.view === "new") {
       const ch = C.newCharacter();
       ch.coreSkills = C.templateCore(ch.profession);
+      persist(true);
       state.ch = C.normalize(ch);
-      S.save(state.ch);
+      state.dirty = false;   // not saved until the first edit, so abandoned drafts don't pile up
+      D.clearAlerts && D.clearAlerts();
+      state.banners = [];
       history.replaceState(null, "", `#/edit/${state.ch.id}/basics`);
       state.route = { view: "edit", id: state.ch.id, step: "basics" };
     } else if (r.view === "edit" || r.view === "play") {
       if (!state.ch || state.ch.id !== r.id) {
         persist(true);
         state.ch = S.load(r.id);
+        state.dirty = false;
+        D.clearAlerts && D.clearAlerts();
+        state.banners = [];
         if (!state.ch) { toast("That character isn't saved in this browser."); go("#/"); return; }
       }
       S.rememberLast(r.id);
@@ -387,7 +408,7 @@
   function edHpMoney(ch, d) {
     const hp = d.hp;
     const lv = ch.levelLog.slice(1).map((e, i) => `<tr><th scope="row">Level ${i + 2}</th>
-      <td><input type="number" min="1" max="6" data-action="hp-roll" data-level="${i + 2}" value="${e.hpRoll || ""}" placeholder="1d6" aria-label="Level ${i + 2} hit die" /></td>
+      <td><input type="number" min="1" max="6" data-action="hp-roll" data-level="${i + 2}" value="${esc(e.hpRoll || "")}" placeholder="1d6" aria-label="Level ${i + 2} hit die" /></td>
       <td class="num">${hp.perLevel[i] !== null ? "+" + hp.perLevel[i] : "—"}</td>
       <td><button class="btn small ghost" data-action="hp-roll-die" data-level="${i + 2}">Roll</button></td></tr>`).join("");
     const m = d.money;
@@ -482,7 +503,7 @@
       case "print": window.print(); break;
       case "clear-banners": state.banners = []; render(); break;
       case "import": document.getElementById("importFile").click(); break;
-      case "sample": { const c = S.save(C.sampleCharacter()).character; toast(`Added ${esc(c.name)}.`); render(); break; }
+      case "sample": { const c = S.save(C.sampleCharacter(), { force: true }).character; toast(`Added ${esc(c.name)}.`); render(); break; }
       case "export-all": download(`investigators-${new Date().toISOString().slice(0, 10)}.json`, S.exportData()); break;
       case "export-one": { const c = S.load(el.dataset.id); if (c) download(`${(c.name || "investigator").replace(/[^\w-]+/g, "_")}.json`, S.exportData([c.id])); break; }
       case "dup": S.duplicate(el.dataset.id); render(); toast("Duplicated."); break;
@@ -531,6 +552,8 @@
     // Values typed straight onto the sheet are saved as you type; refresh the view once editing ends.
     if (el.dataset.live === "hp-current" || el.dataset.live === "san-current") { render(); return; }
     if (el.dataset.bind) {
+      // A blank or invalid Level is ignored, so clearing the field can't wipe level history.
+      if (el.dataset.bind === "level" && !(parseInt(el.value, 10) >= 1)) { render(); return; }
       update((c) => {
         setPath(c, el.dataset.bind, numOrStr(el));
         if (el.dataset.bind === "level") return C.lockIntMods(C.syncLevelLog(c), 1);
@@ -600,16 +623,25 @@
   // ---------------------------------------------------------------------------
   document.addEventListener("click", handleClick);
   document.addEventListener("change", handleChange);
-  document.addEventListener("input", (e) => { if (e.target.dataset.live && D.handleInput) D.handleInput(e.target.dataset.live, e.target, api); });
+  document.addEventListener("input", (e) => {
+    const el = e.target;
+    if (el.dataset.live && D.handleInput) { D.handleInput(el.dataset.live, el, api); return; }
+    // Text fields save as you type (the change event re-renders when you leave the field).
+    if (el.dataset.bind && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && el.type === "text"))) {
+      update((c) => { setPath(c, el.dataset.bind, el.value); }, { render: false });
+    }
+  });
   document.getElementById("importFile").addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) return;
     file.text().then((text) => {
       try {
         const got = S.importData(text);
-        toast(`Imported ${got.length} character${got.length === 1 ? "" : "s"}.`);
-        render();
-      } catch (err) { toast("Couldn't read that file: " + esc(err.message)); }
+        const n = got.imported.length;
+        toast(`Imported ${n} character${n === 1 ? "" : "s"}.${got.skipped ? ` Skipped ${got.skipped} unreadable record${got.skipped === 1 ? "" : "s"}.` : ""}`);
+      } catch (err) {
+        toast("Couldn't import that file: " + esc(err instanceof SyntaxError ? "it isn't valid JSON." : err.message));
+      } finally { render(); }
     });
     e.target.value = "";
   });
@@ -622,6 +654,14 @@
   window.addEventListener("afterprint", () => { if (state.route.view === "play") render(); });
   window.addEventListener("hashchange", onRoute);
   window.addEventListener("beforeunload", () => persist(true));
+  // Keep tabs in step: reload a character saved or deleted in another tab.
+  window.addEventListener("storage", (e) => {
+    if (!e.key || !e.key.startsWith("cocd20v2:")) return;
+    if (state.ch && e.key === "cocd20v2:char:" + state.ch.id) {
+      if (e.newValue === null) { state.ch = null; state.dirty = false; toast("This character was deleted in another tab."); go("#/"); return; }
+      if (!state.dirty) { const fresh = S.load(state.ch.id); if (fresh) { state.ch = fresh; render(); } }
+    } else if (e.key === "cocd20v2:index" && state.route.view === "list") render();
+  });
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(true); });
 
   const migrated = S.importLegacyOnce();

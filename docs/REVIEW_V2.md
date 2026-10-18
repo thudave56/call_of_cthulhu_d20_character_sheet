@@ -66,3 +66,20 @@ Priority: **P0** fix first (legal, data loss or security) · **P1** noticeably b
 3. **P1 #7–12**: focus, weapon cards, undo, Enter-to-apply, alerts that stay with the character, roll strip. These have the most effect at the table.
 4. **P2 #18–21**: XP, ability-0 states, Sanity cap. Then decide whether magic (#19) is in scope for your campaigns.
 5. **P3 #25–26**: make v2 the default, then add offline support.
+
+---
+
+## Status
+
+| # | Status |
+|---|---|
+| 1 | **Partly done.** The rulebook PDFs and full-text extraction are no longer in the repo, so GitHub Pages stops serving them, and the paths are git-ignored. They remain in **git history**; removing them there needs a history rewrite and a force-push to `main` (the owner's decision). |
+| 2 | **Done.** The app saves only when there are unsaved changes. Saves carry a revision number, and a stale tab's save is refused, so the newer version is kept. Other tabs reload a character saved or deleted elsewhere (`storage` event). |
+| 3 | **Done.** A blank Level is ignored. Levels removed by lowering the level are archived and restored when it goes back up. |
+| 4 | **Done.** Text fields save as you type. |
+| 5 | **Done.** `normalize()` converts every field to its expected type and checks ids against `/^[A-Za-z0-9_-]+$/`. The two unescaped templates are escaped. |
+| 6 | **Done.** Imports check every record before saving any, skip and count bad entries, give each duplicate id a new id, fall back to valid profession, era and armor values, decode route ids, and always re-render. |
+| 20 | **Done (skill points).** Temporary Int damage no longer reduces skill points. The ability-0 states are still open. |
+| 21 | **Done.** Current Sanity is capped at the maximum. |
+| 27 | **Partly done.** 10 store and engine tests added (43 in total). The Playwright smoke test in CI is still open. |
+| 29 | **Partly done.** `#/new` no longer saves blank drafts. Quantity has a minimum of 1, ammo is capped at capacity, and storage-full errors get their own message. |

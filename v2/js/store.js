@@ -61,14 +61,26 @@
   function load(id) {
     try { const raw = JSON.parse(get(PREFIX + "char:" + id) || "null"); return raw ? CoC.normalize(raw) : null; } catch (e) { return null; }
   }
-  function save(c) {
+  function storedRev(id) {
+    try { const raw = JSON.parse(get(PREFIX + "char:" + id) || "null"); return raw ? (parseInt(raw.rev, 10) || 0) : null; } catch (e) { return null; }
+  }
+  /**
+   * Save a character. Each save bumps `rev`; a save based on an older revision
+   * than the stored one (an edit made in another tab) is refused with
+   * { conflict: true } so newer work is never overwritten. Pass { force: true }
+   * for new records (imports, duplicates).
+   */
+  function save(c, { force = false } = {}) {
     const ch = CoC.normalize(c);
+    const current = storedRev(ch.id);
+    if (!force && current !== null && current > (parseInt(c.rev, 10) || 0)) return { conflict: true, character: load(ch.id) };
+    ch.rev = (current || 0) + 1;
     ch.updated = new Date().toISOString();
     const ok = set(PREFIX + "char:" + ch.id, JSON.stringify(ch));
     const idx = readIndex().filter((e) => e.id !== ch.id);
     idx.push(summary(ch));
-    writeIndex(idx);
-    return { character: ch, persisted: ok && persistent() };
+    if (ok) writeIndex(idx);
+    return { character: ch, persisted: ok && persistent(), failed: !ok };
   }
   function remove(id) {
     del(PREFIX + "char:" + id);
@@ -82,7 +94,8 @@
     copy.id = CoC.uid();
     copy.name = (c.name || "Investigator") + " (copy)";
     copy.created = new Date().toISOString();
-    return save(copy).character;
+    copy.rev = 0;
+    return save(copy, { force: true }).character;
   }
 
   function rememberLast(id) { setCookie("cocd20_last", id); set(PREFIX + "last", id); }
@@ -95,23 +108,33 @@
     const chars = (ids || list().map((e) => e.id)).map(load).filter(Boolean);
     return JSON.stringify({ format: "cocd20-characters", schemaVersion: CoC.SCHEMA_VERSION, exported: new Date().toISOString(), characters: chars }, null, 2);
   }
-  /** Accepts v2 bundles, single v2 characters, and v1 exports. Returns imported characters. */
+  /**
+   * Accepts v2 bundles, single v2 characters, and v1 exports. Every record is
+   * checked before anything is saved, so a bad file imports nothing.
+   * Returns { imported: [...characters], skipped: number }.
+   */
   function importData(text) {
+    if (String(text).length > 5 * 1024 * 1024) throw new Error("File is larger than 5 MB.");
     const data = JSON.parse(text);
     let raws = [];
     if (data && data.format === "cocd20-characters" && Array.isArray(data.characters)) raws = data.characters;
-    else if (data && data.character && data.characterName) raws = [fromLegacy(data.characterName, data.character)];
+    else if (data && data.character && data.characterName) raws = [fromLegacy(String(data.characterName), data.character)];
     else if (data && data.schemaVersion && data.abilities) raws = [data];
     else throw new Error("Not a character file.");
-    const out = [];
-    const existing = new Set(list().map((e) => e.id));
+    const used = new Set(list().map((e) => e.id));
+    const ready = [];
+    let skipped = 0;
     for (const raw of raws) {
-      if (!raw || typeof raw !== "object") continue;
-      const c = CoC.normalize(raw);
-      if (existing.has(c.id)) c.id = CoC.uid();  // never overwrite silently
-      out.push(save(c).character);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) { skipped++; continue; }
+      let c;
+      try { c = CoC.normalize(raw); CoC.derive(c); } catch (e) { skipped++; continue; }
+      if (used.has(c.id)) c.id = CoC.uid();  // never overwrite an existing or earlier record
+      used.add(c.id);
+      c.rev = 0;
+      ready.push(c);
     }
-    return out;
+    if (!ready.length) throw new Error("No usable characters in that file.");
+    return { imported: ready.map((c) => save(c, { force: true }).character), skipped };
   }
 
   /** Convert a v1 (original sheet) character to the v2 model. */
@@ -153,7 +176,7 @@
     try { old = JSON.parse(get(LEGACY_KEY) || "{}"); } catch (e) { old = {}; }
     const out = [];
     for (const [name, data] of Object.entries(old || {})) {
-      try { out.push(save(fromLegacy(name, data)).character); } catch (e) { /* skip bad record */ }
+      try { out.push(save(fromLegacy(name, data), { force: true }).character); } catch (e) { /* skip bad record */ }
     }
     set(LEGACY_DONE_KEY, new Date().toISOString());
     return out;

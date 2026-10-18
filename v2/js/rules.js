@@ -494,6 +494,8 @@
       notes: "", sessionNotes: "",
       options: { defenseBonus: false, offenseWeaponProficiency: false },
       armorWeight: 0,          // lb, entered by the player (Table 6-4 lists no weights)
+      levelLogArchive: {},     // level -> entry removed by lowering the level, restored on raising it
+      rev: 0,                  // save revision, used to detect edits from another tab
       log: [],
       created: now, updated: now,
     };
@@ -746,7 +748,8 @@
   function isCore(c, id) { return (c.coreSkills || []).includes(id); }
 
   function skillPoints(c) {
-    const m = mods(c);
+    // Temporary Int damage does not reduce skill points (p.63): use the permanent score.
+    const m = { Int: abilityMod(abilityScores(c).Int.permanent) };
     const perLevel = (c.levelLog || []).map((e, i) => {
       const intMod = e && e.intMod !== null && e.intMod !== undefined ? toInt(e.intMod) : m.Int;
       const base = Math.max(1, 8 + intMod);
@@ -914,8 +917,18 @@
     const next = clone(c);
     const L = Math.max(1, Math.min(20, toInt(next.level, 1)));
     next.level = L;
-    const log = (next.levelLog || []).slice(0, L);
-    while (log.length < L) log.push({ level: log.length + 1, intMod: null, hpRoll: null, abilityIncrease: null });
+    // Entries above the new level are archived, so lowering the level and raising
+    // it again brings back the recorded hit-die rolls and ability increases.
+    const archive = Object.assign({}, next.levelLogArchive || {});
+    const full = next.levelLog || [];
+    full.slice(L).forEach((e, i) => { if (e) archive[L + i + 1] = e; });
+    const log = full.slice(0, L);
+    while (log.length < L) {
+      const lvl = log.length + 1;
+      log.push(archive[lvl] ? Object.assign({}, archive[lvl]) : { level: lvl, intMod: null, hpRoll: null, abilityIncrease: null });
+      delete archive[lvl];
+    }
+    next.levelLogArchive = archive;
     log.forEach((e, i) => { e.level = i + 1; if (i === 0) e.hpRoll = null; if ((i + 1) % 4 !== 0) e.abilityIncrease = null; });
     next.levelLog = log;
     return next;
@@ -936,19 +949,88 @@
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
   /** Normalise a stored/imported character (fills missing fields, upgrades schema). */
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const numOrNull = (v) => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+  const str = (v, max = 2000) => (v === null || v === undefined ? "" : String(v).slice(0, max));
+  const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+  /**
+   * Normalise a stored or imported character: fill missing fields, upgrade the
+   * schema, and coerce every field to its expected type so hostile or malformed
+   * files can't inject markup or crash the views.
+   */
   function normalize(raw) {
     const base = newCharacter();
-    const c = Object.assign(base, clone(raw || {}));
-    c.abilities = Object.assign({}, base.abilities, c.abilities || {});
-    c.abilityDamage = Object.assign({ Str: 0, Dex: 0, Con: 0, Int: 0, Wis: 0, Cha: 0 }, c.abilityDamage || {});
-    c.sanity = Object.assign(newCharacter().sanity, c.sanity || {});
-    c.hp = Object.assign({ current: null, subdual: 0, stable: false }, c.hp || {});
-    c.money = Object.assign({ roll: null, cash: null, notes: "" }, c.money || {});
-    c.options = Object.assign({ defenseBonus: false, offenseWeaponProficiency: false }, c.options || {});
-    for (const k of ["feats", "weapons", "equipment", "coreSkills", "goodSaves", "log"]) if (!Array.isArray(c[k])) c[k] = [];
-    if (!c.skills || typeof c.skills !== "object") c.skills = {};
+    const src = isObj(raw) ? clone(raw) : {};
+    delete src.__proto__; delete src.constructor; delete src.prototype;
+    const c = Object.assign(base, src);
+    if (!ID_RE.test(String(c.id || ""))) c.id = uid();
+    for (const k of ["name", "player", "gender", "height", "weight", "notes", "sessionNotes"]) c[k] = str(c[k], k.endsWith("otes") ? 20000 : 200);
+    c.age = Math.max(0, Math.min(200, toInt(c.age, 30)));
+    if (!PROFESSION_BY_NAME[c.profession]) c.profession = "Professor";
+    if (!ERAS[c.era]) c.era = "1921-1940";
+    if (c.attackOption !== "offense") c.attackOption = "defense";
+    if (!ARMOR.some((a) => a.name === c.armor)) c.armor = "None";
+    c.level = Math.max(1, Math.min(20, toInt(c.level, 1)));
+    c.mythos = Math.max(0, toInt(c.mythos, 0));
+    c.armorWeight = Math.max(0, toNum(c.armorWeight, 0));
+    const abil = isObj(c.abilities) ? c.abilities : {};
+    const dmg = isObj(c.abilityDamage) ? c.abilityDamage : {};
+    c.abilities = {}; c.abilityDamage = {};
+    for (const a of ABILITIES) { c.abilities[a] = toInt(abil[a], 10); c.abilityDamage[a] = Math.max(0, toInt(dmg[a], 0)); }
+    const san = isObj(c.sanity) ? c.sanity : {};
+    c.sanity = Object.assign(newCharacter().sanity, {
+      current: numOrNull(san.current), hourStart: numOrNull(san.hourStart), hourLoss: Math.max(0, toInt(san.hourLoss, 0)),
+      insanity: ["sane", "temporary", "indefinite", "permanent"].includes(san.insanity) ? san.insanity : "sane",
+      mythosInsanities: Math.max(0, toInt(san.mythosInsanities, 0)),
+      log: Array.isArray(san.log) ? san.log.filter(isObj).slice(-200).map((l) => ({ t: str(l.t, 40), delta: toInt(l.delta, 0), reason: str(l.reason, 200) })) : [],
+    });
+    const hp = isObj(c.hp) ? c.hp : {};
+    c.hp = { current: numOrNull(hp.current), subdual: Math.max(0, toInt(hp.subdual, 0)), stable: !!hp.stable };
+    const money = isObj(c.money) ? c.money : {};
+    const roll = toInt(money.roll, 0);
+    c.money = { roll: roll >= 1 && roll <= 6 ? roll : null, cash: numOrNull(money.cash), notes: str(money.notes, 500) };
+    const opt = isObj(c.options) ? c.options : {};
+    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency };
+    const arr = (v) => (Array.isArray(v) ? v : []);
+    c.goodSaves = [...new Set(arr(c.goodSaves).filter((k) => ["fort", "ref", "will"].includes(k)))];
+    c.coreSkills = arr(c.coreSkills).filter((x) => typeof x === "string").map((x) => str(x, 120)).slice(0, 12);
+    c.feats = arr(c.feats).filter((f) => isObj(f) && FEAT_BY_NAME[f.name]).map((f) => ({ name: f.name, choice: f.choice === null || f.choice === undefined || f.choice === "" ? null : str(f.choice, 120) }));
+    c.weapons = arr(c.weapons).filter(isObj).map((w) => ({
+      id: ID_RE.test(String(w.id || "")) ? String(w.id) : uid(), name: str(w.name, 120) || "Weapon",
+      category: WEAPON_CATEGORIES[w.category] ? w.category : "melee", damage: str(w.damage, 60), critical: str(w.critical, 20) || "×2",
+      range: str(w.range, 30), rof: str(w.rof, 30), notes: str(w.notes, 300), finesseAs: FINESSE_WEAPONS.includes(w.finesseAs) ? w.finesseAs : "",
+      twoHanded: !!w.twoHanded, capacity: numOrNull(w.capacity) === null ? null : Math.max(0, toInt(w.capacity)),
+      ammo: numOrNull(w.ammo) === null ? null : Math.max(0, toInt(w.ammo)), weight: Math.max(0, toNum(w.weight, 0)),
+    }));
+    for (const w of c.weapons) if (w.capacity !== null && w.ammo !== null && w.ammo > w.capacity) w.ammo = w.capacity;
+    c.equipment = arr(c.equipment).filter(isObj).map((e) => ({
+      id: ID_RE.test(String(e.id || "")) ? String(e.id) : uid(), name: str(e.name, 200), qty: Math.max(1, toInt(e.qty, 1)),
+      weight: Math.max(0, toNum(e.weight, 0)), notes: str(e.notes, 300),
+    }));
+    c.log = arr(c.log).filter(isObj).slice(0, 60).map((l) => ({ t: str(l.t, 40), text: str(l.text, 300) }));
+    const skills = isObj(c.skills) ? c.skills : {};
+    c.skills = {};
+    for (const [id, v] of Object.entries(skills)) {
+      if (!skillDef(id) || !isObj(v)) continue;
+      c.skills[str(id, 120)] = { ranks: Math.max(0, Math.min(40, toNum(v.ranks, 0))), misc: toInt(v.misc, 0) };
+    }
+    const lvlEntry = (e, i) => ({
+      level: i + 1, intMod: numOrNull(e && e.intMod), hpRoll: (() => { const r = toInt(e && e.hpRoll, 0); return r >= 1 && r <= 6 ? r : null; })(),
+      abilityIncrease: e && ABILITIES.includes(e.abilityIncrease) ? e.abilityIncrease : null,
+    });
+    c.levelLog = arr(c.levelLog).map((e, i) => lvlEntry(isObj(e) ? e : {}, i));
+    const archive = isObj(c.levelLogArchive) ? c.levelLogArchive : {};
+    c.levelLogArchive = {};
+    for (const [k, e] of Object.entries(archive)) { const n = toInt(k, 0); if (n >= 2 && n <= 20 && isObj(e)) c.levelLogArchive[n] = lvlEntry(e, n - 1); }
+    for (const k of ["created", "updated"]) c[k] = str(c[k], 40) || new Date().toISOString();
+    c.rev = Math.max(0, toInt(c.rev, 0));
     c.schemaVersion = SCHEMA_VERSION;
-    return syncLevelLog(c);
+    const out = syncLevelLog(c);
+    // Current Sanity can never exceed maximum Sanity (p.50).
+    const s = sanity(out);
+    if (out.sanity.current !== null && out.sanity.current > s.max) out.sanity.current = s.max;
+    return out;
   }
 
   /** Full derived sheet in one call — what every UI design renders from. */

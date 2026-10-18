@@ -140,7 +140,7 @@
     const rows = d.weapons.map((w, i) => {
       const wp = w.weapon;
       const prof = C.isProficient(ch, wp);
-      const ammo = wp.capacity ? `<span class="ammo no-print"><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="-1" aria-label="Fire one">−</button><span>${wp.ammo ?? wp.capacity}/${wp.capacity}</span><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="reload" aria-label="Reload">⟳</button></span><span class="print-only">${wp.capacity} rds</span>` : "";
+      const ammo = wp.capacity ? `<span class="ammo no-print"><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="-1" aria-label="Fire one">−</button><span>${esc(wp.ammo ?? wp.capacity)}/${esc(wp.capacity)}</span><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="reload" aria-label="Reload">⟳</button></span><span class="print-only">${wp.capacity} rds</span>` : "";
       return `<tr>
         <th scope="row">${esc(wp.name)}${prof ? "" : ' <span class="bad" title="Not proficient: −4 included">(−4 nonprof.)</span>'}${opts.compact && (wp.range || wp.rof) ? `<br><small class="muted">${esc([wp.range, wp.rof].filter(Boolean).join(" · "))}</small>` : ""}${wp.notes ? `<br><small class="muted">${esc(wp.notes)}</small>` : ""}</th>
         <td class="num"><button class="roll-link" data-action="roll-attack" data-i="${i}" title="BAB ${fmt(w.parts.bab)} ${fmt(w.parts.ability)} ${w.ability}${w.parts.focus ? " +1 focus" : ""}${w.parts.armor ? ` ${w.parts.armor} armor` : ""}${w.parts.nonproficient ? " −4 nonproficient" : ""}">${w.sequence.map(fmt).join("/")}</button></td>
@@ -514,5 +514,8 @@
     if (apply) api.update(apply, { render: false });
   }
 
-  window.Designs = { list, render, handleAction, handleChange, handleInput, summaryBlock };
+  /** Rule alerts belong to the open character; clear them when another one opens. */
+  function clearAlerts() { playAlerts.length = 0; }
+
+  window.Designs = { list, render, handleAction, handleChange, handleInput, summaryBlock, clearAlerts };
 })();

@@ -1,5 +1,8 @@
 # Rulebook Extraction Review
 
+
+> **Source files are not in the repository.** The rulebook PDF and the full-text extractions (`rulebook.md`, `rulebook_layout.txt`) are copyrighted, so they are kept as local copies only and are git-ignored. To regenerate the text locally from your own copy of the PDF, put it in `docs/` and run `pdftotext docs/<rulebook>.pdf docs/rulebook/rulebook.md` (reading order) and `pdftotext -layout docs/<rulebook>.pdf docs/rulebook/rulebook_layout.txt` (columns). This file keeps only short verified tables with page citations, for checking the app's rules.
+
 Review of the two machine extractions against the scanned source PDF
 (`docs/call-of-cthulhu-d20-core-rulebookpdf-3-pdf-free.pdf`):
 
