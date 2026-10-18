@@ -142,7 +142,7 @@
       const prof = C.isProficient(ch, wp);
       const ammo = wp.capacity ? `<span class="ammo no-print"><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="-1" aria-label="Fire one">−</button><span>${wp.ammo ?? wp.capacity}/${wp.capacity}</span><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="reload" aria-label="Reload">⟳</button></span><span class="print-only">${wp.capacity} rds</span>` : "";
       return `<tr>
-        <th scope="row">${esc(wp.name)}${prof ? "" : ' <span class="bad" title="Not proficient: −4 included">(−4 nonprof.)</span>'}${opts.compact && (wp.range || wp.rof) ? `<br><small class="muted">${esc([wp.range, wp.rof].filter(Boolean).join(" · "))}</small>` : ""}</th>
+        <th scope="row">${esc(wp.name)}${prof ? "" : ' <span class="bad" title="Not proficient: −4 included">(−4 nonprof.)</span>'}${opts.compact && (wp.range || wp.rof) ? `<br><small class="muted">${esc([wp.range, wp.rof].filter(Boolean).join(" · "))}</small>` : ""}${wp.notes ? `<br><small class="muted">${esc(wp.notes)}</small>` : ""}</th>
         <td class="num"><button class="roll-link" data-action="roll-attack" data-i="${i}" title="BAB ${fmt(w.parts.bab)} ${fmt(w.parts.ability)} ${w.ability}${w.parts.focus ? " +1 focus" : ""}${w.parts.armor ? ` ${w.parts.armor} armor` : ""}${w.parts.nonproficient ? " −4 nonproficient" : ""}">${w.sequence.map(fmt).join("/")}</button></td>
         <td><button class="roll-link" data-action="roll-damage" data-i="${i}">${esc(wp.damage)}${w.damageBonus ? " " + fmt(w.damageBonus) : ""}</button></td>
         <td>${esc(w.critical)}</td>
@@ -209,6 +209,20 @@
     return `<section class="panel log no-print" aria-label="Roll log"><h2>Log</h2>${items ? `<ol class="log-list">${items}</ol><button class="btn small ghost" data-action="clear-log">Clear log</button>` : '<p class="muted">Rolls and changes appear here.</p>'}</section>`;
   }
 
+  function referenceBlock(ch, d, x) {
+    const { esc } = x;
+    const t = (head, rows) => `<div class="table-wrap"><table class="ref-table"><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<section class="panel reference no-print" aria-label="Rules reference"><h2>Quick reference</h2>
+      <details><summary>Skill DCs (Table 2-2) and ability checks (Table 2-5)</summary>
+        ${t(["Difficulty", "DC", "Example", "Skill"], C.DC_EXAMPLES)}
+        <p class="hint">A natural 20 is not an automatic success on a skill check, and a natural 1 is not an automatic failure (p.19). With 10+ ranks, beating the DC by 20 is an extraordinary success (p.23).</p>
+        ${t(["Task", "Ability"], C.ABILITY_CHECK_EXAMPLES)}</details>
+      <details><summary>Attack modifiers (Table 5-4)</summary>${t(["Circumstance", "Melee", "Ranged"], C.ATTACK_MODIFIERS)}<p class="hint">† The defender loses any Dex bonus to AC. Attack rolls: a natural 1 always misses; a natural 20 always hits and threatens a critical (p.66).</p></details>
+      <details><summary>Cover (Table 5-5) and concealment (Table 5-6)</summary>${t(["Cover", "AC bonus", "Reflex bonus"], C.COVER)}${t(["Concealment", "Miss chance", "Example"], C.CONCEALMENT)}</details>
+      <details><summary>Shotgun damage by gauge (Table 6-8)</summary>${t(["Gauge", "Buckshot*", "Birdshot*", "Slug", "Crit"], Object.entries(C.SHOTGUN_DAMAGE).map(([g, v]) => [g, v.buckshot, v.birdshot, v.slug, v.critical]))}<p class="hint">* First, second, and further range increments.</p></details>
+    </section>`;
+  }
+
   /** Compact read-only summary (used by the editor's Review step). */
   function summaryBlock(ch, d, x) {
     return abilitiesBlock(ch, d, x, { noDamage: true }) + combatBlock(ch, d, x) + weaponsBlock(ch, d, x) + featsBlock(ch, d, x)
@@ -228,6 +242,7 @@
         <div class="col skills-col">${skillsBlock(ch, d, x)}</div>
       </div>
       <div class="tracker-bottom">${featsBlock(ch, d, x)}${gearBlock(ch, d, x)}${notesBlock(ch, d, x)}${logBlock(ch, d, x)}</div>
+      ${referenceBlock(ch, d, x)}
     </div>`;
   }
 
@@ -247,7 +262,7 @@
         <div class="sheet-title"><h1>${esc(ch.name || "Unnamed investigator")}</h1><span>CALL OF CTHULHU d20 · CHARACTER RECORD</span></div>
         <div class="sheet-ident">
           ${box("Player", esc(ch.player || "—"))}${box("Profession", esc(ch.profession))}${box("Level", ch.level)}${box("Era", esc((C.ERAS[ch.era] || {}).label || ""))}
-          ${box("Age", esc(ch.age))}${box("Gender", esc(ch.gender || "—"))}${box("Option", ch.attackOption === "offense" ? "Offense" : "Defense")}${box("Speed", "30 ft")}
+          ${box("Age", esc(ch.age))}${box("Gender / Ht / Wt", esc([ch.gender || "—", ch.height, ch.weight].filter(Boolean).join(" · ")))}${box("Option", ch.attackOption === "offense" ? "Offense" : "Defense")}${box("Speed", "30 ft")}
         </div>
         ${alertsBlock(x)}
         <div class="sheet-cols">
@@ -283,6 +298,7 @@
         ${gearBlock(ch, d, x)}
         ${notesBlock(ch, d, x)}
         <div class="no-print sheet-vitals">${hpBlock(ch, d, x, { id: "s" })}${sanityBlock(ch, d, x, { id: "s" })}</div>
+        ${referenceBlock(ch, d, x)}
       </div>
     </div>`;
   }
@@ -295,7 +311,7 @@
       skills: skillsBlock(ch, d, x),
       combat: combatBlock(ch, d, x) + weaponsBlock(ch, d, x, { compact: true }),
       gear: gearBlock(ch, d, x) + featsBlock(ch, d, x),
-      notes: notesBlock(ch, d, x) + logBlock(ch, d, x),
+      notes: notesBlock(ch, d, x) + logBlock(ch, d, x) + referenceBlock(ch, d, x),
     }[tab];
     return `<div class="design-pocket">
       <div class="pocket-top">
@@ -359,10 +375,10 @@
       case "roll-save": api.rollD20(d.saves[el.dataset.k].total, SAVE_NAMES[el.dataset.k] + " save"); break;
       case "roll-init": api.rollD20(d.combat.init, "Initiative"); break;
       case "roll-ability": api.rollD20(d.scores[el.dataset.a].mod, C.ABILITY_NAMES[el.dataset.a] + " check"); break;
-      case "roll-attack-basic": api.rollD20(el.dataset.k === "melee" ? d.combat.melee + d.combat.acp : d.combat.ranged + d.combat.acp, el.dataset.k === "melee" ? "Melee attack" : "Ranged attack"); break;
+      case "roll-attack-basic": api.rollD20(el.dataset.k === "melee" ? d.combat.melee + d.combat.acp : d.combat.ranged + d.combat.acp, el.dataset.k === "melee" ? "Melee attack" : "Ranged attack", { attack: true }); break;
       case "roll-attack": {
         const w = d.weapons[i];
-        const total = api.rollD20(w.bonus, `${w.weapon.name} attack`);
+        api.rollD20(w.bonus, `${w.weapon.name} attack`, { attack: true, threat: w.threat });
         break;
       }
       case "roll-damage": {

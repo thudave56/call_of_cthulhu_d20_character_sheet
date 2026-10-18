@@ -63,12 +63,23 @@
     persist();
     if (doRender) render();
   }
-  function rollD20(mod, label) {
+  /**
+   * Roll d20 + mod. Only attack rolls treat natural results specially: a natural 1
+   * always misses, a natural 20 always hits, and a roll in the weapon's threat
+   * range is a possible critical (p.66). Skill checks get no automatic success or
+   * failure (p.19), and the rulebook gives none for saves or ability checks.
+   */
+  function rollD20(mod, label, opts = {}) {
     const r = C.rollDie(20);
     const total = r + mod;
-    const tag = r === 20 ? ' <span class="nat nat20">natural 20</span>' : r === 1 ? ' <span class="nat nat1">natural 1</span>' : "";
+    let tag = "", note = "";
+    if (opts.attack) {
+      const threat = opts.threat || 20;
+      if (r === 1) { tag = ' <span class="nat nat1">natural 1 — automatic miss</span>'; note = " — nat 1, miss"; }
+      else if (r >= threat) { tag = ` <span class="nat nat20">${r === 20 ? "natural 20 — hits; " : ""}critical threat: roll again to confirm</span>`; note = ` — ${r === 20 ? "nat 20, hit, " : ""}threat`; }
+    }
     toast(`<strong>${esc(label)}</strong><br><span class="roll-big">${total}</span> <span class="muted">(d20 ${r} ${fmt(mod)})</span>${tag}`);
-    update((ch) => pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${r === 20 ? " — nat 20" : r === 1 ? " — nat 1" : ""}`), { render: state.route.view === "play" });
+    update((ch) => pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${note}`), { render: state.route.view === "play" });
     return total;
   }
   function rollDice(expr) {
@@ -254,6 +265,7 @@
       ${field("Player", inp("player", ch.player, 'autocomplete="off"'))}
       ${field("Age", inp("age", ch.age, 'type="number" min="15" max="120"'), `Aging: ${esc(d.aging.label)}${d.aging.physical ? ` — ${d.aging.physical} Str/Dex/Con, +${d.aging.mental} Int/Wis/Cha (Table 1-11)` : ""}`)}
       ${field("Gender", inp("gender", ch.gender, 'autocomplete="off"'))}
+      <div class="field"><span class="lbl">Height &amp; weight</span><div class="row" style="margin:0">${inp("height", ch.height || "", 'placeholder="5 ft. 10 in." aria-label="Height" style="width:8em"')}${inp("weight", ch.weight || "", 'placeholder="180 lb." aria-label="Weight" style="width:7em"')}<button class="btn small ghost" data-action="roll-height-weight" title="Table 1-12: base + 2d10 in.; weight base + (that roll × 2d4) lb.">Roll (Table 1-12)</button></div></div>
       ${field("Era", `<select data-bind="era">${eras}</select>`, "Sets starting money and income (Table 1-14).")}
       ${field("Profession", `<select data-action="profession">${profs}</select>`, `Income modifier ${fmt(C.PROFESSION_BY_NAME[ch.profession].moneyMod)} (Table 1-13). Changing profession resets core skills.`)}
       ${field("Level", inp("level", ch.level, 'type="number" min="1" max="20"'), "To advance a character in play, use Level up on the play screen.")}
@@ -492,6 +504,12 @@
       case "feat-add": update((c) => { c.feats.push({ name: el.dataset.name }); }); break;
       case "feat-remove": update((c) => { c.feats.splice(i, 1); }); break;
       case "hp-roll-die": { const l = +el.dataset.level; const r = C.rollDie(6); update((c) => { c.levelLog[l - 1].hpRoll = r; }); toast(`Level ${l} hit die: ${r}`); break; }
+      case "roll-height-weight": {
+        const r = C.rollHeightWeight(state.ch.gender);
+        update((c) => { c.height = r.height; c.weight = r.weight; });
+        toast(`${r.height}, ${r.weight} <span class="muted">(2d10 = ${r.heightRoll}, 2d4 = ${r.weightRoll}; uses the ${/^f/i.test(state.ch.gender || "") ? "female" : "male"} row)</span>`);
+        break;
+      }
       case "money-roll": { const r = C.rollDie(6); update((c) => { c.money.roll = r; }); toast(`Money roll: ${r}`); break; }
       case "weapon-add": { const p = C.WEAPON_PRESETS[+document.getElementById("weaponPreset").value]; update((c) => { c.weapons.push(Object.assign({ id: C.uid(), ammo: p.capacity || null }, C.clone(p))); }); break; }
       case "weapon-add-custom": update((c) => { c.weapons.push({ id: C.uid(), name: "New weapon", category: "melee", damage: "1d6", critical: "×2", range: "" }); }); break;

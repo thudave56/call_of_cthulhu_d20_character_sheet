@@ -323,6 +323,75 @@
   ].map(([name, category, damage, capacity, range, rof, critical]) => ({ name, category, damage, critical: critical || "×3", range: `${range} ft`, capacity, rof, source: "Table 6-5" }));
   WEAPON_PRESETS.push(...SPECIFIC_FIREARMS);
 
+  // Shotgun damage by gauge — Table 6-8 (p.107), checked against the page image.
+  // Buckshot/birdshot list damage for the 1st, 2nd and further range increments.
+  const SHOTGUN_DAMAGE = {
+    "10-gauge": { buckshot: "3d8/2d8/1d8", birdshot: "3d4/2d4/1d4", slug: "2d10", critical: "×3" },
+    "12-gauge": { buckshot: "3d6/2d6/1d6", birdshot: "3d3/2d3/1d3", slug: "2d10", critical: "×4" },
+    "16-gauge": { buckshot: "3d6/2d6/1d6", birdshot: "2d3/2d3/1d3", slug: "2d10", critical: "×3" },
+    "20-gauge": { buckshot: "2d6/1d6/1d4", birdshot: "2d3/1d3/1d2", slug: "2d8", critical: "×3" },
+    "28-gauge": { buckshot: "2d4/1d4/1d3", birdshot: "2d2/1d2/1", slug: "2d6", critical: "×3" },
+    ".410": { buckshot: "1d8/1d3/1d2", birdshot: "1d4/1/1", slug: "1d10", critical: "×3" },
+  };
+  // Specific shotguns — Table 6-5 (p.99): [name, gauge, capacity, rate of fire]. Range 50 ft.
+  const SPECIFIC_SHOTGUNS = [
+    ["Winchester M1897", "12-gauge", 5, "Standard"], ["Winchester M1897 Trench", "12-gauge", 5, "Standard"],
+    ["Winchester M1897 Riot", "12-gauge", 4, "Standard"], ["Browning Auto-5", "12-gauge", 4, "Multifire"],
+    ["Winchester M1912", "12-gauge", 5, "Standard"], ["Ithaca Model 37", "12-gauge", 4, "Standard"],
+    ["Winchester Model 24", "12-gauge", 2, "Multifire"], ["Browning Auto-5 Light", "12-gauge", 5, "Multifire"],
+    ["Remington Model 11A", "12-gauge", 5, "Multifire"], ["Remington Model 11R", "12-gauge", 5, "Multifire"],
+    ["Winchester Model 1400", "12-gauge", 2, "Multifire"], ["Franchi SPAS-12", "12-gauge", 7, "Multifire"],
+    ["Mossberg M590", "12-gauge", 6, "Standard"], ["Beretta 686 Onyx", "12-gauge", 2, "Multifire"],
+    ["Beretta M3P", "12-gauge", 5, "Multifire"],
+  ].map(([name, gauge, capacity, rof]) => ({
+    name: `${name} (${gauge}, buckshot)`, category: "shotgun", damage: SHOTGUN_DAMAGE[gauge].buckshot,
+    critical: SHOTGUN_DAMAGE[gauge].critical, range: "50 ft", capacity, rof, source: "Table 6-5",
+    notes: `Slug ${SHOTGUN_DAMAGE[gauge].slug}; birdshot ${SHOTGUN_DAMAGE[gauge].birdshot} (Table 6-8)`,
+  }));
+  WEAPON_PRESETS.push(...SPECIFIC_SHOTGUNS);
+
+  // Reference tables for play, checked against the page images.
+  const HEIGHT_WEIGHT = { // Table 1-12 (p.14)
+    male: { baseIn: 58, heightDice: "2d10", baseLb: 120, weightDice: "2d4" },
+    female: { baseIn: 53, heightDice: "2d10", baseLb: 85, weightDice: "2d4" },
+  };
+  const DC_EXAMPLES = [ // Table 2-2 (p.19)
+    ["Very easy", 0, "Notice something in plain sight", "Spot"], ["Easy", 5, "Climb a knotted rope", "Climb"],
+    ["Average", 10, "Hear a security guard approaching", "Listen"], ["Tough", 15, "Disarm an explosive device", "Demolitions"],
+    ["Challenging", 20, "Track an escaped madman on a rainy night", "Wilderness Lore (and the Track feat)"],
+    ["Formidable", 25, "Break into a secure computer system", "Computer Use"], ["Heroic", 30, "Leap across a 30-foot chasm", "Jump"],
+  ];
+  const ABILITY_CHECK_EXAMPLES = [ // Table 2-5 (p.23)
+    ["Breaking open a jammed or locked door", "Str"], ["Threading a needle", "Dex"], ["Holding your breath", "Con"],
+    ["Navigating a maze", "Int"], ["Remembering to lock a door", "Wis"], ["Getting yourself singled out in a crowd", "Cha"],
+  ];
+  const ATTACK_MODIFIERS = [ // Table 5-4 (p.72); † defender loses any Dex bonus to AC
+    ["Attacker flanking defender", "+2", "—"], ["Attacker on higher ground", "+1", "+0"],
+    ["Attacker prone", "−4", "— (firearms usable prone; bows are not)"], ["Attacker invisible", "+2†", "+2†"],
+    ["Defender sitting or kneeling", "+2", "See cover"], ["Defender prone", "+4", "See cover"],
+    ["Defender cowering or stunned", "+2†", "+2†"], ["Defender climbing", "+2†", "+2†"],
+    ["Defender surprised or flat-footed", "+0†", "+0†"], ["Defender running", "+0†", "−2†"],
+    ["Defender grappling (attacker not)", "+0†", "+0† (roll which grappler you hit)"], ["Defender pinned", "+4†", "−4†"],
+    ["Defender helpless", "+4 (Dex treated as 0)", "Dex treated as 0; coup de grace possible"],
+  ];
+  const COVER = [ // Table 5-5 (p.72)
+    ["One-quarter", "+2", "+1"], ["One-half", "+4", "+2"], ["Three-quarters", "+7", "+3"],
+    ["Nine-tenths", "+10", "+4 (half damage if save fails, none if it succeeds)"], ["Total", "Can't be attacked", "—"],
+  ];
+  const CONCEALMENT = [ // Table 5-6 (p.73): miss chance
+    ["One-quarter", "10%", "Light fog; moderate darkness; light foliage"], ["One-half", "20%", "Dense fog at 5 ft."],
+    ["Three-quarters", "30%", "Dense foliage"], ["Nine-tenths", "40%", "Near total darkness"],
+    ["Total", "50% and must guess the target's location", "Defender invisible; attacker blind; total darkness; dense fog at 10 ft."],
+  ];
+  /** Roll height and weight on Table 1-12. The same height roll multiplies the weight roll. */
+  function rollHeightWeight(gender, rng = Math.random) {
+    const g = /^f/i.test(String(gender || "")) ? HEIGHT_WEIGHT.female : HEIGHT_WEIGHT.male;
+    const h = rollExpr(g.heightDice, rng).total;
+    const w = rollExpr(g.weightDice, rng).total;
+    const inches = g.baseIn + h;
+    return { height: `${Math.floor(inches / 12)} ft. ${inches % 12} in.`, weight: `${g.baseLb + h * w} lb.`, heightRoll: h, weightRoll: w };
+  }
+
   // ---------------------------------------------------------------------------
   // Small helpers
   // ---------------------------------------------------------------------------
@@ -398,7 +467,7 @@
     const c = {
       schemaVersion: SCHEMA_VERSION,
       id: uid(),
-      name: "", player: "", gender: "", age: 30, era: "1921-1940",
+      name: "", player: "", gender: "", age: 30, height: "", weight: "", era: "1921-1940",
       profession: "Professor",
       level: 1,
       attackOption: "defense",
@@ -1002,6 +1071,7 @@
     abilityIncreaseLevels, defenseBonus, agingCategory, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
     lookup, rollExpr, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    SHOTGUN_DAMAGE, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,

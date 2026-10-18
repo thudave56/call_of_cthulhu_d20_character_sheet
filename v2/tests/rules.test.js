@@ -372,5 +372,23 @@ test("Weapon presets: Table 6-1, 6-3 and 6-5 spot checks", () => {
   assert.deepEqual([w("Colt M1911 (.45 ACP)").damage, w("Colt M1911 (.45 ACP)").capacity], ["2d8", 7]);
   assert.deepEqual([w("Thompson M1921 (.45 ACP)").category, w("Thompson M1921 (.45 ACP)").rof], ["smg", "Autofire"]);
   assert.deepEqual([w("Barrett Light Fifty M82A1").critical, w("AK-47 (7.62×39mm)").range], ["×4", "150 ft"]);
-  assert.ok(!CoC.WEAPON_PRESETS.some((x) => x.source === "Table 6-5" && x.category === "shotgun"));
+  // Specific shotguns take their damage from Table 6-8 by gauge
+  for (const w of CoC.WEAPON_PRESETS.filter((x) => x.source === "Table 6-5" && x.category === "shotgun")) {
+    assert.equal(w.damage, CoC.SHOTGUN_DAMAGE["12-gauge"].buckshot, w.name);
+  }
+});
+
+test("Reference tables: 1-12, 2-2, 5-5, 5-6, 6-8 (checked against page images)", () => {
+  // Sam's example (p.14): 2d10 = 12 → 4 ft. 10 in. + 12 in. = 5 ft. 10 in.; weight 120 + 12 × 6 = 192 lb.
+  const seq = (vals) => { let i = 0; return () => vals[i++ % vals.length]; };
+  const r = CoC.rollHeightWeight("male", seq([0.5, 0.5, 0.5, 0.5])); // 2d10 → 6+6 = 12, 2d4 → 3+3 = 6
+  assert.deepEqual([r.height, r.weight], ["5 ft. 10 in.", "192 lb."]);     // matches the book's Sam: 5'10", 192 lb.
+  assert.equal(CoC.rollHeightWeight("Female", () => 0).height, "4 ft. 7 in.");
+  assert.deepEqual(CoC.DC_EXAMPLES.map((x) => x[1]), [0, 5, 10, 15, 20, 25, 30]);
+  assert.deepEqual(CoC.COVER.map((x) => x[1]).slice(0, 4), ["+2", "+4", "+7", "+10"]);
+  assert.deepEqual(CoC.CONCEALMENT.map((x) => x[1]).slice(0, 4), ["10%", "20%", "30%", "40%"]);
+  assert.deepEqual(CoC.SHOTGUN_DAMAGE["12-gauge"], { buckshot: "3d6/2d6/1d6", birdshot: "3d3/2d3/1d3", slug: "2d10", critical: "×4" });
+  assert.equal(CoC.SHOTGUN_DAMAGE[".410"].birdshot, "1d4/1/1");
+  const spas = CoC.WEAPON_PRESETS.find((w) => w.name.startsWith("Franchi SPAS-12"));
+  assert.deepEqual([spas.capacity, spas.critical, spas.category], [7, "×4", "shotgun"]);
 });

@@ -738,3 +738,26 @@ These are points I could not settle from the page images, or problems in the sou
 6. **Table 6-1 footnote "Requires Martial Arts feat"**: the feat is named "Martial Artist" in Table 3-1. This inconsistency is in the source.
 7. **Springfield M1903 caliber is printed as 7.92×57mm** (PDF 100). Historically it is .30-06, but the book prints 7.92×57mm. It does not affect damage (2d10).
 8. **Not checked against the image:** Table 1-12 (height and weight), Table 2-2 (DC examples), Table 2-5, Tables 4-2 and 4-3 (compared as text only; the d% bands looked consistent), Table 5-x combat tables apart from Combat Basics and Injury, Tables 6-6 to 6-12 (including shotgun damage, Table 6-8 on PDF 109), and all creature, spell and adventure chapters apart from the two spot-check pages. These should be treated as unchecked.
+
+---
+
+## 5. Addendum: further tables checked against the page images
+
+These were checked while building v2 (`v2/js/rules.js`). They close most of the gaps in §4 item 8.
+
+| Table | PDF page (printed) | Result |
+|---|---|---|
+| 1-12 Random Height and Weight | 16 (14) | Male 4 ft. 10 in. + 2d10 in., 120 lb. + (height roll × 2d4) lb.; female 4 ft. 5 in. + 2d10 in., 85 lb. + (height roll × 2d4) lb. ⚠ The example says Sam's 2d4 roll is 5 but computes 12 × 6 = 72 lb (an inconsistency in the source). |
+| 2-2 DC Examples | 21 (19) | Very easy 0, easy 5, average 10, tough 15, challenging 20, formidable 25, heroic 30, with the examples as in `DC_EXAMPLES`. The same page says a natural 20/1 is **not** an automatic success/failure on skill checks. |
+| 2-5 Ability Check Examples | 25 (23) | Jammed door Str, threading a needle Dex, holding your breath Con, navigating a maze Int, remembering to lock a door Wis, getting singled out in a crowd Cha. |
+| 4-1 Duration of Temporary Insanity | 50 (48) | d10 1–7 short (1d10+4 rounds); 8–10 longer (1d10×10 hours). |
+| 4-2 Short-Term Temporary Insanity | 51 (49) | 01–20, 21–30, 31–40, 41–50, 51–55, 56–60, 61–65, 66–70, 71–75, 76–80, 81–90, 91–99, 00 (roll on 4-3); text as in `SHORT_TEMP_INSANITY`. |
+| 4-3 Long-Term Temporary Insanity | 51 (49) | 01–10, 11–20, 21–30, 31–40, 41–45, 46–55, 56–65, 66–75 (tics, −4), 76–85, 86–90, 91–95, 96–00; text as in `LONG_TEMP_INSANITY`. |
+| 4-4 Random Indefinite Insanity | 52 (50) | Matches §2.14. |
+| Sanity Loss Examples | 50 (48) | Matches §2.14. Great Cthulhu is 1d10/d%. |
+| 5-4 Attack Roll Modifiers | 74 (72) | Values as in `ATTACK_MODIFIERS`, including the † (defender loses Dex bonus) and †† (grapple) marks. |
+| 5-5 Cover | 74 (72) | ¼ +2/+1, ½ +4/+2, ¾ +7/+3, 9/10 +10/+4 (half damage on a failed save, none on a success), total: can't be attacked. |
+| 5-6 Concealment | 75 (73) | ¼ 10%, ½ 20%, ¾ 30%, 9/10 40%, total 50% and must guess the location. Helpless defenders: +4 melee, Dex treated as 0 (modifier −5), coup de grace. |
+| 6-8 Shotgun Damage | 109 (107) | 10g 3d8/2d8/1d8, 3d4/2d4/1d4, slug 2d10, ×3. 12g 3d6/2d6/1d6, 3d3/2d3/1d3, 2d10, **×4**. 16g 3d6/2d6/1d6, 2d3/2d3/1d3, 2d10, ×3. 20g 2d6/1d6/1d4, 2d3/1d3/1d2, 2d8, ×3. 28g 2d4/1d4/1d3, 2d2/1d2/1, 2d6, ×3. .410 1d8/1d3/1d2, 1d4/1/1, 1d10, ×3. |
+
+Natural 20s and 1s: attack rolls always hit on a natural 20 (a threat) and always miss on a natural 1 (PDF 68, printed 66). A search of the text found no automatic-result rule for saving throws.

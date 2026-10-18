@@ -233,6 +233,9 @@ input.spec { width: 9em; padding: .2rem .4rem; }
 .feat-summary li { margin: .25rem 0; }
 .gear-list { padding-left: 1.1rem; margin: 0 0 .5rem; columns: 2 200px; }
 .money-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.reference details { border-top: 1px solid var(--line); padding: .45rem 0; }
+.reference summary { cursor: pointer; font-weight: 600; }
+.ref-table th, .ref-table td { font-size: .85rem; padding: .2rem .4rem; }
 .log-list { list-style: none; padding: 0; margin: 0 0 .5rem; font-size: .88rem; max-height: 260px; overflow: auto; }
 .log-list li { padding: .2rem 0; border-bottom: 1px dotted var(--line); }
 .log-list time { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: .35rem; }
