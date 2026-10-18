@@ -79,7 +79,22 @@ Priority: **P0** fix first (legal, data loss or security) · **P1** noticeably b
 | 4 | **Done.** Text fields save as you type. |
 | 5 | **Done.** `normalize()` converts every field to its expected type and checks ids against `/^[A-Za-z0-9_-]+$/`. The two unescaped templates are escaped. |
 | 6 | **Done.** Imports check every record before saving any, skip and count bad entries, give each duplicate id a new id, fall back to valid profession, era and armor values, decode route ids, and always re-render. |
-| 20 | **Done (skill points).** Temporary Int damage no longer reduces skill points. The ability-0 states are still open. |
+| 7 | **Done.** Focus and the text caret are kept across updates, rendering waits until a Tab press has moved focus, and focus moves to the heading on each screen change. |
+| 8 | **Done.** Table Tracker and Pocket show each weapon as a card with Attack (spends a round; disabled when empty), Damage, Crit ×multiplier, Full attack (autofire spends 3 rounds per attack and stops when the ammo runs out) and Reload. Classic Sheet keeps its table with crit and full-attack rolls. |
+| 9 | **Done.** Undo restores the state before the last change (damage, healing, Sanity, ammo, attacks, rests). The button appears in the header with the change's name. |
+| 10 | **Done.** Enter in an amount box applies it (Damage, Lose, Roll check). −1/−5 quick buttons for HP and Sanity. |
+| 11 | **Done.** Alerts are saved on the character as plain text plus an allow-listed roll button, so they survive a reload and stay with the right character. |
+| 12 | **Done.** The last three log entries sit in a strip under the header. On wide screens the toast sits bottom-right, clear of the panels. |
+| 13 | **Done.** Each step lists only its own problems and the step tabs show a count or ✓. Duplicate core skills are named. The literal `*` is gone. The feat list has a search box and an "only feats I can take now" toggle. Dimmed feats use the muted text colour (at least 4.5:1) instead of opacity. |
+| 14 | **Done.** Changing profession asks first, keeps the 3 chosen core skills and warns about ranks that stop being core. Weapon feats point at a weapon id, so renaming keeps them. A missing weapon or skill choice is flagged. Renaming a specialty carries Skill Emphasis with it. |
+| 15 | **Done.** The top-bar height is measured into `--topbar-h`, so Pocket's sticky bar sits below a wrapped top bar. Pocket controls are at least 44 px. |
+| 16 | **Done.** Focus moves on route change. Classic Sheet roll buttons have labels ("Roll Strength check, −1"). Motion is reduced when the system asks. `--ok` is darkened to #22663f. |
+| 17 | **Done (main items).** Notes print as full text, empty notes print blank, and ammo prints as rounds left. The pencil grid and one-column skills were not done; the sheet still prints on 2 pages. |
+| 18 | **Done.** XP field in Basics and on the play screen, with the Table 1-10 threshold and a "Level up!" badge. Level up is hidden at 20th level. |
+| 20 | **Done.** Temporary Int damage no longer reduces skill points. A score of 0 shows its p.62 state (Con 0 dead, others helpless). |
 | 21 | **Done.** Current Sanity is capped at the maximum. |
-| 27 | **Partly done.** 10 store and engine tests added (43 in total). The Playwright smoke test in CI is still open. |
+| 23 | **Done.** The unarmed strike is always listed, with the Str damage modifier and the armor check penalty. |
+| 27 | **Partly done.** 14 store and engine tests added (47 in total). The Playwright smoke test in CI is still open. |
 | 29 | **Partly done.** `#/new` no longer saves blank drafts. Quantity has a minimum of 1, ammo is capped at capacity, and storage-full errors get their own message. |
+
+Still open: #19 (magic and tomes), #22 (conditions, dice roller, initiative), #24 (v1 migration improvements), #25 (make v2 the default: the owner's call), #26 (offline/PWA), #27 (browser test in CI), #28 (stale README and Copilot instructions), and #1's history rewrite.

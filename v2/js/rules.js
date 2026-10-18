@@ -496,9 +496,9 @@
       notes: "", sessionNotes: "",
       options: { defenseBonus: false, offenseWeaponProficiency: false },
       armorWeight: 0,          // lb, entered by the player (Table 6-4 lists no weights)
-      levelLogArchive: {},
+      levelLogArchive: {},     // level -> entry removed by lowering the level, restored on raising it
       xp: 0,                   // experience points (Table 1-10)
-      alerts: [],              // rule alerts shown on the play screen until dismissed     // level -> entry removed by lowering the level, restored on raising it
+      alerts: [],              // rule alerts shown on the play screen until dismissed
       rev: 0,                  // save revision, used to detect edits from another tab
       log: [],
       created: now, updated: now,
@@ -861,62 +861,62 @@
 
   function validate(c, { creation = true } = {}) {
     const issues = [];
-    const err = (msg) => issues.push({ level: "error", msg });
-    const warn = (msg) => issues.push({ level: "warn", msg });
-    if (!String(c.name || "").trim()) err("Character needs a name.");
+    const err = (msg, step) => issues.push({ level: "error", msg, step });
+    const warn = (msg, step) => issues.push({ level: "warn", msg, step });
+    if (!String(c.name || "").trim()) err("Character needs a name.", "basics");
     for (const a of ABILITIES) {
       const v = toInt(c.abilities && c.abilities[a], NaN);
-      if (!Number.isFinite(v) || v < 3 || v > 18) warn(`${ABILITY_NAMES[a]} ${c.abilities && c.abilities[a]} is outside the 3–18 rolled range.`);
+      if (!Number.isFinite(v) || v < 3 || v > 18) warn(`${ABILITY_NAMES[a]} ${c.abilities && c.abilities[a]} is outside the 3–18 rolled range.`, "abilities");
     }
     // Saves (Tables 1-8/1-9)
     const need = goodSaveCount(c.attackOption);
     const got = (c.goodSaves || []).length;
-    if (got !== need) err(`${c.attackOption === "offense" ? "Offense" : "Defense"} option needs exactly ${need} good save${need > 1 ? "s" : ""} (have ${got}).`);
+    if (got !== need) err(`${c.attackOption === "offense" ? "Offense" : "Defense"} option needs exactly ${need} good save${need > 1 ? "s" : ""} (have ${got}).`, "basics");
     // Core skills: 9 template + 3 choice = 12 (p.11)
     const core = c.coreSkills || [];
-    if (core.length !== 12) err(`Choose 12 core skills (have ${core.length}): the 9 template skills plus 3 of your choice.`);
-    if (core.some((id) => String(id).includes("*"))) err("Pick a specialty for every \"any one\" template skill.");
-    if (core.includes("Cthulhu Mythos")) err("Cthulhu Mythos can never be a core skill.");
+    if (core.length !== 12) err(`Choose 12 core skills (have ${core.length}): the 9 template skills plus 3 of your choice.`, "skills");
+    if (core.some((id) => String(id).includes("*"))) err("Pick a specialty for every \"any one\" template skill.", "skills");
+    if (core.includes("Cthulhu Mythos")) err("Cthulhu Mythos can never be a core skill.", "skills");
     const dups = [...new Set(core.filter((id, i) => core.indexOf(id) !== i))];
-    if (dups.length) err(`Core skills must all be different: ${dups.join(", ")} is chosen twice${dups.some((x) => x.includes("*")) ? " (fill in the specialties)" : ""}.`);
+    if (dups.length) err(`Core skills must all be different: ${dups.join(", ")} is chosen twice${dups.some((x) => x.includes("*")) ? " (fill in the specialties)" : ""}.`, "skills");
     const tmpl = templateCore(c.profession).filter((id) => !id.includes("*"));
     const missingTmpl = tmpl.filter((id) => !core.includes(id));
-    if (missingTmpl.length) warn(`Template core skill(s) swapped out: ${missingTmpl.join(", ")} (needs GM approval, p.11).`);
+    if (missingTmpl.length) warn(`Template core skill(s) swapped out: ${missingTmpl.join(", ")} (needs GM approval, p.11).`, "skills");
     // Skill points and maximum ranks
     const sp = skillPoints(c);
-    if (sp.remaining < 0) err(`Skill points overspent by ${-sp.remaining}.`);
-    else if (sp.remaining > 0 && creation) warn(`${sp.remaining} skill point${sp.remaining > 1 ? "s" : ""} unspent (all points must be spent, p.18).`);
+    if (sp.remaining < 0) err(`Skill points overspent by ${-sp.remaining}.`, "skills");
+    else if (sp.remaining > 0 && creation) warn(`${sp.remaining} skill point${sp.remaining > 1 ? "s" : ""} unspent (all points must be spent, p.18).`, "skills");
     for (const row of skillTable(c)) {
       if (row.def.mythos) continue;
-      if (row.ranks > row.max) err(`${row.id}: ${row.ranks} ranks exceeds the ${row.core ? "core" : "noncore"} maximum of ${row.max}.`);
-      if (row.core && row.ranks % 1 !== 0) err(`${row.id}: core skills take whole ranks.`);
-      if (!row.core && (row.ranks * 2) % 1 !== 0) err(`${row.id}: noncore ranks go in ½ steps.`);
+      if (row.ranks > row.max) err(`${row.id}: ${row.ranks} ranks exceeds the ${row.core ? "core" : "noncore"} maximum of ${row.max}.`, "skills");
+      if (row.core && row.ranks % 1 !== 0) err(`${row.id}: core skills take whole ranks.`, "skills");
+      if (!row.core && (row.ranks * 2) % 1 !== 0) err(`${row.id}: noncore ranks go in ½ steps.`, "skills");
     }
-    if (creation && toInt(c.mythos) > 0) warn("Starting characters cannot have Cthulhu Mythos ranks (p.18); ranks come from play.");
+    if (creation && toInt(c.mythos) > 0) warn("Starting characters cannot have Cthulhu Mythos ranks (p.18); ranks come from play.", "basics");
     // Feats
     const slots = featSlots(c);
-    if ((c.feats || []).length > slots) err(`Too many feats: ${c.feats.length} of ${slots}.`);
-    else if ((c.feats || []).length < slots && creation) warn(`${slots - c.feats.length} feat slot(s) unused.`);
+    if ((c.feats || []).length > slots) err(`Too many feats: ${c.feats.length} of ${slots}.`, "feats");
+    else if ((c.feats || []).length < slots && creation) warn(`${slots - c.feats.length} feat slot(s) unused.`, "feats");
     const seen = new Set();
     for (const f of c.feats || []) {
       const d = FEAT_BY_NAME[f.name];
       const key = f.name + "|" + (f.choice || "");
-      if (d && !d.multi && seen.has(f.name)) err(`${f.name} can only be taken once.`);
-      if (d && d.multi && !d.stack && seen.has(key)) err(`${f.name} (${f.choice}) taken twice — pick a different ${d.choice}.`);
+      if (d && !d.multi && seen.has(f.name)) err(`${f.name} can only be taken once.`, "feats");
+      if (d && d.multi && !d.stack && seen.has(key)) err(`${f.name} (${f.choice}) taken twice — pick a different ${d.choice}.`, "feats", "feats");
       seen.add(f.name); seen.add(key);
-      for (const m of featPrereqIssues(c, f)) err(m);
+      for (const m of featPrereqIssues(c, f)) err(m, "feats");
     }
-    if (offenseBonusFeat(c) && !hasFeat(c, "Weapon Proficiency")) warn("The Offense option's bonus feat must be a Weapon Proficiency (p.15) — pick one.");
+    if (offenseBonusFeat(c) && !hasFeat(c, "Weapon Proficiency")) warn("The Offense option's bonus feat must be a Weapon Proficiency (p.15) — pick one.", "feats");
     // Level log
     const L = toInt(c.level, 1);
-    if ((c.levelLog || []).length !== L) err(`Level history has ${(c.levelLog || []).length} entries for level ${L}.`);
+    if ((c.levelLog || []).length !== L) err(`Level history has ${(c.levelLog || []).length} entries for level ${L}.`, "basics");
     const hp = hitPoints(c);
-    if (hp.missingRolls) warn(`${hp.missingRolls} hit-die roll(s) missing (1d6 per level after 1st).`);
+    if (hp.missingRolls) warn(`${hp.missingRolls} hit-die roll(s) missing (1d6 per level after 1st).`, "hp");
     for (const l of abilityIncreaseLevels(L)) {
       const e = (c.levelLog || [])[l - 1];
-      if (!e || !e.abilityIncrease) warn(`Level ${l}: choose an ability score to increase.`);
+      if (!e || !e.abilityIncrease) warn(`Level ${l}: choose an ability score to increase.`, "abilities");
     }
-    if (!money(c).rolled) warn("Starting money not rolled yet.");
+    if (!money(c).rolled) warn("Starting money not rolled yet.", "hp");
     return issues;
   }
 
@@ -1047,6 +1047,17 @@
     return out;
   }
 
+  /** What an ability score of 0 means (p.62). Ability scores never drop below 0. */
+  const ABILITY_ZERO = {
+    Str: "Strength 0: cannot move at all; lies helpless on the ground.",
+    Dex: "Dexterity 0: cannot move at all; stands motionless, rigid and helpless.",
+    Con: "Constitution 0: the character is dead.",
+    Int: "Intelligence 0: cannot think; helpless and unconscious in a comalike stupor.",
+    Wis: "Wisdom 0: helpless, withdrawn into a deep sleep filled with nightmares.",
+    Cha: "Charisma 0: helpless, withdrawn into a catatonic, comalike stupor.",
+  };
+  const UNARMED = { id: "unarmed", name: "Unarmed strike", category: "unarmed", damage: "1d3 subdual", critical: "×2", range: "" };
+
   /** Full derived sheet in one call — what every UI design renders from. */
   function derive(c) {
     const scores = abilityScores(c);
@@ -1057,6 +1068,9 @@
       sanity: sanity(c), skills: skillTable(c), skillPoints: skillPoints(c), featSlots: featSlots(c),
       money: money(c), aging: agingCategory(c.age), gearWeight: gearWeight(c),
       weapons: (c.weapons || []).map((w) => Object.assign({ weapon: w }, weaponAttack(c, w))),
+      unarmed: Object.assign({ weapon: UNARMED }, weaponAttack(c, UNARMED)),
+      abilityZero: ABILITIES.filter((a) => scores[a].score === 0).map((a) => ({ ability: a, text: ABILITY_ZERO[a], dead: a === "Con" })),
+      xp: { current: toInt(c.xp, 0), level: xpForLevel(c.level), next: c.level >= 20 ? null : xpForLevel(toInt(c.level, 1) + 1) },
       profession: PROFESSION_BY_NAME[c.profession] || null,
     };
   }

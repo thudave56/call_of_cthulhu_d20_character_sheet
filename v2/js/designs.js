@@ -16,7 +16,8 @@
     { key: "sheet", name: "Classic Sheet", blurb: "Record-sheet layout; prints cleanly." },
     { key: "pocket", name: "Pocket", blurb: "Phone-first with big buttons and tabs." },
   ];
-  const playAlerts = [];
+  // Buttons an alert may carry (alerts are saved on the character, so only these are allowed).
+  const ALERT_BUTTONS = { "roll-temp-insanity": "Roll Tables 4-1 &amp; 4-2/4-3", "roll-indef-insanity": "Roll Table 4-4" };
 
   const SAVE_NAMES = { fort: "Fortitude", ref: "Reflex", will: "Will" };
   const pct = (v, max) => (max > 0 ? Math.max(0, Math.min(100, (v / max) * 100)) : 0);
@@ -28,18 +29,37 @@
     const { esc } = x;
     return `<div class="play-header">
       <div>
-        <h1>${esc(ch.name || "Unnamed investigator")}</h1>
+        <h1 tabindex="-1">${esc(ch.name || "Unnamed investigator")}</h1>
         <p class="muted">Level ${ch.level} ${esc(ch.profession)} · ${esc((C.ERAS[ch.era] || {}).label || "")} · ${ch.attackOption === "offense" ? "Offense" : "Defense"} option${ch.player ? " · played by " + esc(ch.player) : ""}</p>
       </div>
-      <div class="play-header-actions no-print">
-        <button class="btn small" data-action="level-up">Level up</button>
-      </div>
-    </div>`;
+      <div class="play-header-actions no-print">${xpBox(ch, d, x)}${undoButton(x)}${ch.level < 20 ? `<button class="btn small" data-action="level-up">Level up</button>` : ""}</div>
+    </div>${recentBlock(ch, x)}`;
   }
 
-  function alertsBlock(x) {
-    if (!playAlerts.length) return "";
-    return `<div class="play-alerts" role="alert">${playAlerts.map((a, i) => `<div class="alert ${a.kind}"><span>${a.html}</span><button class="btn small ghost" data-action="alert-dismiss" data-i="${i}" aria-label="Dismiss">✕</button></div>`).join("")}</div>`;
+  /** XP with the next level's threshold (Table 1-10, p.11). */
+  function xpBox(ch, d, x) {
+    const xp = d.xp;
+    const ready = xp.next !== null && xp.current >= xp.next;
+    return `<label class="xp-box ${ready ? "ready" : ""}" title="${xp.next === null ? "20th level is the highest" : `Level ${ch.level + 1} at ${xp.next.toLocaleString()} XP (Table 1-10)`}"><span class="lbl">XP</span><input type="number" min="0" step="50" data-live="xp" value="${xp.current}" aria-label="Experience points" />${xp.next === null ? "" : `<span class="muted">/ ${xp.next.toLocaleString()}</span>`}${ready ? '<span class="badge">Level up!</span>' : ""}</label>`;
+  }
+
+  function undoButton(x) {
+    const u = x.state.undo;
+    return u ? `<button class="btn small ghost" data-action="undo" title="Undo: ${x.esc(u.label)}">↶ Undo <span class="undo-lbl">${x.esc(u.label)}</span></button>` : "";
+  }
+
+  /** The last three log entries, pinned where they can be seen (the toast fades). */
+  function recentBlock(ch, x) {
+    const items = (ch.log || []).slice(0, 3);
+    if (!items.length) return "";
+    return `<ol class="recent no-print" aria-label="Recent rolls and changes">${items.map((l, i) => `<li class="${i ? "" : "latest"}">${x.esc(l.text)}</li>`).join("")}</ol>`;
+  }
+
+  function alertsBlock(ch, d, x) {
+    const { esc } = x;
+    const zero = d.abilityZero.map((z) => `<div class="alert danger"><span><strong>${z.dead ? "Dead." : "Helpless."}</strong> ${esc(z.text)} <span class="muted">(p.62)</span></span></div>`).join("");
+    const saved = (ch.alerts || []).map((a, i) => `<div class="alert ${a.kind}"><span><strong>${esc(a.title)}</strong> ${esc(a.text)}${ALERT_BUTTONS[a.action] ? ` <button class="btn small" data-action="${a.action}">${ALERT_BUTTONS[a.action]}</button>` : ""}</span><button class="btn small ghost" data-action="alert-dismiss" data-i="${i}" aria-label="Dismiss alert">✕</button></div>`).join("");
+    return zero || saved ? `<div class="play-alerts" role="alert">${zero}${saved}</div>` : "";
   }
 
   function hpBlock(ch, d, x, opts = {}) {
@@ -54,8 +74,10 @@
       ${hp.subdual && hp.subdual >= hp.current && hp.current > 0 ? `<p class="state-note">Subdual damage ≥ current HP: ${hp.subdual === hp.current ? "staggered" : "unconscious"}.</p>` : ""}
       <div class="amount-row no-print">
         <label class="sr-only" for="hpAmt-${opts.id || "a"}">Amount</label>
-        <input class="amt" id="hpAmt-${opts.id || "a"}" type="number" min="0" inputmode="numeric" placeholder="0" />
+        <input class="amt" id="hpAmt-${opts.id || "a"}" type="number" min="0" inputmode="numeric" placeholder="0" data-enter="hp-damage" />
         <button class="btn danger" data-action="hp-damage">Damage</button>
+        <button class="btn danger ghost quick" data-action="hp-damage" data-n="1" aria-label="Take 1 damage">−1</button>
+        <button class="btn danger ghost quick" data-action="hp-damage" data-n="5" aria-label="Take 5 damage">−5</button>
         <button class="btn ok" data-action="hp-heal">Heal</button>
         ${opts.compact ? "" : `<button class="btn ghost small" data-action="hp-subdual" title="Subdual (nonlethal) damage">Subdual</button>`}
         <button class="btn ghost small" data-action="hp-rest" title="Natural healing: 1 HP per character level per day of rest (p.69)">Rest a day</button>
@@ -80,14 +102,16 @@
       ${s.state.note ? `<p class="state-note">${s.state.note}</p>` : ""}
       <div class="amount-row no-print">
         <label class="sr-only" for="sanAmt-${opts.id || "a"}">Amount</label>
-        <input class="amt" id="sanAmt-${opts.id || "a"}" type="number" min="0" inputmode="numeric" placeholder="0" />
+        <input class="amt" id="sanAmt-${opts.id || "a"}" type="number" min="0" inputmode="numeric" placeholder="0" data-enter="san-lose" />
         <button class="btn danger" data-action="san-lose">Lose</button>
+        <button class="btn danger ghost quick" data-action="san-lose" data-n="1" aria-label="Lose 1 Sanity">−1</button>
+        <button class="btn danger ghost quick" data-action="san-lose" data-n="5" aria-label="Lose 5 Sanity">−5</button>
         <button class="btn ok" data-action="san-gain" title="Gain Sanity (capped at maximum)">Gain</button>
         ${opts.compact ? "" : `<button class="btn ghost small" data-action="san-therapy" title="Psychoanalysis: cannot raise Sanity above starting Sanity">Therapy</button>`}
       </div>
       <div class="sanroll-row no-print">
         <label class="sr-only" for="sanRoll-${opts.id || "a"}">Sanity loss (success/failure)</label>
-        <input class="sanroll" id="sanRoll-${opts.id || "a"}" list="sanExamples" placeholder="0/1d6" autocomplete="off" />
+        <input class="sanroll" id="sanRoll-${opts.id || "a"}" list="sanExamples" placeholder="0/1d6" autocomplete="off" data-enter="san-roll" />
         <button class="btn" data-action="san-roll" title="Roll d% against current Sanity, then roll and apply the success or failure loss">Roll check &amp; apply</button>
         <datalist id="sanExamples">${C.SANITY_LOSS_EXAMPLES.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</datalist>
       </div>
@@ -105,7 +129,7 @@
       <div class="abil-grid">${C.ABILITIES.map((a) => {
         const s = d.scores[a];
         return `<div class="abil ${s.damage ? "damaged" : ""}">
-          <button class="abil-btn" data-action="roll-ability" data-a="${a}" title="Roll a ${C.ABILITY_NAMES[a]} check">
+          <button class="abil-btn" data-action="roll-ability" data-a="${a}" title="Roll a ${C.ABILITY_NAMES[a]} check" aria-label="Roll ${C.ABILITY_NAMES[a]} check, ${x.fmt(s.mod)}">
             <span class="abil-name">${a}</span><span class="abil-mod">${x.fmt(s.mod)}</span><span class="abil-score">${s.score}${s.damage ? `<small> (${s.permanent})</small>` : ""}</span>
           </button>
           ${opts.noDamage ? "" : `<div class="abil-dmg no-print" title="Temporary ability damage (recovers 1 point per day)"><button class="mini-btn" data-action="abil-dmg" data-a="${a}" data-v="1" aria-label="Damage ${a}">−</button><span>${s.damage ? "−" + s.damage : "dmg"}</span><button class="mini-btn" data-action="abil-dmg" data-a="${a}" data-v="-1" aria-label="Restore ${a}">+</button></div>`}
@@ -134,30 +158,62 @@
     </section>`;
   }
 
+  /** Attack-bonus breakdown shown as a tooltip. */
+  function attackTitle(w, fmt) {
+    return `BAB ${fmt(w.parts.bab)} ${fmt(w.parts.ability)} ${w.ability}${w.parts.focus ? " +1 focus" : ""}${w.parts.armor ? ` ${w.parts.armor} armor` : ""}${w.parts.nonproficient ? " −4 nonproficient" : ""}`;
+  }
+  const rounds = (wp) => (wp.ammo ?? wp.capacity);
+
+  /** Weapons as cards with large buttons (Table Tracker, Pocket). */
+  function weaponCard(ch, w, i, x) {
+    const { esc, fmt } = x;
+    const wp = w.weapon;
+    const prof = C.isProficient(ch, wp);
+    const dmg = `${esc(wp.damage)}${w.damageBonus ? " " + fmt(w.damageBonus) : ""}`;
+    const full = w.fullAttack && w.fullAttack.normal ? [["normal", w.fullAttack.normal, "Full attack"], ...(w.fullAttack.rapid ? [["rapid", w.fullAttack.rapid, "Full + Rapid Shot"]] : [])] : [];
+    const fullBtns = full.map(([k, f, l]) => `<button class="btn ghost" data-action="fire-full" data-i="${i}" data-mode="${k}" title="Full-round action (p.80-81, Table 5-12)${f.bulletsPerAttack > 1 ? `: ${f.bulletsPerAttack} rounds per attack` : ""}">${l} <small>${f.sequence.map(fmt).join("/")}</small></button>`).join("");
+    const empty = wp.capacity && !rounds(wp);
+    return `<article class="wcard" aria-label="${esc(wp.name)}">
+      <div class="wcard-head"><strong>${esc(wp.name)}</strong>${prof ? "" : ' <span class="bad" title="Not proficient: −4 included">−4 nonprof.</span>'} <span class="muted small">${esc([wp.range, wp.rof].filter(Boolean).join(" · "))}</span></div>
+      <div class="wcard-stats muted small">Attack ${w.sequence.map(fmt).join("/")} · Damage ${dmg} · Crit ${esc(w.critical)}${wp.notes ? ` · ${esc(wp.notes)}` : ""}</div>
+      <div class="wcard-btns">
+        <button class="btn" data-action="roll-attack" data-i="${i}" title="${attackTitle(w, fmt)}${wp.capacity ? " — spends 1 round" : ""}" ${empty ? "disabled" : ""}>Attack ${fmt(w.bonus)}</button>
+        <button class="btn" data-action="roll-damage" data-i="${i}">Damage ${dmg}</button>
+        <button class="btn ghost" data-action="roll-crit" data-i="${i}" title="Confirmed critical: roll damage ×${w.multiplier} (p.66)">Crit ×${w.multiplier}</button>
+        ${fullBtns}
+      </div>
+      ${wp.capacity ? `<div class="wcard-ammo"><span>Ammo <strong class="${empty ? "bad" : ""}">${esc(rounds(wp))}</strong>/${esc(wp.capacity)}</span><button class="btn ghost quick" data-action="ammo" data-i="${i}" data-v="-1" aria-label="Spend one round">−1</button><button class="btn" data-action="ammo" data-i="${i}" data-v="reload" title="Reloading to capacity is a full-round action">Reload</button></div>` : ""}
+    </article>`;
+  }
+
   function weaponsBlock(ch, d, x, opts = {}) {
     const { esc, fmt } = x;
-    if (!d.weapons.length) return `<section class="panel weapons" aria-label="Weapons"><h2>Weapons</h2><p class="muted">No weapons. Add them on the Gear step of Edit. Unarmed: ${fmt(d.combat.melee)} for ${C.hasFeat(ch, "Martial Artist") ? "1d4" : "1d3 subdual"}.</p></section>`;
-    const rows = d.weapons.map((w, i) => {
+    const pbs = C.hasFeat(ch, "Point Blank Shot") ? `<p class="hint">Point Blank Shot: +1 attack and damage with ranged weapons within 30 ft (not included).</p>` : "";
+    if (opts.cards) {
+      const cards = d.weapons.map((w, i) => weaponCard(ch, w, i, x)).join("") + weaponCard(ch, d.unarmed, "u", x);
+      return `<section class="panel weapons" aria-label="Weapons"><h2>Weapons</h2><div class="wcards">${cards}</div>${pbs}</section>`;
+    }
+    const all = d.weapons.map((w, i) => [w, i]).concat([[d.unarmed, "u"]]);
+    const rows = all.map(([w, i]) => {
       const wp = w.weapon;
       const prof = C.isProficient(ch, wp);
-      const ammo = wp.capacity ? `<span class="ammo no-print"><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="-1" aria-label="Fire one">−</button><span>${esc(wp.ammo ?? wp.capacity)}/${esc(wp.capacity)}</span><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="reload" aria-label="Reload">⟳</button></span><span class="print-only">${wp.capacity} rds</span>` : "";
+      const ammo = wp.capacity ? `<span class="ammo no-print"><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="-1" aria-label="Spend one round of ${esc(wp.name)}">−</button><span>${esc(rounds(wp))}/${esc(wp.capacity)}</span><button class="btn small ghost" data-action="ammo" data-i="${i}" data-v="reload" aria-label="Reload ${esc(wp.name)}">Reload</button></span><span class="print-only">${esc(rounds(wp))}/${esc(wp.capacity)} rds</span>` : "";
       return `<tr>
-        <th scope="row">${esc(wp.name)}${prof ? "" : ' <span class="bad" title="Not proficient: −4 included">(−4 nonprof.)</span>'}${opts.compact && (wp.range || wp.rof) ? `<br><small class="muted">${esc([wp.range, wp.rof].filter(Boolean).join(" · "))}</small>` : ""}${wp.notes ? `<br><small class="muted">${esc(wp.notes)}</small>` : ""}</th>
-        <td class="num"><button class="roll-link" data-action="roll-attack" data-i="${i}" title="BAB ${fmt(w.parts.bab)} ${fmt(w.parts.ability)} ${w.ability}${w.parts.focus ? " +1 focus" : ""}${w.parts.armor ? ` ${w.parts.armor} armor` : ""}${w.parts.nonproficient ? " −4 nonproficient" : ""}">${w.sequence.map(fmt).join("/")}</button></td>
-        <td><button class="roll-link" data-action="roll-damage" data-i="${i}">${esc(wp.damage)}${w.damageBonus ? " " + fmt(w.damageBonus) : ""}</button></td>
-        <td>${esc(w.critical)}</td>
-        ${opts.compact ? "" : `<td>${esc(wp.range || "—")}${wp.rof ? `<br><small>${esc(wp.rof)}</small>` : ""}</td>`}
+        <th scope="row">${esc(wp.name)}${prof ? "" : ' <span class="bad" title="Not proficient: −4 included">(−4 nonprof.)</span>'}${wp.notes ? `<br><small class="muted">${esc(wp.notes)}</small>` : ""}</th>
+        <td class="num"><button class="roll-link" data-action="roll-attack" data-i="${i}" title="${attackTitle(w, fmt)}" aria-label="Roll ${esc(wp.name)} attack, ${fmt(w.bonus)}">${w.sequence.map(fmt).join("/")}</button></td>
+        <td><button class="roll-link" data-action="roll-damage" data-i="${i}" aria-label="Roll ${esc(wp.name)} damage">${esc(wp.damage)}${w.damageBonus ? " " + fmt(w.damageBonus) : ""}</button></td>
+        <td><button class="roll-link" data-action="roll-crit" data-i="${i}" title="Roll critical damage (×${w.multiplier})" aria-label="Roll ${esc(wp.name)} critical damage">${esc(w.critical)}</button></td>
+        <td>${esc(wp.range || "—")}${wp.rof ? `<br><small>${esc(wp.rof)}</small>` : ""}</td>
         <td>${ammo}</td>
       </tr>`;
     }).join("");
-    const fa = d.weapons.filter((w) => w.fullAttack && w.fullAttack.normal).map((w) => {
+    const fa = d.weapons.map((w, i) => [w, i]).filter(([w]) => w.fullAttack && w.fullAttack.normal).map(([w, i]) => {
       const f = w.fullAttack.normal, rp = w.fullAttack.rapid;
-      return `<li><strong>${esc(w.weapon.name)}</strong> — full attack (${f.mode}): ${f.sequence.map(fmt).join("/")}${rp ? `; with Rapid Shot: ${rp.sequence.map(fmt).join("/")}` : ""}${f.bulletsPerAttack > 1 ? " · 3 bullets per attack" : ""}</li>`;
+      return `<li><strong>${esc(w.weapon.name)}</strong> — <button class="roll-link" data-action="fire-full" data-i="${i}" data-mode="normal">full attack (${f.mode}): ${f.sequence.map(fmt).join("/")}</button>${rp ? `; <button class="roll-link" data-action="fire-full" data-i="${i}" data-mode="rapid">with Rapid Shot: ${rp.sequence.map(fmt).join("/")}</button>` : ""}${f.bulletsPerAttack > 1 ? " · 3 rounds per attack" : ""}</li>`;
     }).join("");
-    const pbs = (fa ? `<ul class="hint full-attacks">${fa}</ul><p class="hint">Firearm full attacks are a full-round action (p.80–81, Table 5-12). Reloading to capacity takes a full-round action.</p>` : "")
-      + (C.hasFeat(ch, "Point Blank Shot") ? `<p class="hint">Point Blank Shot: +1 attack and damage with ranged weapons within 30 ft (not included).</p>` : "");
+    const notes = (fa ? `<ul class="hint full-attacks">${fa}</ul><p class="hint">Firearm full attacks are a full-round action (p.80–81, Table 5-12). Reloading to capacity takes a full-round action.</p>` : "") + pbs;
     return `<section class="panel weapons" aria-label="Weapons"><h2>Weapons</h2>
-      <div class="table-wrap"><table class="wtable"><thead><tr><th>Weapon</th><th>Attack</th><th>Damage</th><th>Crit</th>${opts.compact ? "" : "<th>Range</th>"}<th>Ammo</th></tr></thead><tbody>${rows}</tbody></table></div>${pbs}</section>`;
+      <div class="table-wrap"><table class="wtable"><thead><tr><th>Weapon</th><th>Attack</th><th>Damage</th><th>Crit</th><th>Range</th><th>Ammo</th></tr></thead><tbody>${rows}</tbody></table></div>${notes}</section>`;
   }
 
   function skillsBlock(ch, d, x, opts = {}) {
@@ -189,7 +245,9 @@
     if (!ch.feats.length) return `<section class="panel feats"><h2>Feats</h2><p class="muted">None.</p></section>`;
     return `<section class="panel feats" aria-label="Feats"><h2>Feats</h2><ul class="feat-summary">${ch.feats.map((f) => {
       const def = C.FEAT_BY_NAME[f.name];
-      return `<li><strong>${esc(f.name)}${f.choice ? ` (${esc(C.WEAPON_CATEGORIES[f.choice] || f.choice)})` : ""}</strong> — <span>${esc(def ? def.text : "")}</span></li>`;
+      const w = def && def.choice === "weapon" ? ch.weapons.find((wp) => wp.id === f.choice) : null;
+      const choice = w ? w.name : C.WEAPON_CATEGORIES[f.choice] || f.choice;
+      return `<li><strong>${esc(f.name)}${f.choice ? ` (${esc(choice)})` : ""}</strong> — <span>${esc(def ? def.text : "")}</span></li>`;
     }).join("")}</ul></section>`;
   }
 
@@ -206,7 +264,8 @@
 
   function notesBlock(ch, d, x) {
     return `<section class="panel notes" aria-label="Session notes"><h2>Session notes</h2>
-      <textarea data-live="session-notes" rows="6" placeholder="Clues, contacts, names, places…" aria-label="Session notes">${x.esc(ch.sessionNotes || "")}</textarea></section>`;
+      <textarea class="no-print" data-live="session-notes" rows="6" placeholder="Clues, contacts, names, places…" aria-label="Session notes">${x.esc(ch.sessionNotes || "")}</textarea>
+      <div class="print-only print-notes">${x.esc(ch.sessionNotes || "")}</div></section>`;
   }
 
   function logBlock(ch, d, x) {
@@ -241,10 +300,10 @@
   // ---------------------------------------------------------------------------
   function tracker(ch, d, x) {
     return `<div class="design-tracker">
-      ${header(ch, d, x)}${alertsBlock(x)}
+      ${header(ch, d, x)}${alertsBlock(ch, d, x)}
       <div class="tracker-grid">
         <div class="col vitals-col">${hpBlock(ch, d, x, { id: "t" })}${sanityBlock(ch, d, x, { id: "t" })}</div>
-        <div class="col combat-col">${combatBlock(ch, d, x)}${weaponsBlock(ch, d, x, { compact: true })}${abilitiesBlock(ch, d, x)}</div>
+        <div class="col combat-col">${combatBlock(ch, d, x)}${weaponsBlock(ch, d, x, { cards: true })}${abilitiesBlock(ch, d, x)}</div>
         <div class="col skills-col">${skillsBlock(ch, d, x)}</div>
       </div>
       <div class="tracker-bottom">${featsBlock(ch, d, x)}${gearBlock(ch, d, x)}${notesBlock(ch, d, x)}${logBlock(ch, d, x)}</div>
@@ -257,20 +316,21 @@
     const box = (label, value) => `<div class="box"><span class="box-lbl">${label}</span><span class="box-val">${value}</span></div>`;
     const abilRows = C.ABILITIES.map((a) => {
       const s = d.scores[a];
-      return `<tr><th scope="row">${C.ABILITY_NAMES[a].toUpperCase()}</th><td class="num strong"><button class="roll-link" data-action="roll-ability" data-a="${a}">${s.permanent}</button></td><td class="num strong">${fmt(C.abilityMod(s.permanent))}</td><td class="num">${s.damage ? s.score : ""}</td><td class="num">${s.damage ? fmt(s.mod) : ""}</td></tr>`;
+      return `<tr><th scope="row">${C.ABILITY_NAMES[a].toUpperCase()}</th><td class="num strong"><button class="roll-link" data-action="roll-ability" data-a="${a}" aria-label="Roll ${C.ABILITY_NAMES[a]} check, ${fmt(s.mod)}">${s.permanent}</button></td><td class="num strong">${fmt(C.abilityMod(s.permanent))}</td><td class="num">${s.damage ? s.score : ""}</td><td class="num">${s.damage ? fmt(s.mod) : ""}</td></tr>`;
     }).join("");
     const sv = d.saves;
-    const saveRow = (k, abil) => `<tr><th scope="row"><button class="roll-link" data-action="roll-save" data-k="${k}">${SAVE_NAMES[k].toUpperCase()}</button></th><td class="num strong">${fmt(sv[k].total)}</td><td class="num">${sv[k].base}${sv[k].good ? "*" : ""}</td><td class="num">${fmt(sv[k].ability)} ${abil}</td><td class="num">${sv[k].feat || ""}</td></tr>`;
+    const saveRow = (k, abil) => `<tr><th scope="row"><button class="roll-link" data-action="roll-save" data-k="${k}" aria-label="Roll ${SAVE_NAMES[k]} save, ${fmt(sv[k].total)}">${SAVE_NAMES[k].toUpperCase()}</button></th><td class="num strong">${fmt(sv[k].total)}</td><td class="num">${sv[k].base}${sv[k].good ? "*" : ""}</td><td class="num">${fmt(sv[k].ability)} ${abil}</td><td class="num">${sv[k].feat || ""}</td></tr>`;
     const hpTrack = Array.from({ length: Math.min(d.hp.max, 60) }, (_, i) => `<i class="${i < d.hp.current ? "" : "gone"}"></i>`).join("");
     const san = d.sanity;
     return `<div class="design-sheet">
       <div class="sheet-page">
-        <div class="sheet-title"><h1>${esc(ch.name || "Unnamed investigator")}</h1><span>CALL OF CTHULHU d20 · CHARACTER RECORD</span></div>
+        <div class="sheet-title"><h1 tabindex="-1">${esc(ch.name || "Unnamed investigator")}</h1><span>CALL OF CTHULHU d20 · CHARACTER RECORD</span></div>
         <div class="sheet-ident">
           ${box("Player", esc(ch.player || "—"))}${box("Profession", esc(ch.profession))}${box("Level", ch.level)}${box("Era", esc((C.ERAS[ch.era] || {}).label || ""))}
           ${box("Age", esc(ch.age))}${box("Gender / Ht / Wt", esc([ch.gender || "—", ch.height, ch.weight].filter(Boolean).join(" · ")))}${box("Option", ch.attackOption === "offense" ? "Offense" : "Defense")}${box("Speed", "30 ft")}
         </div>
-        ${alertsBlock(x)}
+        <div class="no-print sheet-tools">${xpBox(ch, d, x)}${undoButton(x)}${ch.level < 20 ? `<button class="btn small" data-action="level-up">Level up</button>` : ""}</div>
+        ${recentBlock(ch, x)}${alertsBlock(ch, d, x)}
         <div class="sheet-cols">
           <div class="sheet-left">
             <table class="sheet-table"><caption>Abilities</caption><thead><tr><th></th><th>Score</th><th>Mod</th><th>Temp</th><th>Temp mod</th></tr></thead><tbody>${abilRows}</tbody></table>
@@ -278,7 +338,7 @@
             <p class="hint">* good save</p>
             <div class="sheet-boxes">
               ${box("Armor class", `${d.combat.ac}<small> touch ${d.combat.touch} · flat ${d.combat.flatFooted}</small>`)}
-              ${box("Initiative", `<button class="roll-link" data-action="roll-init">${fmt(d.combat.init)}</button>`)}
+              ${box("Initiative", `<button class="roll-link" data-action="roll-init" aria-label="Roll initiative, ${fmt(d.combat.init)}">${fmt(d.combat.init)}</button>`)}
               ${box("Base attack", d.combat.sequence.map(fmt).join("/"))}
               ${box("Melee / Ranged", `${fmt(d.combat.melee + d.combat.acp)} / ${fmt(d.combat.ranged + d.combat.acp)}`)}
             </div>
@@ -315,13 +375,13 @@
     const body = {
       vitals: hpBlock(ch, d, x, { id: "p", compact: false }) + sanityBlock(ch, d, x, { id: "p", compact: false }) + abilitiesBlock(ch, d, x),
       skills: skillsBlock(ch, d, x),
-      combat: combatBlock(ch, d, x) + weaponsBlock(ch, d, x, { compact: true }),
+      combat: combatBlock(ch, d, x) + weaponsBlock(ch, d, x, { cards: true }),
       gear: gearBlock(ch, d, x) + featsBlock(ch, d, x),
       notes: notesBlock(ch, d, x) + logBlock(ch, d, x) + referenceBlock(ch, d, x),
     }[tab];
     return `<div class="design-pocket">
       <div class="pocket-top">
-        <div class="pocket-name"><strong>${x.esc(ch.name || "Investigator")}</strong> <span class="muted">L${ch.level} ${x.esc(ch.profession)}</span></div>
+        <div class="pocket-name"><strong tabindex="-1" class="route-focus">${x.esc(ch.name || "Investigator")}</strong> <span class="muted">L${ch.level} ${x.esc(ch.profession)}</span></div>
         <div class="pocket-vitals">
           <button class="pv hp state-${d.hp.state.key}" data-action="pocket-tab" data-k="vitals"><span>HP</span><strong>${d.hp.current}</strong><small>/${d.hp.max}</small></button>
           <button class="pv san state-${d.sanity.state.key}" data-action="pocket-tab" data-k="vitals"><span>SAN</span><strong>${d.sanity.current}</strong><small>/${d.sanity.max}</small></button>
@@ -329,9 +389,9 @@
           <button class="pv" data-action="roll-init"><span>INIT</span><strong>${x.fmt(d.combat.init)}</strong></button>
         </div>
       </div>
-      ${alertsBlock(x)}
+      ${recentBlock(ch, x)}${alertsBlock(ch, d, x)}
       <div class="pocket-body">${body}</div>
-      <div class="pocket-actions"><button class="btn small ghost" data-action="level-up">Level up</button></div>
+      <div class="pocket-actions">${xpBox(ch, d, x)}${undoButton(x)}${ch.level < 20 ? `<button class="btn small ghost" data-action="level-up">Level up</button>` : ""}</div>
       <nav class="pocket-tabs" aria-label="Sections">${tabs.map(([k, l]) => `<button class="${tab === k ? "on" : ""}" data-action="pocket-tab" data-k="${k}" aria-current="${tab === k ? "page" : "false"}">${l}</button>`).join("")}</nav>
     </div>`;
   }
@@ -345,26 +405,50 @@
   // Play actions
   // ---------------------------------------------------------------------------
   function amount(el) {
+    if (el.dataset.n) return parseInt(el.dataset.n, 10) || 0;   // −1 / −5 quick buttons
     const panel = el.closest(".panel") || document;
     const input = panel.querySelector("input.amt");
     const v = input ? parseInt(input.value, 10) : NaN;
     return Number.isFinite(v) && v > 0 ? v : 0;
   }
+  /** Add a rule alert to the character (newest first, at most 6 kept). */
+  function addAlert(c, kind, title, text, action = "") {
+    c.alerts = [{ kind, title, text, action }, ...(c.alerts || [])].slice(0, 6);
+  }
   /** Remove the alert holding a given roll button once it has been used. */
-  function dropAlert(action) { const k = playAlerts.findIndex((x) => x.html.includes(`data-action="${action}"`)); if (k >= 0) playAlerts.splice(k, 1); }
-  function addAlert(kind, html) { playAlerts.unshift({ kind, html }); if (playAlerts.length > 4) playAlerts.pop(); }
+  function dropAlert(c, action) { c.alerts = (c.alerts || []).filter((x) => x.action !== action); }
+  /** A weapon row by index; "u" is the always-present unarmed strike. */
+  function weaponAt(d, el) { return el.dataset.i === "u" ? d.unarmed : d.weapons[+el.dataset.i]; }
 
   /** Apply a Sanity loss and raise the rule alerts it triggers (p.47-50). */
   function applyLoss(ch, d, n, reason, api) {
     const res = C.loseSanity(ch, n, reason);
     const s = C.sanity(res.character);
-    for (const t of res.triggers) {
-      if (t === "temporary") addAlert("warn", `<strong>Lost ${n} in one roll (≥ ½ Wis = ${d.sanity.tempThreshold}).</strong> The GM calls for a Sanity check: on a failure the investigator goes temporarily insane. <button class="btn small" data-action="roll-temp-insanity">Roll Tables 4-1 &amp; 4-2/4-3</button>`);
-      if (t === "indefinite") addAlert("danger", `<strong>Lost ${s.hourLoss} Sanity this hour (≥ 20% = ${s.indefiniteThreshold}).</strong> The investigator goes indefinitely insane when the GM judges it. <button class="btn small" data-action="roll-indef-insanity">Roll Table 4-4</button>`);
-      if (t === "zero") addAlert("danger", `<strong>Sanity at ${s.current}.</strong> The character loses 1 more Sanity each round until −10 unless stabilized with Psychoanalysis.`);
-      if (t === "permanent") addAlert("danger", `<strong>Sanity −10 or lower: permanent insanity.</strong> The character becomes an NPC.`);
+    api.update(() => {
+      const c = res.character;
+      for (const t of res.triggers) {
+        if (t === "temporary") addAlert(c, "warn", `Lost ${n} in one roll (≥ ½ Wis = ${d.sanity.tempThreshold}).`, "The GM calls for a Sanity check: on a failure the investigator goes temporarily insane.", "roll-temp-insanity");
+        if (t === "indefinite") addAlert(c, "danger", `Lost ${s.hourLoss} Sanity this hour (≥ 20% = ${s.indefiniteThreshold}).`, "The investigator goes indefinitely insane when the GM judges it.", "roll-indef-insanity");
+        if (t === "zero") addAlert(c, "danger", `Sanity at ${s.current}.`, "The character loses 1 more Sanity each round until −10 unless stabilized with Psychoanalysis.");
+        if (t === "permanent") addAlert(c, "danger", "Sanity −10 or lower: permanent insanity.", "The character becomes an NPC.");
+      }
+      api.pushLog(c, `Lost ${n} Sanity (${d.sanity.current} → ${s.current})${reason ? " — " + reason : ""}`);
+      if (res.triggers.includes("permanent")) c.sanity.insanity = "permanent";
+      return c;
+    }, { undo: `Lost ${n} Sanity` });
+  }
+
+  /** Roll a damage expression `times` times (a confirmed critical multiplies the roll, p.66). */
+  function rollWeaponDamage(w, times, api) {
+    let total = 0; const parts = [];
+    for (let k = 0; k < times; k++) {
+      const r = api.rollDice(w.damage);
+      if (!r) return null;
+      const one = Math.max(1, r.total + w.damageBonus);
+      total += one;
+      parts.push(`${r.rolls.join("+")}${r.bonus ? " " + C.fmt(r.bonus) : ""}${w.damageBonus ? " " + C.fmt(w.damageBonus) : ""}`);
     }
-    api.update(() => { const c = res.character; api.pushLog(c, `Lost ${n} Sanity (${d.sanity.current} → ${s.current})${reason ? " — " + reason : ""}`); if (res.triggers.includes("permanent")) c.sanity.insanity = "permanent"; return c; });
+    return { total, detail: parts.map((p) => `(${p})`).join(" + ") };
   }
 
   function handleAction(a, el, api) {
@@ -375,48 +459,77 @@
     switch (a) {
       case "pocket-tab": api.state.pocketTab = el.dataset.k; api.render(); window.scrollTo(0, 0); break;
       case "skill-mode": api.state.skillMode = el.dataset.k; api.render(); break;
-      case "alert-dismiss": playAlerts.splice(i, 1); api.render(); break;
-      case "clear-log": api.update((c) => { c.log = []; }); break;
+      case "alert-dismiss": api.update((c) => { c.alerts.splice(i, 1); }); break;
+      case "clear-log": api.update((c) => { c.log = []; }, { undo: "Clear log" }); break;
       case "roll-skill": { const r = d.skills.find((s) => s.id === el.dataset.id); if (r) api.rollD20(r.total, r.id); break; }
       case "roll-save": api.rollD20(d.saves[el.dataset.k].total, SAVE_NAMES[el.dataset.k] + " save"); break;
       case "roll-init": api.rollD20(d.combat.init, "Initiative"); break;
       case "roll-ability": api.rollD20(d.scores[el.dataset.a].mod, C.ABILITY_NAMES[el.dataset.a] + " check"); break;
       case "roll-attack-basic": api.rollD20(el.dataset.k === "melee" ? d.combat.melee + d.combat.acp : d.combat.ranged + d.combat.acp, el.dataset.k === "melee" ? "Melee attack" : "Ranged attack", { attack: true }); break;
       case "roll-attack": {
-        const w = d.weapons[i];
-        api.rollD20(w.bonus, `${w.weapon.name} attack`, { attack: true, threat: w.threat });
+        const w = weaponAt(d, el);
+        if (!w) break;
+        const wp = w.weapon;
+        if (wp.capacity && !rounds(wp)) { api.toast(`<strong>${api.esc(wp.name)} is empty.</strong> Reload first.`); break; }
+        // A firearm attack spends a round (the roll and the spent round are logged together).
+        api.rollD20(w.bonus, `${wp.name} attack`, { attack: true, threat: w.threat, spend: wp.capacity ? (c) => { c.weapons[i].ammo = rounds(c.weapons[i]) - 1; } : null });
         break;
       }
-      case "roll-damage": {
-        const w = d.weapons[i];
-        const r = api.rollDice(w.weapon.damage);
+      case "fire-full": {
+        const w = weaponAt(d, el);
+        const f = w && w.fullAttack && w.fullAttack[el.dataset.mode];
+        if (!f) break;
+        const wp = w.weapon;
+        const have = rounds(wp) || 0;
+        const shots = Math.min(f.sequence.length, Math.floor(have / f.bulletsPerAttack));
+        if (!shots) { api.toast(`<strong>${api.esc(wp.name)}</strong> needs ${f.bulletsPerAttack} round${f.bulletsPerAttack > 1 ? "s" : ""} per attack. Reload first.`); break; }
+        const results = f.sequence.slice(0, shots).map((b) => {
+          const r = C.rollDie(20);
+          const tag = r === 1 ? " miss (nat 1)" : r >= w.threat ? (r === 20 ? " hit, threat (nat 20)" : " threat") : "";
+          return { r, total: r + b, b, tag };
+        });
+        const spent = shots * f.bulletsPerAttack;
+        api.toast(`<strong>${api.esc(wp.name)} full attack (${f.mode})</strong><br>${results.map((x) => `<span class="roll-big">${x.total}</span> <span class="muted">(d20 ${x.r} ${C.fmt(x.b)})</span>${x.tag ? ` <span class="nat">${x.tag}</span>` : ""}`).join("<br>")}<br><span class="muted">${spent} round${spent > 1 ? "s" : ""} spent${shots < f.sequence.length ? `; ammo ran out after ${shots} attack${shots > 1 ? "s" : ""}` : ""}</span>`, 8000);
+        api.update((c) => {
+          c.weapons[i].ammo = have - spent;
+          api.pushLog(c, `${wp.name} full attack: ${results.map((x) => x.total + x.tag).join(", ")} (${spent} rds)`);
+        }, { undo: `${wp.name} full attack` });
+        break;
+      }
+      case "roll-damage": case "roll-crit": {
+        const w = weaponAt(d, el);
+        if (!w) break;
+        const crit = a === "roll-crit";
+        const r = rollWeaponDamage(w, crit ? w.multiplier : 1, api);
         if (!r) { api.toast(`Roll ${api.esc(w.weapon.damage)} by hand.`); break; }
-        const total = Math.max(1, r.total + w.damageBonus);
-        api.toast(`<strong>${api.esc(w.weapon.name)} damage</strong><br><span class="roll-big">${total}</span> <span class="muted">(${r.rolls.join("+")}${w.damageBonus ? " " + C.fmt(w.damageBonus) : ""})</span>`);
-        api.update((c) => api.pushLog(c, `${w.weapon.name} damage: ${total}`));
+        api.toast(`<strong>${api.esc(w.weapon.name)} ${crit ? `critical damage (×${w.multiplier})` : "damage"}</strong><br><span class="roll-big">${r.total}</span> <span class="muted">${r.detail}</span>`);
+        api.update((c) => api.pushLog(c, `${w.weapon.name} ${crit ? "critical " : ""}damage: ${r.total}`));
         break;
       }
       case "ammo": api.update((c) => {
         const w = c.weapons[i];
-        const cur = w.ammo ?? w.capacity;
-        w.ammo = el.dataset.v === "reload" ? w.capacity : Math.max(0, cur - 1);
-      }); break;
+        w.ammo = el.dataset.v === "reload" ? w.capacity : Math.max(0, rounds(w) - 1);
+        if (el.dataset.v === "reload") api.pushLog(c, `Reloaded ${w.name} (${w.capacity} rds)`);
+      }, { undo: el.dataset.v === "reload" ? "Reload" : "Spend round" }); break;
       case "abil-dmg": api.update((c) => {
         const ab = el.dataset.a;
         c.abilityDamage[ab] = Math.max(0, C.toInt(c.abilityDamage[ab]) + C.toInt(el.dataset.v));
-      }); break;
+      }, { undo: `${el.dataset.a} damage` }); break;
       case "hp-damage": case "hp-heal": case "hp-subdual": {
         const n = amount(el);
         if (!n) { api.toast("Enter an amount first."); break; }
+        const label = a === "hp-damage" ? `Took ${n} damage` : a === "hp-heal" ? `Healed ${n}` : `Took ${n} subdual`;
         api.update((c) => {
           const before = d.hp.current;
           if (a === "hp-damage") { c.hp.current = before - n; c.hp.stable = false; }
           else if (a === "hp-heal") { c.hp.current = Math.min(d.hp.max, before + n); c.hp.subdual = Math.max(0, C.toInt(c.hp.subdual) - n); if (before < 0) c.hp.stable = true; }
           else c.hp.subdual = C.toInt(c.hp.subdual) + n;
-          api.pushLog(c, a === "hp-damage" ? `Took ${n} damage (${before} → ${c.hp.current})` : a === "hp-heal" ? `Healed ${n} (${before} → ${c.hp.current})` : `Took ${n} subdual damage`);
+          api.pushLog(c, a === "hp-subdual" ? label : `${label} (${before} → ${c.hp.current})`);
           const st = C.hpState(c.hp.current);
-          if (a === "hp-damage" && st.key !== "ok") addAlert(st.key === "dead" ? "danger" : "warn", `<strong>${st.label}.</strong> ${st.note}`);
-        });
+          if (a === "hp-damage" && st.key !== "ok" && st.key !== C.hpState(before).key) addAlert(c, st.key === "dead" ? "danger" : "warn", `${st.label}.`, st.note);
+        }, { undo: label });
+        const box = (el.closest(".panel") || document).querySelector("input.amt");
+        if (box && !el.dataset.n) box.value = "";
         break;
       }
       case "hp-stabilize": {
@@ -424,18 +537,18 @@
         api.update((c) => {
           if (r === 1) { c.hp.stable = true; api.pushLog(c, "10% roll: 1 — stabilized"); }
           else { c.hp.current = d.hp.current - 1; api.pushLog(c, `10% roll: ${r} — lost 1 HP (${d.hp.current} → ${c.hp.current})`); }
-          if (C.hpState(c.hp.current).key === "dead") addAlert("danger", "<strong>Dead.</strong> Hit points reached −10.");
-        });
+          if (C.hpState(c.hp.current).key === "dead") addAlert(c, "danger", "Dead.", "Hit points reached −10.");
+        }, { undo: "10% roll" });
         api.toast(r === 1 ? "<strong>10% roll: 1</strong><br>Stabilized." : `<strong>10% roll: ${r}</strong><br>Lost 1 HP.`);
         break;
       }
-      case "hp-stable": api.update((c) => { c.hp.stable = true; api.pushLog(c, "Stabilized"); }); break;
+      case "hp-stable": api.update((c) => { c.hp.stable = true; api.pushLog(c, "Stabilized"); }, { undo: "Stabilized" }); break;
       case "hp-rest": api.update((c) => {
         const gain = C.toInt(c.level, 1);
         c.hp.current = Math.min(d.hp.max, d.hp.current + gain);
         c.hp.subdual = 0;
         api.pushLog(c, `Rested a day: +${c.hp.current - d.hp.current} HP`);
-      }); break;
+      }, { undo: "Rest a day" }); break;
       case "san-roll": {
         const input = (el.closest(".panel") || document).querySelector("input.sanroll");
         const notation = input ? input.value : "";
@@ -447,16 +560,22 @@
       }
       case "roll-temp-insanity": {
         const r = C.rollTemporaryInsanity();
-        dropAlert("roll-temp-insanity");
-        addAlert("warn", `<strong>${r.kind}: ${r.length}</strong> (Table 4-1 d10 ${r.d10}; ${r.duration}).<br>${api.esc(r.effect)} <span class="muted">(${r.kind.startsWith("Short") ? "Table 4-2" : "Table 4-3"} d% ${r.roll}${r.rerolled ? `, then Table 4-3 d% ${r.rerolled}` : ""})</span>`);
-        api.update((c) => { c.sanity.insanity = "temporary"; api.pushLog(c, `Temporary insanity: ${r.length} — ${r.effect}`); });
+        api.update((c) => {
+          dropAlert(c, "roll-temp-insanity");
+          addAlert(c, "warn", `${r.kind}: ${r.length}`, `(Table 4-1 d10 ${r.d10}; ${r.duration}.) ${r.effect} (${r.kind.startsWith("Short") ? "Table 4-2" : "Table 4-3"} d% ${r.roll}${r.rerolled ? `, then Table 4-3 d% ${r.rerolled}` : ""})`);
+          c.sanity.insanity = "temporary";
+          api.pushLog(c, `Temporary insanity: ${r.length} — ${r.effect}`);
+        }, { undo: "Temporary insanity roll" });
         break;
       }
       case "roll-indef-insanity": {
         const r = C.rollIndefiniteInsanity();
-        dropAlert("roll-indef-insanity");
-        addAlert("danger", `<strong>Indefinite insanity: ${r.months} game month${r.months > 1 ? "s" : ""}</strong> (1d6).<br>${api.esc(r.disorder)} <span class="muted">(Table 4-4 d% ${r.roll}; the GM may choose instead)</span>`);
-        api.update((c) => { c.sanity.insanity = "indefinite"; api.pushLog(c, `Indefinite insanity (${r.months} months): ${r.disorder}`); });
+        api.update((c) => {
+          dropAlert(c, "roll-indef-insanity");
+          addAlert(c, "danger", `Indefinite insanity: ${r.months} game month${r.months > 1 ? "s" : ""}`, `(1d6.) ${r.disorder} (Table 4-4 d% ${r.roll}; the GM may choose instead)`);
+          c.sanity.insanity = "indefinite";
+          api.pushLog(c, `Indefinite insanity (${r.months} months): ${r.disorder}`);
+        }, { undo: "Indefinite insanity roll" });
         break;
       }
       case "san-lose": {
@@ -468,7 +587,7 @@
       case "san-gain": case "san-therapy": {
         const n = amount(el);
         if (!n) { api.toast("Enter an amount first."); break; }
-        api.update(() => { const c = C.gainSanity(ch, n, a === "san-therapy" ? "therapy" : "other"); api.pushLog(c, `${a === "san-therapy" ? "Therapy" : "Gained"}: Sanity ${d.sanity.current} → ${C.sanity(c).current}`); return c; });
+        api.update(() => { const c = C.gainSanity(ch, n, a === "san-therapy" ? "therapy" : "other"); api.pushLog(c, `${a === "san-therapy" ? "Therapy" : "Gained"}: Sanity ${d.sanity.current} → ${C.sanity(c).current}`); return c; }, { undo: `Gained ${n} Sanity` });
         break;
       }
       case "san-check": {
@@ -478,10 +597,10 @@
         api.update((c) => api.pushLog(c, `Sanity check: ${r} vs ${d.sanity.current} — ${ok ? "success" : "failure"}`));
         break;
       }
-      case "san-hour": api.update(() => { const c = C.newSanityHour(ch); api.pushLog(c, "New game hour (20% tracker reset)"); return c; }); api.toast("New game hour — the 20% indefinite-insanity tracker starts again."); break;
+      case "san-hour": api.update(() => { const c = C.newSanityHour(ch); api.pushLog(c, "New game hour (20% tracker reset)"); return c; }, { undo: "New hour" }); api.toast("New game hour — the 20% indefinite-insanity tracker starts again."); break;
       case "san-mythos":
         api.confirmDialog(`<h2>Mythos-related insanity</h2><p>The first time an investigator goes insane from a Mythos encounter they gain 2 ranks of Cthulhu Mythos; each later episode adds 1 (p.50). Maximum Sanity drops to match.</p>`, "Add Mythos ranks").then((ok) => {
-          if (ok) api.update(() => { const c = C.mythosInsanity(ch); api.pushLog(c, `Mythos insanity: Cthulhu Mythos now ${c.mythos}`); return c; });
+          if (ok) api.update(() => { const c = C.mythosInsanity(ch); api.pushLog(c, `Mythos insanity: Cthulhu Mythos now ${c.mythos}`); return c; }, { undo: "Mythos insanity" });
         });
         break;
       default: break;
@@ -489,7 +608,7 @@
   }
 
   function handleChange(a, el, api) {
-    if (a === "insanity") api.update((c) => { c.sanity.insanity = el.value; api.pushLog(c, `Insanity state: ${el.value}`); });
+    if (a === "insanity") api.update((c) => { c.sanity.insanity = el.value; api.pushLog(c, `Insanity state: ${el.value}`); }, { undo: "Insanity state" });
   }
 
   let liveTimer = null;
@@ -510,12 +629,10 @@
       cash: (c) => { c.money.cash = el.value === "" ? null : Number(el.value); },
       "hp-current": (c) => { c.hp.current = el.value === "" ? null : Number(el.value); },
       "san-current": (c) => { c.sanity.current = el.value === "" ? null : Number(el.value); },
+      xp: (c) => { c.xp = Math.max(0, parseInt(el.value, 10) || 0); },
     }[key];
     if (apply) api.update(apply, { render: false });
   }
 
-  /** Rule alerts belong to the open character; clear them when another one opens. */
-  function clearAlerts() { playAlerts.length = 0; }
-
-  window.Designs = { list, render, handleAction, handleChange, handleInput, summaryBlock, clearAlerts };
+  window.Designs = { list, render, handleAction, handleChange, handleInput, summaryBlock };
 })();

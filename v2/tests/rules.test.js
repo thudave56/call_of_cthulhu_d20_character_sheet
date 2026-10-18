@@ -438,3 +438,27 @@ test("Weapon feats follow the chosen weapon's id; missing choices are flagged", 
   e.feats.push({ name: "Skill Emphasis", choice: "Knowledge (alchemy)" });
   assert.ok(CoC.featPrereqIssues(e, e.feats[e.feats.length - 1]).some((m) => /no longer one of your skills/.test(m)));
 });
+
+test("Ability score 0 states (p.62): Con 0 is dead, others helpless", () => {
+  const c = CoC.sampleCharacter();
+  assert.deepEqual(CoC.derive(c).abilityZero, []);
+  c.abilityDamage.Con = 99;
+  c.abilityDamage.Wis = 99;
+  const z = CoC.derive(c).abilityZero;
+  assert.deepEqual(z.map((x) => x.ability), ["Con", "Wis"]);
+  assert.equal(z[0].dead, true);
+  assert.equal(z[1].dead, false);
+});
+
+test("Unarmed line is always derived, with Str damage and the armor check penalty (p.94)", () => {
+  const c = CoC.sampleCharacter();
+  c.abilities.Str = 14;
+  c.armor = CoC.ARMOR.find((a) => a.acp < 0).name;
+  const d = CoC.derive(c);
+  assert.equal(d.unarmed.damageBonus, d.scores.Str.mod);
+  assert.ok(d.combat.acp < 0);
+  assert.equal(d.unarmed.bonus, d.combat.melee + d.combat.acp);
+  assert.equal(d.unarmed.weapon.damage, "1d3 subdual");
+  c.feats.push({ name: "Martial Artist" });
+  assert.equal(CoC.derive(c).unarmed.damage, "1d4");
+});

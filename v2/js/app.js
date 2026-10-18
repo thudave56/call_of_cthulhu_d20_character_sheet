@@ -28,7 +28,7 @@
     { key: "review", label: "Review" },
   ];
 
-  const state = { ch: null, dirty: false, route: { view: "list" }, saveTimer: null, design: S.getPref("design", "tracker"), pocketTab: "vitals", skillFilter: "", skillMode: "all", banners: [] };
+  const state = { ch: null, dirty: false, route: { view: "list" }, saveTimer: null, design: S.getPref("design", "tracker"), pocketTab: "vitals", skillFilter: "", skillMode: "all", featFilter: "", featAvailable: false, banners: [], undo: null };
 
   // ---------------------------------------------------------------------------
   // Utilities
@@ -67,14 +67,31 @@
     };
     if (immediate) run(); else state.saveTimer = setTimeout(run, 300);
   }
-  /** Mutate the current character, re-normalise, save and re-render. */
-  function update(fn, { render: doRender = true } = {}) {
+  /**
+   * Mutate the current character, re-normalise, save and re-render. Pass
+   * `undo: "label"` to let the player take this change back with Undo.
+   */
+  function update(fn, { render: doRender = true, undo = null } = {}) {
+    const before = state.ch;
     const next = C.clone(state.ch);
     const result = fn(next);
     state.ch = C.normalize(result || next);
+    if (undo) state.undo = { ch: before, label: undo };
     state.dirty = true;
     persist();
     if (doRender) render();
+  }
+  function undoLast() {
+    const u = state.undo;
+    if (!u || !state.ch || u.ch.id !== state.ch.id) return;
+    const restored = C.clone(u.ch);
+    restored.rev = state.ch.rev;   // a newer save of our own, not a conflict
+    state.ch = restored;
+    state.undo = null;
+    state.dirty = true;
+    persist();
+    render();
+    toast(`Undid: ${esc(u.label)}`);
   }
   /**
    * Roll d20 + mod. Only attack rolls treat natural results specially: a natural 1
@@ -92,7 +109,7 @@
       else if (r >= threat) { tag = ` <span class="nat nat20">${r === 20 ? "natural 20 — hits; " : ""}critical threat: roll again to confirm</span>`; note = ` — ${r === 20 ? "nat 20, hit, " : ""}threat`; }
     }
     toast(`<strong>${esc(label)}</strong><br><span class="roll-big">${total}</span> <span class="muted">(d20 ${r} ${fmt(mod)})</span>${tag}`);
-    update((ch) => pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${note}`), { render: state.route.view === "play" });
+    update((ch) => { pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${note}`); if (opts.spend) opts.spend(ch); }, { render: state.route.view === "play", undo: opts.spend ? label : null });
     return total;
   }
   function rollDice(expr) {
@@ -140,7 +157,7 @@
       persist(true);
       state.ch = C.normalize(ch);
       state.dirty = false;   // not saved until the first edit, so abandoned drafts don't pile up
-      D.clearAlerts && D.clearAlerts();
+      state.undo = null;
       state.banners = [];
       history.replaceState(null, "", `#/edit/${state.ch.id}/basics`);
       state.route = { view: "edit", id: state.ch.id, step: "basics" };
@@ -149,7 +166,7 @@
         persist(true);
         state.ch = S.load(r.id);
         state.dirty = false;
-        D.clearAlerts && D.clearAlerts();
+        state.undo = null;
         state.banners = [];
         if (!state.ch) { toast("That character isn't saved in this browser."); go("#/"); return; }
       }
@@ -161,12 +178,46 @@
     }
     render();
     window.scrollTo(0, 0);
+    // Move focus to the new screen's heading so keyboard and screen-reader users land on it.
+    const h = $app.querySelector("h1[tabindex], .route-focus");
+    if (h) h.focus({ preventScroll: true });
   }
 
   // ---------------------------------------------------------------------------
   // Rendering
   // ---------------------------------------------------------------------------
+  // Attributes that identify a control across re-renders, so focus can be put back.
+  const FOCUS_KEYS = ["action", "bind", "live", "filter", "i", "id", "k", "a", "level", "slot", "v", "n", "mode", "name"];
+  function focusSelector(el) {
+    if (!el || el === document.body || !$app.contains(el) && !$nav.contains(el)) return null;
+    if (el.id) return "#" + CSS.escape(el.id);
+    const parts = FOCUS_KEYS.filter((k) => el.dataset[k] !== undefined).map((k) => `[data-${k.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase())}="${CSS.escape(el.dataset[k])}"]`);
+    return parts.length ? el.tagName.toLowerCase() + parts.join("") : null;
+  }
+  /**
+   * Render now, or — while a change event is being handled — just after it, so
+   * a Tab press has already moved focus to the next field and we can keep it there.
+   */
+  let deferRender = false, renderQueued = false;
   function render() {
+    if (deferRender) { if (!renderQueued) { renderQueued = true; setTimeout(() => { renderQueued = false; renderNow(); }, 0); } return; }
+    renderNow();
+  }
+  function renderNow() {
+    const active = document.activeElement;
+    const sel = focusSelector(active);
+    const caret = active && typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd] : null;
+    const scrollY = window.scrollY;
+    paint();
+    if (!sel) return;
+    const again = document.querySelector(sel);
+    if (again && again !== document.activeElement) {
+      again.focus({ preventScroll: true });
+      if (caret) { try { again.setSelectionRange(caret[0], caret[1]); } catch (e) { /* number inputs */ } }
+      window.scrollTo(0, scrollY);
+    }
+  }
+  function paint() {
     const r = state.route;
     document.body.dataset.view = r.view;
     document.body.dataset.design = r.view === "play" ? state.design : "";
@@ -225,7 +276,7 @@
     return `<section class="list-view">
       <div class="list-head">
         <div>
-          <h1>Your investigators</h1>
+          <h1 tabindex="-1">Your investigators</h1>
           <p class="muted">Saved in this browser${S.persistent() ? "" : " — <strong>storage is unavailable, export to keep your work</strong>"}. They stay here between visits; export a file to move them to another device.</p>
         </div>
         <div class="list-buttons">
@@ -243,16 +294,28 @@
   // ---------------------------------------------------------------------------
   // Editor
   // ---------------------------------------------------------------------------
-  function stepNav(current) {
+  function stepNav(current, issues) {
     const id = state.ch.id;
-    return `<ol class="steps">${STEPS.map((s, i) => `<li><a href="#/edit/${id}/${s.key}" class="${s.key === current ? "current" : ""}"><span class="num">${i + 1}</span>${s.label}</a></li>`).join("")}</ol>`;
+    const badge = (key) => {
+      if (key === "review") return "";
+      const mine = issues.filter((x) => x.step === key);
+      const errs = mine.filter((x) => x.level === "error").length;
+      if (errs) return ` <span class="step-badge bad" title="${errs} rule problem${errs > 1 ? "s" : ""}">${errs}</span>`;
+      if (mine.length) return ` <span class="step-badge warn" title="${mine.length} reminder${mine.length > 1 ? "s" : ""}">${mine.length}</span>`;
+      return ' <span class="step-badge ok" aria-label="no problems">✓</span>';
+    };
+    return `<ol class="steps">${STEPS.map((s, i) => `<li><a href="#/edit/${id}/${s.key}" class="${s.key === current ? "current" : ""}" ${s.key === current ? 'aria-current="step"' : ""}><span class="num">${i + 1}</span>${s.label}${badge(s.key)}</a></li>`).join("")}</ol>`;
   }
-  function issuesPanel(issues) {
-    if (!issues.length) return `<div class="issues ok">✓ This character follows the creation rules.</div>`;
+  /** Problems for the current step (the Review step lists them all). */
+  function issuesPanel(all, step) {
+    const issues = step === "review" ? all : all.filter((x) => x.step === step);
+    const elsewhere = all.length - issues.length;
+    const more = elsewhere ? ` <span class="muted">${elsewhere} more on other steps (see the step numbers above).</span>` : "";
+    if (!issues.length) return `<div class="issues ok">✓ ${step === "review" ? "This character follows the creation rules." : "Nothing to fix on this step."}${more}</div>`;
     const errs = issues.filter((i) => i.level === "error");
     const warns = issues.filter((i) => i.level === "warn");
     return `<details class="issues" ${errs.length ? "open" : ""}><summary>${errs.length ? `<span class="bad">${errs.length} rule problem${errs.length > 1 ? "s" : ""}</span>` : ""} ${warns.length ? `<span class="warn">${warns.length} reminder${warns.length > 1 ? "s" : ""}</span>` : ""}</summary>
-      <ul>${errs.map((i) => `<li class="bad">${esc(i.msg)}</li>`).join("")}${warns.map((i) => `<li class="warn">${esc(i.msg)}</li>`).join("")}</ul></details>`;
+      <ul>${errs.map((i) => `<li class="bad">${esc(i.msg)}</li>`).join("")}${warns.map((i) => `<li class="warn">${esc(i.msg)}</li>`).join("")}</ul>${more ? `<p>${more}</p>` : ""}</details>`;
   }
   function renderEditor(step) {
     const ch = state.ch;
@@ -263,11 +326,11 @@
     const body = ({ basics: edBasics, abilities: edAbilities, skills: edSkills, feats: edFeats, hp: edHpMoney, gear: edGear, review: edReview }[step] || edBasics)(ch, d, issues);
     return `<section class="editor">
       <div class="editor-head">
-        <h1>${esc(ch.name || "New investigator")} <span class="muted">· Level ${ch.level} ${esc(ch.profession)}</span></h1>
-        ${stepNav(step)}
+        <h1 tabindex="-1">${esc(ch.name || "New investigator")} <span class="muted">· Level ${ch.level} ${esc(ch.profession)}</span></h1>
+        ${stepNav(idx >= 0 ? step : "basics", issues)}
       </div>
       ${state.banners.length ? `<div class="banner">${state.banners.map(esc).join("<br>")} <button class="btn small ghost" data-action="clear-banners">Dismiss</button></div>` : ""}
-      ${issuesPanel(issues)}
+      ${issuesPanel(issues, idx >= 0 ? step : "basics")}
       <div class="editor-body">${body}</div>
       <div class="editor-foot">
         ${prev ? `<a class="btn ghost" href="#/edit/${ch.id}/${prev.key}">← ${prev.label}</a>` : "<span></span>"}
@@ -291,8 +354,9 @@
       ${field("Gender", inp("gender", ch.gender, 'autocomplete="off"'))}
       <div class="field"><span class="lbl">Height &amp; weight</span><div class="row" style="margin:0">${inp("height", ch.height || "", 'placeholder="5 ft. 10 in." aria-label="Height" style="width:8em"')}${inp("weight", ch.weight || "", 'placeholder="180 lb." aria-label="Weight" style="width:7em"')}<button class="btn small ghost" data-action="roll-height-weight" title="Table 1-12: base + 2d10 in.; weight base + (that roll × 2d4) lb.">Roll (Table 1-12)</button></div></div>
       ${field("Era", `<select data-bind="era">${eras}</select>`, "Sets starting money and income (Table 1-14).")}
-      ${field("Profession", `<select data-action="profession">${profs}</select>`, `Income modifier ${fmt(C.PROFESSION_BY_NAME[ch.profession].moneyMod)} (Table 1-13). Changing profession resets core skills.`)}
+      ${field("Profession", `<select data-action="profession">${profs}</select>`, `Income modifier ${fmt(C.PROFESSION_BY_NAME[ch.profession].moneyMod)} (Table 1-13). Changing profession replaces the 9 template core skills (you'll be asked first).`)}
       ${field("Level", inp("level", ch.level, 'type="number" min="1" max="20"'), "To advance a character in play, use Level up on the play screen.")}
+      ${field("Experience points", inp("xp", ch.xp, 'type="number" min="0" step="50"'), d.xp.next === null ? "20th level is the highest." : `Level ${ch.level + 1} at ${d.xp.next.toLocaleString()} XP (Table 1-10, p.11).${d.xp.current >= d.xp.next ? " <strong>Enough to level up.</strong>" : ""}`)}
       ${field("Attack option", `<select data-action="attack-option"><option value="defense" ${ch.attackOption === "defense" ? "selected" : ""}>Defense — 2 good saves, BAB +0 at 1st</option><option value="offense" ${ch.attackOption === "offense" ? "selected" : ""}>Offense — 1 good save, BAB +1 at 1st</option></select>`, "Tables 1-8 / 1-9.")}
     </div>
     <fieldset class="field"><legend class="lbl">Good saves — choose exactly ${need}</legend>
@@ -345,7 +409,7 @@
     const extraHtml = [0, 1, 2].map((i) => {
       const id = extra[i] || "";
       const def = id ? C.skillDef(id) : null;
-      return `<div class="extra-core"><select data-action="extra-core" data-i="${i}" aria-label="Extra core skill ${i + 1}">${options(id)}</select>${def && def.specialty ? `<input class="spec" data-action="extra-spec" data-i="${i}" value="${esc(C.skillSpecialty(id))}" placeholder="specialty" aria-label="Specialty" />` : ""}</div>`;
+      return `<div class="extra-core"><select data-action="extra-core" data-i="${i}" aria-label="Extra core skill ${i + 1}">${options(id)}</select>${def && def.specialty ? `<input class="spec" data-action="extra-spec" data-i="${i}" value="${esc(C.skillSpecialty(id) === "*" ? "" : C.skillSpecialty(id))}" placeholder="specialty" aria-label="Extra core skill ${i + 1} specialty" />` : ""}</div>`;
     }).join("");
     const sp = d.skillPoints;
     const rows = d.skills.filter((r) => !r.def.mythos).map((r) => `<tr class="${r.core ? "core" : ""}">
@@ -381,7 +445,15 @@
     let opts = [];
     if (def.choice === "category") opts = Object.entries(C.WEAPON_CATEGORIES).filter(([k]) => k !== "unarmed").map(([k, v]) => [k, v]);
     else if (def.choice === "finesse") opts = C.FINESSE_WEAPONS.map((w) => [w, w]);
-    else if (def.choice === "weapon") opts = [...new Set([...(ch.weapons || []).map((w) => w.name), ...C.WEAPON_PRESETS.map((w) => w.name)])].map((w) => [w, w]);
+    else if (def.choice === "weapon") {
+      // Weapon feats follow one specific weapon you own (by id, so renaming it keeps the feat).
+      opts = (ch.weapons || []).map((w) => [w.id, w.name]);
+      if (f.choice && !opts.some(([v]) => v === f.choice)) {
+        const byName = (ch.weapons || []).find((w) => w.name === f.choice);
+        opts.unshift([f.choice, byName ? `${f.choice} (old link — re-pick)` : `${f.choice} (no longer carried)`]);
+      }
+      if (!opts.length) return `<span class="hint">Add a weapon on the Gear step first.</span>`;
+    }
     else if (def.choice === "skill") opts = C.skillIds(ch).filter((id) => id !== "Cthulhu Mythos").map((s) => [s, s]);
     return `<select data-action="feat-choice" data-i="${i}" aria-label="${esc(f.name)} choice"><option value="">— choose ${def.choice} —</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${f.choice === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
   }
@@ -391,10 +463,15 @@
       return `<li class="${probs.length ? "bad" : ""}"><strong>${esc(f.name)}</strong> ${choiceInput(f, i, ch)} <button class="btn small ghost" data-action="feat-remove" data-i="${i}" aria-label="Remove ${esc(f.name)}">Remove</button>
         <div class="hint">${esc(C.FEAT_BY_NAME[f.name] ? C.FEAT_BY_NAME[f.name].text : "")}</div>${probs.length ? `<div class="bad small">${probs.map(esc).join("; ")}</div>` : ""}</li>`;
     }).join("");
+    const q = state.featFilter.trim().toLowerCase();
+    let shown = 0;
     const avail = C.FEATS.map((f) => {
       const taken = C.hasFeat(ch, f.name);
-      const probs = C.featPrereqIssues(ch, { name: f.name, choice: "x" }).filter((m) => !/choose a/.test(m));
+      const probs = C.featPrereqIssues(ch, { name: f.name, choice: "x" }).filter((m) => !/choose a|pick one of your weapons|no longer one of your skills/.test(m));
       const disabled = (taken && !f.multi) || probs.length > 0;
+      if (q && !(f.name + " " + f.text).toLowerCase().includes(q)) return "";
+      if (state.featAvailable && disabled) return "";
+      shown++;
       const pre = f.prereq ? [...Object.entries(f.prereq.abil || {}).map(([a, v]) => `${a} ${v}+`), ...(f.prereq.feats || []), ...(f.prereq.bab ? [`BAB +${f.prereq.bab}`] : []), ...(f.prereq.proficient ? ["proficient"] : [])].join(", ") : "";
       return `<li class="${disabled ? "dim" : ""}"><button class="btn small" data-action="feat-add" data-name="${esc(f.name)}" ${disabled ? "disabled" : ""}>Add</button> <strong>${esc(f.name)}</strong>${f.psychic ? ' <span class="tag">Psychic</span>' : ""}${f.multi ? ' <span class="tag" title="Can be taken more than once">×</span>' : ""}
         <span class="hint">${esc(f.text)}${pre ? ` <em>Requires: ${esc(pre)}.</em>` : ""}${probs.length ? ` <span class="bad">(${probs.map(esc).join("; ")})</span>` : ""}</span></li>`;
@@ -402,7 +479,9 @@
     return `<div class="sp-tracker ${ch.feats.length > d.featSlots ? "bad" : ch.feats.length === d.featSlots ? "ok" : ""}">Feats: <strong>${ch.feats.length}</strong> / ${d.featSlots} <span class="muted">(2 at 1st level, +1 at every level divisible by 3${C.offenseBonusFeat(ch) ? ", +1 bonus Weapon Proficiency for the Offense option" : ""})</span></div>
       <p class="hint">No character is proficient with weapons by default: without the right Weapon Proficiency feat, attacks take −4 (p.43). Psychic feats need GM approval.</p>
       <h3>Your feats</h3><ul class="feat-list chosen">${chosen || '<li class="muted">None yet.</li>'}</ul>
-      <h3>Available feats</h3><ul class="feat-list">${avail}</ul>`;
+      <h3>Available feats</h3>
+      <div class="row feat-controls"><input type="search" data-filter="feat" value="${esc(state.featFilter)}" placeholder="Search feats…" aria-label="Search feats" /><label class="check"><input type="checkbox" data-action="feat-available" ${state.featAvailable ? "checked" : ""}/> Only feats I can take now</label></div>
+      <ul class="feat-list">${avail || ""}${shown ? "" : '<li class="muted">No feats match.</li>'}</ul>`;
   }
 
   function edHpMoney(ch, d) {
@@ -501,6 +580,7 @@
     const i = el.dataset.i !== undefined ? +el.dataset.i : null;
     switch (a) {
       case "print": window.print(); break;
+      case "undo": undoLast(); break;
       case "clear-banners": state.banners = []; render(); break;
       case "import": document.getElementById("importFile").click(); break;
       case "sample": { const c = S.save(C.sampleCharacter(), { force: true }).character; toast(`Added ${esc(c.name)}.`); render(); break; }
@@ -548,9 +628,18 @@
   }
 
   function handleChange(e) {
+    deferRender = true;
+    try { onChange(e); } finally { deferRender = false; }
+  }
+  /** Skill Emphasis follows a renamed specialty skill. */
+  function renameSkillChoice(c, from, to) {
+    if (!from || from === to) return;
+    for (const f of c.feats) if (f.name === "Skill Emphasis" && f.choice === from) f.choice = to;
+  }
+  function onChange(e) {
     const el = e.target;
     // Values typed straight onto the sheet are saved as you type; refresh the view once editing ends.
-    if (el.dataset.live === "hp-current" || el.dataset.live === "san-current") { render(); return; }
+    if (el.dataset.live === "hp-current" || el.dataset.live === "san-current" || el.dataset.live === "xp") { render(); return; }
     if (el.dataset.bind) {
       // A blank or invalid Level is ignored, so clearing the field can't wipe level history.
       if (el.dataset.bind === "level" && !(parseInt(el.value, 10) >= 1)) { render(); return; }
@@ -573,7 +662,23 @@
         if (state.route.view !== "play") toast(`Layout set to <strong>${esc((D.list.find((d) => d.key === el.value) || {}).name || el.value)}</strong>. Characters open in this layout when you press Play.`);
         break;
       }
-      case "profession": update((c) => { c.profession = el.value; c.coreSkills = C.templateCore(el.value); }); break;
+      case "profession": {
+        const to = el.value;
+        const from = state.ch.profession;
+        if (to === from) break;
+        // Keep the 3 core skills the player chose; only the 9 template skills change.
+        const change = () => update((c) => {
+          const extra = c.coreSkills.slice(9);
+          c.profession = to;
+          c.coreSkills = C.templateCore(to).concat(extra);
+        }, { undo: "Change profession" });
+        const tmpl = C.templateCore(from).filter((id) => !id.includes("*"));
+        const ranked = state.ch.coreSkills.slice(0, 9).filter((id) => C.toInt((state.ch.skills[id] || {}).ranks) > 0 && !C.templateCore(to).includes(id));
+        if (!tmpl.length && !ranked.length) { change(); break; }
+        confirmDialog(`<h2>Change profession to ${esc(to)}?</h2><p>The 9 template core skills will become the ${esc(to)} template. Your 3 chosen core skills stay.</p>${ranked.length ? `<p class="warn">These skills have ranks and will stop being core, so their ranks may exceed the noncore maximum: ${ranked.map(esc).join(", ")}.</p>` : ""}`, "Change profession").then((ok) => { if (ok) change(); else render(); });
+        break;
+      }
+      case "feat-available": state.featAvailable = el.checked; render(); break;
       case "attack-option": update((c) => { c.attackOption = el.value; const need = C.goodSaveCount(el.value); c.goodSaves = c.goodSaves.slice(0, need); }); break;
       case "good-save": update((c) => {
         // Keep the most recent picks; ticking one too many drops the oldest.
@@ -591,12 +696,18 @@
         const old = c.coreSkills[slot];
         c.coreSkills[slot] = val ? t.replace("*", val) : t;
         if (old && c.skills[old] && old !== c.coreSkills[slot] && !old.includes("*")) { c.skills[c.coreSkills[slot]] = c.skills[old]; delete c.skills[old]; }
+        if (old && !old.includes("*") && !c.coreSkills[slot].includes("*")) renameSkillChoice(c, old, c.coreSkills[slot]);
       }); break;
       case "extra-core": case "extra-spec": update((c) => {
         const core = c.coreSkills.slice(0, 9);
         while (core.length < 9) core.push(C.templateCore(c.profession)[core.length]);
         const extra = c.coreSkills.slice(9);
-        if (a === "extra-core") extra[i] = el.value; else extra[i] = `${C.skillBase(extra[i])} (${el.value.trim()})`;
+        const old = extra[i];
+        if (a === "extra-core") extra[i] = el.value; else extra[i] = `${C.skillBase(extra[i])} (${el.value.trim() || "*"})`;
+        if (a === "extra-spec" && old && !old.includes("*")) {
+          if (c.skills[old] && !c.skills[extra[i]]) { c.skills[extra[i]] = c.skills[old]; delete c.skills[old]; }
+          renameSkillChoice(c, old, extra[i]);
+        }
         if (C.skillDef(extra[i]) && C.skillDef(extra[i]).specialty && !/\(/.test(extra[i])) extra[i] = `${extra[i]} (*)`;
         c.coreSkills = core.concat(extra.filter(Boolean));
       }); break;
@@ -616,16 +727,32 @@
   }
 
   // API handed to designs.js for play-mode actions.
-  const api = { update, render, toast, rollD20, rollDice, pushLog, confirmDialog, state, esc, levelUp };
+  const api = { update, render, toast, rollD20, rollDice, pushLog, confirmDialog, state, esc, levelUp, undoLast };
 
   // ---------------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------------
+  let featTimer = null;
   document.addEventListener("click", handleClick);
+  // Enter in an amount box presses that panel's main button (Damage, Lose, Roll check).
+  document.addEventListener("keydown", (e) => {
+    const el = e.target;
+    if (e.key !== "Enter" || !el.dataset || !el.dataset.enter) return;
+    e.preventDefault();
+    const panel = el.closest(".panel") || document;
+    const btn = panel.querySelector(`button[data-action="${el.dataset.enter}"]:not([data-n])`);
+    if (btn) btn.click();
+  });
   document.addEventListener("change", handleChange);
   document.addEventListener("input", (e) => {
     const el = e.target;
     if (el.dataset.live && D.handleInput) { D.handleInput(el.dataset.live, el, api); return; }
+    if (el.dataset.filter === "feat") {
+      state.featFilter = el.value;
+      clearTimeout(featTimer);
+      featTimer = setTimeout(render, 150);   // render() keeps focus and the caret in the box
+      return;
+    }
     // Text fields save as you type (the change event re-renders when you leave the field).
     if (el.dataset.bind && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && el.type === "text"))) {
       update((c) => { setPath(c, el.dataset.bind, el.value); }, { render: false });
@@ -663,6 +790,12 @@
     } else if (e.key === "cocd20v2:index" && state.route.view === "list") render();
   });
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(true); });
+
+  // The top bar wraps on narrow screens; Pocket's sticky vitals sit just below it.
+  const $top = document.querySelector(".topbar");
+  const setTopbarHeight = () => document.documentElement.style.setProperty("--topbar-h", ($top ? $top.offsetHeight : 52) + "px");
+  if ($top && window.ResizeObserver) new ResizeObserver(setTopbarHeight).observe($top);
+  setTopbarHeight();
 
   const migrated = S.importLegacyOnce();
   if (migrated.length) setTimeout(() => toast(`Copied ${migrated.length} character(s) from the original sheet. Review their skills and HP on the edit screen.`, 7000), 300);
