@@ -495,3 +495,28 @@ test("Dice roller reads NdM±K expressions and rejects junk", () => {
   assert.equal(CoC.rollDiceExpr("2d10 - 3", min).total, -1);
   for (const bad of ["", "abc", "3d", "d1", "200d6", "1d6+<script>"]) assert.equal(CoC.rollDiceExpr(bad), null, bad);
 });
+
+test("Spell costs are read from the printed Cost line (p.128-146)", () => {
+  assert.deepEqual(CoC.parseSpellCost("4 Str damage and 1d3 Sanity points"), { abilities: [{ ability: "Str", amount: "4", permanent: false }], sanity: "1d3" });
+  assert.deepEqual(CoC.parseSpellCost("2 Con drain (permanent) and 3d6 Sanity points"), { abilities: [{ ability: "Con", amount: "2", permanent: true }], sanity: "3d6" });
+  assert.deepEqual(CoC.parseSpellCost("2 Str + 2 Wis damage").abilities.map((x) => x.ability), ["Str", "Wis"]);
+  assert.deepEqual(CoC.parseSpellCost("1d4+1 Con damage, 1/1d6 Sanity").abilities[0].amount, "1d4+1");
+  assert.deepEqual(CoC.parseSpellCost(""), { abilities: [], sanity: null });
+});
+
+test("Permanent drain lowers the score, HP and saves; study bonus and spell DC", () => {
+  const c = CoC.sampleCharacter();
+  const before = CoC.derive(c);
+  c.abilityDrain.Con = 4;
+  const after = CoC.derive(c);
+  assert.equal(after.scores.Con.permanent, before.scores.Con.permanent - 4);
+  assert.ok(after.hp.max < before.hp.max);
+  assert.ok(after.saves.fort.total < before.saves.fort.total);
+  const intMod = before.scores.Int.mod;
+  assert.equal(CoC.spellSaveDC(c), 15 + Math.max(0, intMod));
+  assert.equal(CoC.tomeStudyBonus(c, { studyChecks: 2 }), c.level + intMod + 2);
+  const n = CoC.normalize({ spells: [{ name: "<b>x</b>", cost: 5 }], tomes: [{ status: "weird", dc: "abc" }] });
+  assert.equal(n.spells[0].cost, "5");
+  assert.equal(n.tomes[0].status, "unread");
+  assert.equal(n.tomes[0].dc, 20);
+});

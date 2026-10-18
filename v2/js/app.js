@@ -18,6 +18,16 @@
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   const fmt = C.fmt;
+  // Sample entries from Chapter 7, to start from or copy the format of.
+  const SPELL_PRESETS = [
+    { name: "Animal Form", components: "V", cost: "4 Int damage and 1d8 Sanity points", castingTime: "1 action", range: "Personal", duration: "1 hour/level (D)", save: "", notes: "p.130" },
+    { name: "Fist of Yog-Sothoth", components: "S", cost: "2 Str damage and 1d6 Sanity points", castingTime: "1 action", range: "Medium (100 ft. + 10 ft./level)", duration: "Instantaneous", save: "Ref half", notes: "Force. p.142" },
+    { name: "Mindblast", components: "S", cost: "4 Str damage and 1d3 Sanity points", castingTime: "1 action", range: "Close (25 ft. + 5 ft./2 levels)", duration: "1 hour", save: "Will negates", notes: "Mind-Affecting. p.146" },
+  ];
+  const TOME_PRESETS = [
+    { name: "Necronomicon (Latin, Olaus Wormius)", language: "Latin", exam: "2d10 weeks", dc: 24, sanityInitial: "1d10", sanityComplete: "2d10", mythos: 2, spells: "3d6 spells", notes: "p.121" },
+    { name: "The Sussex Manuscript", language: "English", exam: "1d8 weeks", dc: 20, sanityInitial: "1d3", sanityComplete: "1d6", mythos: 1, spells: "1d6 spells", notes: "p.121" },
+  ];
   const STEPS = [
     { key: "basics", label: "Basics" },
     { key: "abilities", label: "Abilities" },
@@ -25,6 +35,7 @@
     { key: "feats", label: "Feats" },
     { key: "hp", label: "HP & Money" },
     { key: "gear", label: "Gear" },
+    { key: "magic", label: "Magic" },
     { key: "review", label: "Review" },
   ];
 
@@ -297,7 +308,7 @@
   function stepNav(current, issues) {
     const id = state.ch.id;
     const badge = (key) => {
-      if (key === "review") return "";
+      if (key === "review" || key === "magic") return "";
       const mine = issues.filter((x) => x.step === key);
       const errs = mine.filter((x) => x.level === "error").length;
       if (errs) return ` <span class="step-badge bad" title="${errs} rule problem${errs > 1 ? "s" : ""}">${errs}</span>`;
@@ -323,7 +334,7 @@
     const issues = C.validate(ch, { creation: true });
     const idx = STEPS.findIndex((s) => s.key === step);
     const prev = STEPS[idx - 1], next = STEPS[idx + 1];
-    const body = ({ basics: edBasics, abilities: edAbilities, skills: edSkills, feats: edFeats, hp: edHpMoney, gear: edGear, review: edReview }[step] || edBasics)(ch, d, issues);
+    const body = ({ basics: edBasics, abilities: edAbilities, skills: edSkills, feats: edFeats, hp: edHpMoney, gear: edGear, magic: edMagic, review: edReview }[step] || edBasics)(ch, d, issues);
     return `<section class="editor">
       <div class="editor-head">
         <h1 tabindex="-1">${esc(ch.name || "New investigator")} <span class="muted">· Level ${ch.level} ${esc(ch.profession)}</span></h1>
@@ -529,6 +540,27 @@
       ${items ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Item</th><th>Qty</th><th>lb each</th><th>Notes</th><th></th></tr></thead><tbody>${items}</tbody></table></div>` : ""}`;
   }
 
+  function edMagic(ch, d) {
+    const cell = (kind, i, k, v, attrs = "") => `<td><input data-action="${kind}" data-i="${i}" data-k="${k}" value="${esc(v ?? "")}" aria-label="${k}" ${attrs} /></td>`;
+    const spells = ch.spells.map((sp, i) => `<tr>${cell("spell", i, "name", sp.name)}${cell("spell", i, "cost", sp.cost, 'placeholder="2 Str damage and 1d6 Sanity points" size="28"')}${cell("spell", i, "components", sp.components, 'size="4"')}${cell("spell", i, "castingTime", sp.castingTime, 'size="8"')}${cell("spell", i, "range", sp.range, 'size="10"')}${cell("spell", i, "duration", sp.duration, 'size="10"')}${cell("spell", i, "save", sp.save, 'size="8"')}${cell("spell", i, "notes", sp.notes)}
+      <td class="small">${(() => { const c = C.parseSpellCost(sp.cost); return c.abilities.length || c.sanity ? esc([...c.abilities.map((a) => `${a.amount} ${a.ability}${a.permanent ? " drain" : ""}`), c.sanity ? `${c.sanity} SAN` : ""].filter(Boolean).join(", ")) : '<span class="warn">not read</span>'; })()}</td>
+      <td><button class="btn small ghost" data-action="spell-remove" data-i="${i}" aria-label="Remove spell">✕</button></td></tr>`).join("");
+    const tomes = ch.tomes.map((t, i) => `<tr>${cell("tome", i, "name", t.name)}${cell("tome", i, "language", t.language, 'size="8"')}${cell("tome", i, "exam", t.exam, 'size="9" placeholder="1d8 weeks"')}${cell("tome", i, "dc", t.dc, 'type="number" min="1" max="60" style="width:4em"')}${cell("tome", i, "sanityInitial", t.sanityInitial, 'size="5" placeholder="1d3"')}${cell("tome", i, "sanityComplete", t.sanityComplete, 'size="5" placeholder="1d6"')}${cell("tome", i, "mythos", t.mythos, 'type="number" min="0" max="20" style="width:3.5em"')}${cell("tome", i, "spells", t.spells, 'size="12"')}
+      <td><select data-action="tome" data-i="${i}" data-k="status" aria-label="Status">${[["unread", "Unread"], ["examining", "Studying"], ["read", "Read"]].map(([k, l]) => `<option value="${k}" ${t.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+      <td><button class="btn small ghost" data-action="tome-remove" data-i="${i}" aria-label="Remove tome">✕</button></td></tr>`).join("");
+    const drain = C.ABILITIES.map((a) => `<label class="field inline"><span class="lbl">${a}</span><input type="number" min="0" data-bind="abilityDrain.${a}" value="${esc(ch.abilityDrain[a] || "")}" placeholder="0" style="width:4em" aria-label="${C.ABILITY_NAMES[a]} permanent drain" /></label>`).join("");
+    return `<p class="muted">Investigators rarely start with magic. Spells cost Sanity and ability damage; there are no magic points (p.126). Enter costs as printed, e.g. <code>4 Str damage and 1d3 Sanity points</code> or <code>2 Con drain (permanent) and 3d6 Sanity points</code>, and the play screen pays them when you cast.</p>
+      <label class="check"><input type="checkbox" data-action="opt-unmastered" ${ch.options.unmasteredMagic ? "checked" : ""}/> Variant: Unmastered Magic (p.151) — every casting needs an Int check (DC 15); a failure rolls d% for a mishap.</label>
+      <h3>Spells known</h3>
+      <div class="row"><select id="spellPreset" aria-label="Spell to add"><option value="">Blank spell</option>${SPELL_PRESETS.map((sp, i) => `<option value="${i}">${esc(sp.name)} (${esc(sp.notes.replace(/.*(p\.\d+)/, "$1"))})</option>`).join("")}</select><button class="btn small" data-action="spell-add">Add spell</button></div>
+      ${spells ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Spell</th><th>Cost</th><th>Comp.</th><th>Time</th><th>Range</th><th>Duration</th><th>Save</th><th>Notes</th><th>Read as</th><th></th></tr></thead><tbody>${spells}</tbody></table></div>` : '<p class="muted">No spells.</p>'}
+      <h3>Mythos tomes</h3>
+      <div class="row"><select id="tomePreset" aria-label="Tome to add"><option value="">Blank tome</option>${TOME_PRESETS.map((t, i) => `<option value="${i}">${esc(t.name)}</option>`).join("")}</select><button class="btn small" data-action="tome-add">Add tome</button></div>
+      ${tomes ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Tome</th><th>Language</th><th>Exam. period</th><th>DC</th><th>SAN initial</th><th>SAN completion</th><th>Mythos +</th><th>Spells</th><th>Status</th><th></th></tr></thead><tbody>${tomes}</tbody></table></div>` : '<p class="muted">No tomes.</p>'}
+      <p class="hint">Reading a tome: initial contact costs its initial Sanity; each Examination Period ends with a study check, 1d20 + level + Int modifier + earlier checks against the DC; finishing costs the completion Sanity and adds its Cthulhu Mythos ranks (p.119-121). The play screen rolls all of this.</p>
+      <h3>Permanent ability drain</h3><p class="hint">Some spells drain abilities permanently ("drain" or "permanent" in the cost). Casting records it automatically; correct it here.</p><div class="row">${drain}</div>`;
+  }
+
   function edReview(ch, d, issues) {
     return `<p>${issues.filter((i) => i.level === "error").length ? "Fix the rule problems listed above, then start playing." : "Everything checks out. You can come back and edit at any time."}</p>
       <div class="review-grid">${D.summaryBlock(ch, d, ctx())}</div>
@@ -620,6 +652,10 @@
       case "weapon-remove": update((c) => { c.weapons.splice(i, 1); }); break;
       case "item-add": { const n = document.getElementById("itemName").value.trim(); if (n) update((c) => { c.equipment.push({ id: C.uid(), name: n, qty: 1, notes: "" }); }); break; }
       case "item-remove": update((c) => { c.equipment.splice(i, 1); }); break;
+      case "spell-add": { const v = document.getElementById("spellPreset").value; const p = v === "" ? { name: "New spell", cost: "" } : SPELL_PRESETS[+v]; update((c) => { c.spells.push(Object.assign({ id: C.uid() }, C.clone(p))); }); break; }
+      case "spell-remove": update((c) => { c.spells.splice(i, 1); }); break;
+      case "tome-add": { const v = document.getElementById("tomePreset").value; const p = v === "" ? { name: "New tome", dc: 20 } : TOME_PRESETS[+v]; update((c) => { c.tomes.push(Object.assign({ id: C.uid() }, C.clone(p))); }); break; }
+      case "tome-remove": update((c) => { c.tomes.splice(i, 1); }); break;
       case "level-up":
         confirmDialog(`<h2>Level up to ${state.ch.level + 1}?</h2><p>This rolls your hit die (1d6 + Con) and adds 1d6 Sanity (p.51), then takes you to spend skill points${(state.ch.level + 1) % 3 === 0 ? ", choose a feat" : ""}${(state.ch.level + 1) % 4 === 0 ? " and raise an ability" : ""}.</p>`, "Level up").then((ok) => ok && levelUp());
         break;
@@ -689,6 +725,8 @@
       }); break;
       case "opt-defense": update((c) => { c.options.defenseBonus = el.checked; }); break;
       case "opt-offense-wp": update((c) => { c.options.offenseWeaponProficiency = el.checked; }); break;
+      case "opt-unmastered": update((c) => { c.options.unmasteredMagic = el.checked; }); break;
+      case "spell": case "tome": update((c) => { const k = el.dataset.k; c[a === "spell" ? "spells" : "tomes"][i][k] = el.type === "number" ? (el.value === "" ? 0 : +el.value) : el.value; }); break;
       case "ability-increase": update((c) => { c.levelLog[+el.dataset.level - 1].abilityIncrease = el.value || null; return C.lockIntMods(c, +el.dataset.level); }); break;
       case "core-spec": update((c) => {
         const slot = +el.dataset.slot; const t = C.templateCore(c.profession)[slot];

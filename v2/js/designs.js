@@ -80,7 +80,7 @@
         <button class="btn danger ghost quick" data-action="hp-damage" data-n="5" aria-label="Take 5 damage">−5</button>
         <button class="btn ok" data-action="hp-heal">Heal</button>
         ${opts.compact ? "" : `<button class="btn ghost small" data-action="hp-subdual" title="Subdual (nonlethal) damage">Subdual</button>`}
-        <button class="btn ghost small" data-action="hp-rest" title="Natural healing: 1 HP per character level per day of rest (p.69)">Rest a day</button>
+        <button class="btn ghost small" data-action="hp-rest" title="Natural healing: 1 HP per character level per day of rest (p.69), and 1 point of each damaged ability (p.74)">Rest a day</button>
       </div>
       ${opts.compact ? "" : `<p class="hint">Max = 6 ${x.fmt(hp.conMod)} at 1st${hp.perLevel.length ? " + hit dice" : ""}${hp.toughness ? ` + ${hp.toughness} Toughness` : ""}. 0 HP disabled · −1 to −9 dying · −10 dead.</p>`}
     </section>`;
@@ -172,6 +172,37 @@
       <h3 class="sub-h">Conditions</h3>
       <div class="chips" role="group" aria-label="Conditions">${chips}</div>
       ${active.length ? `<ul class="cond-list">${active.map((k) => `<li><strong>${esc(k.name)}:</strong> ${esc(k.text)}</li>`).join("")}</ul><p class="hint">Applied to the numbers on this sheet: ability penalties, attack penalties, initiative, speed and Dex to AC (Character Condition Summary, p.91).</p>` : ""}
+    </section>`;
+  }
+
+  /** Spells known and Mythos tomes (Ch. 7). */
+  function magicBlock(ch, d, x) {
+    const { esc, fmt } = x;
+    if (!ch.spells.length && !ch.tomes.length) return x.opts && x.opts.hideEmptyMagic ? "" : `<section class="panel magic no-print" aria-label="Magic"><h2>Magic</h2><p class="muted">No spells or tomes. Add them on the Magic step of Edit.</p></section>`;
+    const drained = C.ABILITIES.filter((a) => d.scores[a].drained).map((a) => `${a} −${d.scores[a].drained}`);
+    const spells = ch.spells.map((sp, i) => {
+      const cost = C.parseSpellCost(sp.cost);
+      return `<li class="spell"><div class="spell-head"><strong>${esc(sp.name)}</strong> <span class="muted small">${esc([sp.components, sp.castingTime, sp.range, sp.duration, sp.save].filter(Boolean).join(" · "))}</span></div>
+        <div class="small">Cost: ${esc(sp.cost || "—")}${sp.casts ? ` <span class="muted">· cast ${sp.casts}×</span>` : ""}</div>${sp.notes ? `<div class="muted small">${esc(sp.notes)}</div>` : ""}
+        <button class="btn small no-print" data-action="spell-cast" data-i="${i}" title="Pay the cost${cost.sanity ? `: ${esc(cost.sanity)} Sanity` : ""}${cost.abilities.length ? ` and ${esc(cost.abilities.map((c) => `${c.amount} ${c.ability}${c.permanent ? " drain" : ""}`).join(", "))}` : ""}">Cast</button></li>`;
+    }).join("");
+    const tomes = ch.tomes.map((t, i) => {
+      const bonus = C.tomeStudyBonus(ch, t);
+      const status = t.status === "read" ? "Read" : t.status === "examining" ? `Studying (${t.studyChecks} check${t.studyChecks === 1 ? "" : "s"} so far)` : "Unread";
+      const btn = t.status === "read"
+        ? `<button class="btn small" data-action="tome-consult" data-i="${i}" title="Spend 1d4 hours; Cthulhu Mythos check +${t.mythos} (p.120). No Sanity loss.">Consult</button>`
+        : !t.initialDone
+          ? `<button class="btn small" data-action="tome-open" data-i="${i}" title="Initial contact always risks Sanity (p.119)">Open it (Sanity ${esc(t.sanityInitial || "0")})</button>`
+          : `<button class="btn small" data-action="tome-study" data-i="${i}" title="End of an Examination Period: 1d20 + level + Int + earlier checks vs DC ${t.dc} (p.119)">Study check (d20 ${fmt(bonus)} vs DC ${t.dc})</button>`;
+      return `<li class="tome"><div class="spell-head"><strong>${esc(t.name)}</strong> <span class="muted small">${esc([t.language, t.exam && `${t.exam} per period`, `DC ${t.dc}`].filter(Boolean).join(" · "))}</span></div>
+        <div class="small">${status} · Sanity ${esc(t.sanityInitial || "0")} initial, ${esc(t.sanityComplete || "0")} on completion · Cthulhu Mythos +${t.mythos}${t.spells ? ` · Spells: ${esc(t.spells)}` : ""}</div>
+        <div class="no-print">${btn}</div></li>`;
+    }).join("");
+    return `<section class="panel magic" aria-label="Magic"><h2>Magic</h2>
+      ${spells ? `<h3 class="sub-h">Spells known <span class="muted">· saves vs your spells DC ${C.spellSaveDC(ch)}</span></h3><ul class="spell-list">${spells}</ul>
+      <p class="hint">Costs are paid when the casting completes (p.128). Damaged or distracted while casting: Concentration DC 15 + damage, or the spell is lost.${ch.options.unmasteredMagic ? " Unmastered Magic is on: each casting needs an Int check DC 15 (p.151)." : ""}</p>` : ""}
+      ${tomes ? `<h3 class="sub-h">Tomes</h3><ul class="spell-list">${tomes}</ul><p class="hint">Not in your language? Speak Other Language DC 15 each week; a failure adds a week (p.119). Learning a spell from a read tome takes 1d3 weeks (p.129).</p>` : ""}
+      ${drained.length ? `<p class="small"><strong>Permanent drain:</strong> ${drained.join(", ")}</p>` : ""}
     </section>`;
   }
 
@@ -332,7 +363,7 @@
         <div class="col combat-col">${encounterBlock(ch, d, x)}${combatBlock(ch, d, x)}${weaponsBlock(ch, d, x, { cards: true })}${abilitiesBlock(ch, d, x)}</div>
         <div class="col skills-col">${skillsBlock(ch, d, x)}</div>
       </div>
-      <div class="tracker-bottom">${diceBlock(ch, d, x)}${featsBlock(ch, d, x)}${gearBlock(ch, d, x)}${notesBlock(ch, d, x)}${logBlock(ch, d, x)}</div>
+      <div class="tracker-bottom">${diceBlock(ch, d, x)}${magicBlock(ch, d, x)}${featsBlock(ch, d, x)}${gearBlock(ch, d, x)}${notesBlock(ch, d, x)}${logBlock(ch, d, x)}</div>
       ${referenceBlock(ch, d, x)}
     </div>`;
   }
@@ -387,6 +418,7 @@
       <div class="sheet-page">
         ${weaponsBlock(ch, d, x)}
         ${featsBlock(ch, d, x)}
+        ${ch.spells.length || ch.tomes.length ? magicBlock(ch, d, x) : ""}
         ${gearBlock(ch, d, x)}
         ${notesBlock(ch, d, x)}
         <div class="no-print sheet-vitals">${hpBlock(ch, d, x, { id: "s" })}${sanityBlock(ch, d, x, { id: "s" })}${encounterBlock(ch, d, x)}${diceBlock(ch, d, x)}</div>
@@ -397,12 +429,13 @@
 
   function pocket(ch, d, x) {
     const tab = x.state.pocketTab || "vitals";
-    const tabs = [["vitals", "Vitals"], ["skills", "Skills"], ["combat", "Combat"], ["gear", "Gear"], ["notes", "Notes"]];
+    const tabs = [["vitals", "Vitals"], ["skills", "Skills"], ["combat", "Combat"], ["gear", "Gear"], ["magic", "Magic"], ["notes", "Notes"]];
     const body = {
       vitals: hpBlock(ch, d, x, { id: "p", compact: false }) + sanityBlock(ch, d, x, { id: "p", compact: false }) + abilitiesBlock(ch, d, x),
       skills: skillsBlock(ch, d, x),
       combat: encounterBlock(ch, d, x) + combatBlock(ch, d, x) + weaponsBlock(ch, d, x, { cards: true }) + diceBlock(ch, d, x),
       gear: gearBlock(ch, d, x) + featsBlock(ch, d, x),
+      magic: magicBlock(ch, d, x),
       notes: notesBlock(ch, d, x) + logBlock(ch, d, x) + referenceBlock(ch, d, x),
     }[tab];
     return `<div class="design-pocket">
@@ -446,22 +479,28 @@
   /** A weapon row by index; "u" is the always-present unarmed strike. */
   function weaponAt(d, el) { return el.dataset.i === "u" ? d.unarmed : d.weapons[+el.dataset.i]; }
 
-  /** Apply a Sanity loss and raise the rule alerts it triggers (p.47-50). */
-  function applyLoss(ch, d, n, reason, api) {
-    const res = C.loseSanity(ch, n, reason);
+  /**
+   * Apply a Sanity loss and raise the rule alerts it triggers (p.47-50).
+   * opts.before / opts.after change the character in the same step (one Undo).
+   */
+  function applyLoss(ch, d, n, reason, api, opts = {}) {
+    let start = ch;
+    if (opts.before) { start = C.clone(ch); opts.before(start); }
+    const res = C.loseSanity(start, n, reason);
     const s = C.sanity(res.character);
     api.update(() => {
       const c = res.character;
+      if (opts.after) opts.after(c);
       for (const t of res.triggers) {
         if (t === "temporary") addAlert(c, "warn", `Lost ${n} in one roll (≥ ½ Wis = ${d.sanity.tempThreshold}).`, "The GM calls for a Sanity check: on a failure the investigator goes temporarily insane.", "roll-temp-insanity");
         if (t === "indefinite") addAlert(c, "danger", `Lost ${s.hourLoss} Sanity this hour (≥ 20% = ${s.indefiniteThreshold}).`, "The investigator goes indefinitely insane when the GM judges it.", "roll-indef-insanity");
         if (t === "zero") addAlert(c, "danger", `Sanity at ${s.current}.`, "The character loses 1 more Sanity each round until −10 unless stabilized with Psychoanalysis.");
         if (t === "permanent") addAlert(c, "danger", "Sanity −10 or lower: permanent insanity.", "The character becomes an NPC.");
       }
-      api.pushLog(c, `Lost ${n} Sanity (${d.sanity.current} → ${s.current})${reason ? " — " + reason : ""}`);
+      if (n || !opts.before) api.pushLog(c, `Lost ${n} Sanity (${d.sanity.current} → ${s.current})${reason ? " — " + reason : ""}`);
       if (res.triggers.includes("permanent")) c.sanity.insanity = "permanent";
       return c;
-    }, { undo: `Lost ${n} Sanity` });
+    }, { undo: opts.undo || `Lost ${n} Sanity` });
   }
 
   /** Roll a damage expression `times` times (a confirmed critical multiplies the roll, p.66). */
@@ -529,6 +568,73 @@
         if (!r) { api.toast("Type dice like 3d6+2, 1d20+1d4 or d%."); break; }
         api.toast(`<strong>${api.esc(expr)}</strong><br><span class="roll-big">${r.total}</span> <span class="muted">${api.esc(r.detail)}</span>`);
         api.update((c) => api.pushLog(c, `Rolled ${expr}: ${r.total} (${r.detail})`));
+        break;
+      }
+      case "spell-cast": {
+        const sp = ch.spells[i];
+        if (!sp) break;
+        const cost = C.parseSpellCost(sp.cost);
+        const costText = [cost.abilities.map((c) => `${c.amount} ${c.ability} ${c.permanent ? "drain (permanent)" : "damage"}`).join(", "), cost.sanity && `${cost.sanity} Sanity`].filter(Boolean).join(" and ");
+        api.confirmDialog(`<h2>Cast ${api.esc(sp.name)}?</h2><p>Cost: <strong>${api.esc(costText || sp.cost || "none listed")}</strong>. It is paid when the casting completes (p.128).</p>${cost.abilities.length || cost.sanity ? "" : '<p class="warn">The cost line couldn\'t be read; apply it by hand.</p>'}${ch.options.unmasteredMagic ? "<p>Unmastered Magic: an Int check (DC 15) is rolled first (p.151).</p>" : ""}`, "Cast").then((ok) => {
+          if (!ok) return;
+          const cur = api.state.ch;
+          const dd = C.derive(cur);
+          let mishap = "";
+          if (cur.options.unmasteredMagic) {
+            const r = C.rollDie(20), total = r + dd.scores.Int.mod;
+            if (total < 15) {
+              const p = C.rollDie(100);
+              mishap = p <= 60 ? "works normally" : p <= 70 ? "has no effect, but the cost is paid" : p <= 95 ? "goes astray: random target, area or effect" : "goes astray, and a random character within 100 ft also pays the cost";
+              mishap = `Int check ${total} (d20 ${r}) failed — d% ${p}: the spell ${mishap}.`;
+            } else mishap = `Int check ${total} (d20 ${r}) succeeded.`;
+          }
+          const paid = cost.abilities.map((c) => { const r = C.rollDiceExpr(c.amount); return Object.assign({}, c, { n: r ? Math.max(0, r.total) : 0 }); });
+          const san = cost.sanity ? C.rollDiceExpr(cost.sanity) : null;
+          const n = san ? Math.max(0, san.total) : 0;
+          const paidText = [paid.map((c) => `${c.n} ${c.ability}${c.permanent ? " drain" : ""}`).join(", "), cost.sanity && `${n} Sanity`].filter(Boolean).join(", ");
+          api.toast(`<strong>Cast ${api.esc(sp.name)}</strong><br>Paid: ${api.esc(paidText || "nothing")}${mishap ? `<br>${api.esc(mishap)}` : ""}`, 8000);
+          applyLoss(cur, dd, n, `cast ${sp.name}`, api, {
+            undo: `Cast ${sp.name}`,
+            before: (c) => {
+              for (const p of paid) { const key = p.permanent ? "abilityDrain" : "abilityDamage"; c[key][p.ability] = C.toInt(c[key][p.ability]) + p.n; }
+              c.spells[i].casts = C.toInt(c.spells[i].casts) + 1;
+              api.pushLog(c, `Cast ${sp.name}: ${paidText || "no cost"}${mishap ? " — " + mishap : ""}`);
+            },
+          });
+        });
+        break;
+      }
+      case "tome-open": {
+        const t = ch.tomes[i];
+        const r = C.rollDiceExpr(t.sanityInitial || "0");
+        const n = r ? Math.max(0, r.total) : 0;
+        api.toast(`<strong>${api.esc(t.name)}: initial contact</strong><br>Lose <span class="roll-big">${n}</span> Sanity${r && r.terms.some((x) => x.rolls.length) ? ` <span class="muted">(${api.esc(r.detail)})</span>` : ""}. Examination begins: ${api.esc(t.exam || "see the tome")} per period.`, 7000);
+        applyLoss(ch, d, n, `opened ${t.name}`, api, { undo: `Open ${t.name}`, before: (c) => { c.tomes[i].initialDone = true; c.tomes[i].status = "examining"; } });
+        break;
+      }
+      case "tome-study": {
+        const t = ch.tomes[i];
+        const bonus = C.tomeStudyBonus(ch, t);
+        const r = C.rollDie(20), total = r + bonus;
+        if (total >= t.dc) {
+          const loss = C.rollDiceExpr(t.sanityComplete || "0");
+          const n = loss ? Math.max(0, loss.total) : 0;
+          api.toast(`<strong>${api.esc(t.name)}: study check ${total}</strong> <span class="muted">(d20 ${r} ${C.fmt(bonus)} vs DC ${t.dc})</span><br>Read! Lose ${n} Sanity; Cthulhu Mythos +${t.mythos}. Its spells can now be learned (1d3 weeks each, p.129).`, 9000);
+          applyLoss(ch, d, n, `finished ${t.name}`, api, {
+            undo: `Finish ${t.name}`,
+            before: (c) => { c.tomes[i].status = "read"; c.tomes[i].studyChecks += 1; },
+            after: (c) => { c.mythos = C.toInt(c.mythos) + t.mythos; api.pushLog(c, `Finished ${t.name} (check ${total} vs DC ${t.dc}): Cthulhu Mythos +${t.mythos} → ${c.mythos}`); },
+          });
+        } else {
+          api.toast(`<strong>${api.esc(t.name)}: study check ${total}</strong> <span class="muted">(d20 ${r} ${C.fmt(bonus)} vs DC ${t.dc})</span><br>Not yet. A Strange Event occurs (GM: Table 7-1, p.120), and another Examination Period begins with +1 to the next check.`, 9000);
+          api.update((c) => { c.tomes[i].studyChecks += 1; api.pushLog(c, `${t.name}: study check ${total} vs DC ${t.dc} — failed (Strange Event)`); }, { undo: `Study ${t.name}` });
+        }
+        break;
+      }
+      case "tome-consult": {
+        const t = ch.tomes[i];
+        const row = d.skills.find((sk) => sk.id === "Cthulhu Mythos");
+        api.rollD20((row ? row.total : C.toInt(ch.mythos)) + t.mythos, `Cthulhu Mythos (consulting ${t.name}, 1d4 hours)`);
         break;
       }
       case "pocket-tab": api.state.pocketTab = el.dataset.k; api.render(); window.scrollTo(0, 0); break;
@@ -621,7 +727,10 @@
         const gain = C.toInt(c.level, 1);
         c.hp.current = Math.min(d.hp.max, d.hp.current + gain);
         c.hp.subdual = 0;
-        api.pushLog(c, `Rested a day: +${c.hp.current - d.hp.current} HP`);
+        // Ability damage returns 1 point per day of rest for each damaged ability (p.74); drain does not.
+        const healed = C.ABILITIES.filter((ab) => c.abilityDamage[ab] > 0);
+        healed.forEach((ab) => { c.abilityDamage[ab] -= 1; });
+        api.pushLog(c, `Rested a day: +${c.hp.current - d.hp.current} HP${healed.length ? `, +1 ${healed.join(", ")}` : ""}`);
       }, { undo: "Rest a day" }); break;
       case "san-roll": {
         const input = (el.closest(".panel") || document).querySelector("input.sanroll");

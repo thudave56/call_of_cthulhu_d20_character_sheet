@@ -494,7 +494,10 @@
       weapons: [],
       equipment: [],
       notes: "", sessionNotes: "",
-      options: { defenseBonus: false, offenseWeaponProficiency: false },
+      options: { defenseBonus: false, offenseWeaponProficiency: false, unmasteredMagic: false },
+      abilityDrain: {},        // permanent ability loss from spells (p.128): lowers the score for good
+      spells: [],              // spells known (Ch. 7)
+      tomes: [],               // Mythos tomes being read or already read (p.119-122)
       armorWeight: 0,          // lb, entered by the player (Table 6-4 lists no weights)
       levelLogArchive: {},     // level -> entry removed by lowering the level, restored on raising it
       xp: 0,                   // experience points (Table 1-10)
@@ -507,6 +510,36 @@
     };
     return Object.assign(c, overrides);
   }
+
+  // ---------------------------------------------------------------------------
+  // Magic (Ch. 7). Spells cost only Sanity and ability damage — there are no
+  // magic points (p.126). Damage is temporary unless marked permanent ("drain").
+  // ---------------------------------------------------------------------------
+  /**
+   * Read a spell's Cost line as printed, e.g. "4 Str damage and 1d3 Sanity points",
+   * "2 Con drain (permanent) and 3d6 Sanity points", "2 Str + 2 Wis damage".
+   * Returns { abilities: [{ ability, amount, permanent }], sanity: "1d3" | null }.
+   */
+  function parseSpellCost(text) {
+    const out = { abilities: [], sanity: null };
+    for (const seg of String(text || "").split(/\s+and\s+|[,;]/i)) {
+      if (/sanity/i.test(seg)) {
+        const m = seg.match(/(\d*d\d+(?:\s*[+-]\s*\d+)?|\d+)/i);
+        if (m) out.sanity = m[1].replace(/\s+/g, "");
+        continue;
+      }
+      const permanent = /drain|permanent/i.test(seg);
+      for (const m of seg.matchAll(/(\d*d\d+(?:\s*[+-]\s*\d+)?|\d+)\s*(Str|Dex|Con|Int|Wis|Cha)\b/gi)) {
+        const ability = m[2][0].toUpperCase() + m[2].slice(1, 3).toLowerCase();
+        out.abilities.push({ ability, amount: m[1].replace(/\s+/g, ""), permanent });
+      }
+    }
+    return out;
+  }
+  /** Saving throw DC against your spells: 15 + Intelligence bonus (p.127). */
+  function spellSaveDC(c) { return 15 + Math.max(0, mods(c).Int); }
+  /** Tome study check bonus: level + Int modifier + earlier study checks with it (p.119). */
+  function tomeStudyBonus(c, tome) { return toInt(c.level, 1) + mods(c).Int + Math.max(0, toInt(tome && tome.studyChecks, 0)); }
 
   // ---------------------------------------------------------------------------
   // Conditions — Character Condition Summary (p.91). Effects the sheet applies:
@@ -552,11 +585,12 @@
     for (const a of ABILITIES) {
       const base = toInt(c.abilities && c.abilities[a], 10);
       const ageMod = ["Str", "Dex", "Con"].includes(a) ? aging.physical : aging.mental;
-      const permanent = Math.max(1, base + ageMod + (inc[a] || 0));
+      const drained = Math.max(0, toInt(c.abilityDrain && c.abilityDrain[a], 0));
+      const permanent = Math.max(0, Math.max(1, base + ageMod + (inc[a] || 0)) - drained);
       const dmg = Math.max(0, toInt(c.abilityDamage && c.abilityDamage[a], 0));
       const condition = a === "Str" ? cond.str : a === "Dex" ? cond.dex : 0;
       const score = Math.max(0, permanent - dmg + condition);
-      out[a] = { base, ageMod, increases: inc[a] || 0, permanent, damage: dmg, condition, score, mod: abilityMod(score) };
+      out[a] = { base, ageMod, increases: inc[a] || 0, drained, permanent, damage: dmg, condition, score, mod: abilityMod(score) };
     }
     return out;
   }
@@ -1042,7 +1076,7 @@
     const roll = toInt(money.roll, 0);
     c.money = { roll: roll >= 1 && roll <= 6 ? roll : null, cash: numOrNull(money.cash), notes: str(money.notes, 500) };
     const opt = isObj(c.options) ? c.options : {};
-    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency };
+    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency, unmasteredMagic: !!opt.unmasteredMagic };
     const arr = (v) => (Array.isArray(v) ? v : []);
     c.goodSaves = [...new Set(arr(c.goodSaves).filter((k) => ["fort", "ref", "will"].includes(k)))];
     c.coreSkills = arr(c.coreSkills).filter((x) => typeof x === "string").map((x) => str(x, 120)).slice(0, 12);
@@ -1081,6 +1115,21 @@
     c.alerts = arr(c.alerts).filter(isObj).slice(0, 6).map((a) => ({
       kind: a.kind === "danger" ? "danger" : "warn", title: str(a.title, 200), text: str(a.text, 600),
       action: ALERT_ACTIONS.includes(a.action) ? a.action : "",
+    }));
+    const drain = isObj(c.abilityDrain) ? c.abilityDrain : {};
+    c.abilityDrain = {};
+    for (const a of ABILITIES) c.abilityDrain[a] = Math.max(0, toInt(drain[a], 0));
+    c.spells = arr(c.spells).filter(isObj).slice(0, 200).map((sp) => ({
+      id: ID_RE.test(String(sp.id || "")) ? sp.id : uid(), name: str(sp.name, 120) || "Spell", cost: str(sp.cost, 200),
+      castingTime: str(sp.castingTime, 80), range: str(sp.range, 80), duration: str(sp.duration, 80), save: str(sp.save, 80),
+      components: str(sp.components, 40), notes: str(sp.notes, 2000), casts: Math.max(0, toInt(sp.casts, 0)),
+    }));
+    c.tomes = arr(c.tomes).filter(isObj).slice(0, 100).map((t) => ({
+      id: ID_RE.test(String(t.id || "")) ? t.id : uid(), name: str(t.name, 160) || "Tome", language: str(t.language, 80),
+      exam: str(t.exam, 60), dc: Math.max(1, Math.min(60, toInt(t.dc, 20))),
+      sanityInitial: str(t.sanityInitial, 30), sanityComplete: str(t.sanityComplete, 30), mythos: Math.max(0, Math.min(20, toInt(t.mythos, 0))),
+      spells: str(t.spells, 1000), status: ["unread", "examining", "read"].includes(t.status) ? t.status : "unread",
+      initialDone: !!t.initialDone, studyChecks: Math.max(0, toInt(t.studyChecks, 0)), notes: str(t.notes, 2000),
     }));
     c.conditions = [...new Set(arr(c.conditions).filter((k) => CONDITION_BY_KEY[k]))];
     const enc = isObj(c.encounter) ? c.encounter : null;
@@ -1281,7 +1330,7 @@
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    firearmFullAttack, lookup, rollExpr, rollDiceExpr, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    firearmFullAttack, lookup, rollExpr, rollDiceExpr, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
