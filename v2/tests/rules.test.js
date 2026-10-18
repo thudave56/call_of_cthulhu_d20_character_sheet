@@ -342,3 +342,35 @@ test("Temporary insanity threshold is ≥ half the Wisdom score (odd Wis rounds 
   assert.equal(CoC.loseSanity(c, 7).triggers.includes("temporary"), false);
   assert.equal(CoC.loseSanity(c, 8).triggers.includes("temporary"), true);
 });
+
+test("Insanity tables 4-1 to 4-4 and Sanity loss notation (p.48-50)", () => {
+  assert.deepEqual(CoC.parseSanityLoss("1/1d4+1"), { success: "1", failure: "1d4+1" });
+  assert.equal(CoC.parseSanityLoss("1d6"), null);
+  assert.equal(CoC.rollExpr("2d10+1", () => 0.999).total, 21);
+  assert.equal(CoC.rollExpr("1d100", () => 0).total, 1);
+  assert.equal(CoC.lookup(CoC.SHORT_TEMP_INSANITY, 20), "Character faints (can be awakened by vigorous action taking one round)");
+  assert.match(CoC.lookup(CoC.SHORT_TEMP_INSANITY, 100), /Table 4-3/);
+  assert.match(CoC.lookup(CoC.LONG_TEMP_INSANITY, 70), /tics or tremors/);
+  assert.match(CoC.lookup(CoC.INDEFINITE_INSANITY, 56), /Schizophrenia/);
+  assert.match(CoC.lookup(CoC.INDEFINITE_INSANITY, 96), /Other Disorders/);
+  // d10 1-7 short, 8-10 long (Table 4-1)
+  const seq = (vals) => { let i = 0; return () => vals[i++ % vals.length]; };
+  assert.equal(CoC.rollTemporaryInsanity(seq([0.65, 0.5, 0.5])).kind, "Short temporary insanity");   // d10 7
+  assert.equal(CoC.rollTemporaryInsanity(seq([0.75, 0.5, 0.5])).kind, "Longer temporary insanity");  // d10 8
+  // Sanity check: d% ≤ current Sanity succeeds and applies the success cost
+  const c = CoC.sampleCharacter(); // Sanity 75
+  const ok = CoC.sanityCheck(c, "1/1d6", seq([0.74, 0.0]));            // d% 75 → success, lose 1
+  assert.deepEqual([ok.roll, ok.success, ok.amount], [75, true, 1]);
+  const bad = CoC.sanityCheck(c, "0/1d6", seq([0.75, 0.999]));         // d% 76 → failure, 1d6 = 6
+  assert.deepEqual([bad.roll, bad.success, bad.amount], [76, false, 6]);
+});
+
+test("Weapon presets: Table 6-1, 6-3 and 6-5 spot checks", () => {
+  const w = (n) => CoC.WEAPON_PRESETS.find((x) => x.name === n);
+  assert.deepEqual([w("Axe, wood or fire").damage, w("Axe, wood or fire").critical], ["1d8", "×3"]);
+  assert.deepEqual([w("Knife, kukri").critical], ["18-20/×2"]);
+  assert.deepEqual([w("Colt M1911 (.45 ACP)").damage, w("Colt M1911 (.45 ACP)").capacity], ["2d8", 7]);
+  assert.deepEqual([w("Thompson M1921 (.45 ACP)").category, w("Thompson M1921 (.45 ACP)").rof], ["smg", "Autofire"]);
+  assert.deepEqual([w("Barrett Light Fifty M82A1").critical, w("AK-47 (7.62×39mm)").range], ["×4", "150 ft"]);
+  assert.ok(!CoC.WEAPON_PRESETS.some((x) => x.source === "Table 6-5" && x.category === "shotgun"));
+});

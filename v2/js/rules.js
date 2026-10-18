@@ -253,6 +253,76 @@
     { name: "Submachine gun (9×19mm)", category: "smg", damage: "1d10", critical: "×3", range: "25 ft", capacity: 30, rof: "Autofire" },
   ];
 
+  // Specific firearms — Table 6-5 (p.98-99), verified against the page images
+  // (docs/rulebook/EXTRACTION_REVIEW.md §2.18). Where a gun is listed in several
+  // calibers, each calibre's damage is shown in the name. Shotguns are omitted
+  // because their damage comes from Table 6-8, which has not been verified;
+  // use the generic shotgun from Table 6-3.
+  const SPECIFIC_FIREARMS = [
+    // [name, category, damage, capacity, range ft, rate of fire, critical]
+    ["Remington Double Derringer (.41 RF)", "pistol", "1d8", 2, 5, "Multifire"],
+    ["Colt Single Action Army (.45 Colt)", "pistol", "2d8", 6, 20, "Standard"],
+    ["Colt Single Action Army (.40/.41 Colt)", "pistol", "1d10", 6, 20, "Standard"],
+    ["Colt M1877 \"Lightning\" (.38 Colt)", "pistol", "1d10", 6, 20, "Multifire"],
+    ["Colt M1877 \"Thunderer\" (.41 Colt)", "pistol", "1d10", 6, 20, "Multifire"],
+    ["Webley Mark I (.455)", "pistol", "2d8", 6, 20, "Standard/Multifire"],
+    ["Mauser M1896 \"Broomhandle\"", "pistol", "1d10", 10, 20, "Multifire"],
+    ["P08 Luger (9×19mm)", "pistol", "1d10", 8, 20, "Multifire"],
+    ["Colt M1911 (.45 ACP)", "pistol", "2d8", 7, 20, "Multifire"],
+    ["Colt M1917 Revolver (.45 ACP)", "pistol", "2d8", 6, 20, "Multifire"],
+    ["S&W M1917 Revolver (.45 ACP)", "pistol", "2d8", 6, 20, "Multifire"],
+    ["Astra M1921 (9mm)", "pistol", "1d10", 8, 20, "Multifire"],
+    ["Walther PPK (.32 ACP)", "pistol", "1d8", 7, 20, "Multifire"],
+    ["Walther PPK (.380 ACP)", "pistol", "1d10", 7, 20, "Multifire"],
+    ["Browning GP35 High-Power (9×19mm)", "pistol", "1d10", 13, 20, "Multifire"],
+    ["Walther P38 (9×19mm)", "pistol", "1d10", 8, 20, "Multifire"],
+    ["Colt Python (.357 Magnum)", "pistol", "2d6", 6, 20, "Multifire"],
+    ["Ruger Blackhawk (.357 Magnum)", "pistol", "2d6", 6, 20, "Standard"],
+    ["Ruger Blackhawk (.44 Magnum / .45 Colt)", "pistol", "2d8", 6, 20, "Standard"],
+    ["H&K P9 (9×19mm)", "pistol", "1d10", 9, 20, "Multifire"],
+    ["SIG-Sauer P225 (9×19mm)", "pistol", "1d10", 8, 20, "Multifire"],
+    ["Beretta M92 (9×19mm)", "pistol", "1d10", 15, 20, "Multifire"],
+    ["Ruger Redhawk (.44 Magnum)", "pistol", "2d8", 6, 20, "Multifire"],
+    ["IMI Desert Eagle (.357/.41)", "pistol", "2d6", 9, 20, "Multifire"],
+    ["IMI Desert Eagle (.44 Magnum)", "pistol", "2d8", 7, 20, "Multifire"],
+    ["IMI Desert Eagle (.50 AE)", "pistol", "2d10", 7, 20, "Multifire"],
+    ["Glock 17 (9×19mm)", "pistol", "1d10", 17, 20, "Multifire"],
+    ["Colt Delta Elite (10mm)", "pistol", "1d10", 8, 20, "Multifire"],
+    ["Mosin-Nagant M1891 (7.62×54mm)", "rifle", "2d10", 5, 200, "Standard"],
+    ["Mannlicher-Carcano M1891 Carbine", "rifle", "2d8", 6, 175, "Standard"],
+    ["Winchester M1894 (.32-40/.25-35)", "rifle", "2d6", 8, 200, "Standard"],
+    ["Winchester M1894 (.30-30/.38-55)", "rifle", "2d10", 8, 200, "Standard"],
+    ["Lee-Enfield Mk I (.303)", "rifle", "2d10", 6, 175, "Standard"],
+    ["Mauser M1898 (7.92×57mm)", "rifle", "2d10", 5, 200, "Standard"],
+    ["Springfield M1903", "rifle", "2d10", 5, 175, "Standard"],
+    ["Lee-Enfield Mk III (.303)", "rifle", "2d10", 10, 200, "Standard"],
+    ["M1 Garand (.30-06)", "rifle", "2d10", 8, 200, "Multifire"],
+    ["Springfield M1903A4 Sniper (.30-06)", "rifle", "2d10", 5, 200, "Standard"],
+    ["Lee-Enfield No. 5 Jungle Carbine", "rifle", "2d10", 10, 175, "Standard"],
+    ["Ruger Mini-14 (5.56×45mm)", "rifle", "2d6", 30, 200, "Multifire"],
+    ["M21 Sniper (7.62×51mm)", "rifle", "2d10", 20, 200, "Multifire"],
+    ["Barrett Light Fifty M82A1", "rifle", "2d12", 11, 200, "Multifire", "×4"],
+    ["FR-F2 Sniper (7.62×51mm)", "rifle", "2d10", 10, 200, "Standard"],
+    ["Ruger M77 Mk II Police (7.62×51mm)", "rifle", "2d10", 4, 200, "Standard"],
+    ["M1918 BAR (.30-06)", "rifle", "2d10", 20, 200, "Autofire"],
+    ["AK-47 (7.62×39mm)", "rifle", "2d6", 30, 150, "Autofire"],
+    ["FN FAL (7.62×51mm)", "rifle", "2d10", 20, 200, "Autofire"],
+    ["M-14 (7.62×51mm)", "rifle", "2d10", 20, 200, "Autofire"],
+    ["H&K G3 (7.62×51mm)", "rifle", "2d6", 20, 200, "Autofire"],
+    ["Colt M-16A1 (5.56×45mm)", "rifle", "2d6", 30, 200, "Autofire"],
+    ["Galil (5.56×45mm)", "rifle", "2d6", 35, 200, "Autofire"],
+    ["Steyr AUG (5.56×45mm)", "rifle", "2d6", 30, 200, "Autofire"],
+    ["Enfield L85A1 (5.56×45mm)", "rifle", "2d6", 30, 200, "Autofire"],
+    ["Thompson M1921 (.45 ACP)", "smg", "2d8", 20, 30, "Autofire"],
+    ["Sten Mk I (9×19mm)", "smg", "1d10", 32, 25, "Autofire"],
+    ["M3 \"Grease Gun\" (.45 ACP)", "smg", "2d8", 30, 30, "Autofire"],
+    ["Uzi (9×19mm)", "smg", "1d10", 32, 25, "Autofire"],
+    ["Sterling L2A1 (9×19mm)", "smg", "1d10", 34, 30, "Autofire"],
+    ["vz61 Skorpion (.32 ACP)", "smg", "1d8", 20, 20, "Autofire"],
+    ["H&K MP5 (9×19mm)", "smg", "1d10", 30, 25, "Autofire"],
+  ].map(([name, category, damage, capacity, range, rof, critical]) => ({ name, category, damage, critical: critical || "×3", range: `${range} ft`, capacity, rof, source: "Table 6-5" }));
+  WEAPON_PRESETS.push(...SPECIFIC_FIREARMS);
+
   // ---------------------------------------------------------------------------
   // Small helpers
   // ---------------------------------------------------------------------------
@@ -795,6 +865,112 @@
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // Insanity tables (p.48-50), transcribed from the page images.
+  // ---------------------------------------------------------------------------
+  const SANITY_LOSS_EXAMPLES = [ // p.48: successful check cost / failed check cost
+    ["0/1d2", "Surprised to find mangled animal carcass"], ["0/1d3", "Surprised to find human corpse"],
+    ["0/1d3", "Surprised to find human body part"], ["0/1d4", "Finding a stream flowing with blood"],
+    ["1/1d4+1", "Finding a mangled human corpse"], ["0/1d6", "Awakening trapped in a coffin"],
+    ["0/1d6", "Witnessing a friend's violent death"], ["0/1d6", "Seeing a ghoul"],
+    ["1/1d6+1", "Meeting someone you know to be dead"], ["0/1d10", "Undergoing severe torture"],
+    ["1/1d10", "Seeing a corpse rise from its grave"], ["2/2d10+1", "Seeing a gigantic severed head fall from the sky"],
+    ["1d10/1d100", "Seeing Great Cthulhu"],
+  ];
+  const TEMP_INSANITY_DURATION = [ // Table 4-1 (d10)
+    { max: 7, type: "short", label: "Short temporary insanity", duration: "1d10+4 rounds" },
+    { max: 10, type: "long", label: "Longer temporary insanity", duration: "1d10×10 hours" },
+  ];
+  const SHORT_TEMP_INSANITY = [ // Table 4-2 (d%), lasts 1d10+4 rounds
+    [20, "Character faints (can be awakened by vigorous action taking one round)"],
+    [30, "Character has a screaming fit"],
+    [40, "Character flees in panic"],
+    [50, "Character shows physical hysterics or emotional outburst (laughing, crying, and so on)"],
+    [55, "Character babbles in incoherent rapid speech or in logorrhea (a torrent of coherent speech)"],
+    [60, "Character gripped by intense phobia, perhaps rooting her to the spot"],
+    [65, "Character becomes homicidal, dealing harm on nearest person as efficiently as possible"],
+    [70, "Character has hallucinations or delusions (details at the discretion of the GM)"],
+    [75, "Character gripped with echopraxia or echolalia (saying or doing whatever those around him say or do)"],
+    [80, "Character gripped with strange or deviant eating desire (dirt, slime, cannibalism, and so on)"],
+    [90, "Character falls into a stupor (assumes fetal position, oblivious to events around her)"],
+    [99, "Character becomes catatonic (can stand but has no will or interest; may be led or forced to simple actions but takes no independent action)"],
+    [100, "Roll on Table 4-3: Long-Term Temporary Insanity Effects"],
+  ];
+  const LONG_TEMP_INSANITY = [ // Table 4-3 (d%), lasts 1d10×10 hours
+    [10, "Character performs compulsive rituals (washing hands constantly, praying, walking in a particular rhythm, never stepping on cracks, constantly checking to see if gun is loaded, and so on)"],
+    [20, "Character has hallucinations or delusions (details at the discretion of the GM)"],
+    [30, "Character becomes paranoid"],
+    [40, "Character gripped with severe phobia (refuses to approach object of phobia except on successful Will save, DC 20)"],
+    [45, "Character has strange sexual desires (exhibitionism, nymphomania or satyriasis, teratophilia, necrophilia, and so on)"],
+    [55, "Character develops an attachment to a \"lucky charm\" (embraces object, type of object, or person as a safety blanket) and cannot function without it"],
+    [65, "Character develops psychosomatic blindness, deafness, or the loss of the use of a limb or limbs"],
+    [75, "Character has uncontrollable tics or tremors (−4 penalty to all attack rolls, checks, and saves except those purely mental in nature)"],
+    [85, "Character has amnesia (memories of intimates usually lost first; Knowledge skills useless)"],
+    [90, "Character has bouts of reactive psychosis (incoherence, delusions, aberrant behavior, and/or hallucinations)"],
+    [95, "Character loses ability to communicate via speech or writing"],
+    [100, "Character becomes catatonic (can stand but has no will or interest; may be led or forced into simple actions but takes no independent action)"],
+  ];
+  const INDEFINITE_INSANITY = [ // Table 4-4 (d%), lasts 1d6 game months
+    [15, "Anxiety Disorders (includes severe phobias)"],
+    [25, "Dissociative Disorders (amnesia, multiple personalities)"],
+    [30, "Eating Disorders (anorexia, bulimia)"],
+    [35, "Impulse Control Disorders (compulsions)"],
+    [45, "Mood Disorders (manic/depressive)"],
+    [50, "Personality Disorders (various neuroses)"],
+    [55, "Psychosexual Disorders (sadism, nymphomania)"],
+    [70, "Schizophrenia/Psychotic Disorders (delusions, hallucinations, paranoia, catatonia)"],
+    [80, "Sleep Disorders (night terrors, sleepwalking)"],
+    [85, "Somatoform Disorders (psychosomatic conditions)"],
+    [95, "Substance Abuse Disorder (alcoholic, drug addict)"],
+    [100, "Other Disorders (megalomania, quixotism, panzaism)"],
+  ];
+  /** Look up a d% (1-100; "00" = 100) on one of the tables above. */
+  function lookup(table, roll) { return (table.find(([max]) => roll <= max) || table[table.length - 1])[1]; }
+
+  /** Roll an expression such as "3", "1d6+1", "d10", "2d10+1", "1d100". */
+  function rollExpr(expr, rng = Math.random) {
+    const e = String(expr || "").trim().replace(/\s+/g, "").replace(/d%/i, "1d100");
+    if (/^-?\d+$/.test(e)) return { total: +e, rolls: [] };
+    const m = e.match(/^(\d*)d(\d+)([+-]\d+)?$/i);
+    if (!m) return null;
+    const n = +(m[1] || 1), sides = +m[2], bonus = +(m[3] || 0);
+    const rolls = Array.from({ length: n }, () => rollDie(sides, rng));
+    return { total: Math.max(0, rolls.reduce((a, b) => a + b, 0) + bonus), rolls, bonus };
+  }
+  /** Parse Sanity loss notation "success/failure", e.g. "0/1d6" or "1/1d4+1". */
+  function parseSanityLoss(text) {
+    const parts = String(text || "").split("/").map((x) => x.trim());
+    if (parts.length !== 2 || !rollExpr(parts[0], () => 0) || !rollExpr(parts[1], () => 0)) return null;
+    return { success: parts[0], failure: parts[1] };
+  }
+  /** Sanity check (d% ≤ current Sanity) and the resulting loss (p.46-48). */
+  function sanityCheck(c, notation, rng = Math.random) {
+    const loss = parseSanityLoss(notation);
+    if (!loss) return null;
+    const current = sanity(c).current;
+    const roll = rollDie(100, rng);
+    const success = roll <= current;
+    const amount = rollExpr(success ? loss.success : loss.failure, rng);
+    return { roll, current, success, expr: success ? loss.success : loss.failure, amount: amount.total, dice: amount.rolls, bonus: amount.bonus || 0 };
+  }
+  /** Roll temporary insanity: Table 4-1 for duration, then 4-2 or 4-3 for the effect. */
+  function rollTemporaryInsanity(rng = Math.random) {
+    const d10 = rollDie(10, rng);
+    const kind = TEMP_INSANITY_DURATION.find((r) => d10 <= r.max);
+    let pct = rollDie(100, rng);
+    let table = kind.type === "short" ? SHORT_TEMP_INSANITY : LONG_TEMP_INSANITY;
+    let effect = lookup(table, pct);
+    let rerolled = null;
+    if (kind.type === "short" && pct === 100) { rerolled = rollDie(100, rng); effect = lookup(LONG_TEMP_INSANITY, rerolled); }
+    const length = kind.type === "short" ? `${rollExpr("1d10+4", rng).total} rounds` : `${rollDie(10, rng) * 10} hours`;
+    return { d10, kind: kind.label, duration: kind.duration, length, roll: pct, rerolled, effect };
+  }
+  /** Roll indefinite insanity on Table 4-4; it lasts 1d6 game months (p.49). */
+  function rollIndefiniteInsanity(rng = Math.random) {
+    const pct = rollDie(100, rng);
+    return { roll: pct, disorder: lookup(INDEFINITE_INSANITY, pct), months: rollDie(6, rng) };
+  }
+
   /** Worked example used by v2/DESIGNS.md and the tests (3rd-level Professor, age 52). */
   function sampleCharacter() {
     const c = newCharacter({
@@ -824,6 +1000,8 @@
     skillBase, skillSpecialty, skillDef,
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, offenseBonusFeat, gearWeight, sampleCharacter,
+    SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
+    lookup, rollExpr, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,

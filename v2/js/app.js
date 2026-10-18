@@ -264,7 +264,7 @@
     </fieldset>
     <fieldset class="field"><legend class="lbl">Optional rules</legend>
       <label class="check"><input type="checkbox" data-action="opt-defense" ${ch.options.defenseBonus ? "checked" : ""}/> Variant: Defense bonus by level (Table 1-15, p.15) — adds to AC; Offense characters also get a bonus Weapon Proficiency feat.</label>
-      <label class="check"><input type="checkbox" data-action="opt-offense-wp" ${ch.options.offenseWeaponProficiency ? "checked" : ""}/> Table ruling: give Offense characters the bonus Weapon Proficiency even without the variant (p.15 prints it inside the variant box; off by default).</label>
+      <label class="check"><input type="checkbox" data-action="opt-offense-wp" ${ch.options.offenseWeaponProficiency ? "checked" : ""}/> House rule: give Offense characters the bonus Weapon Proficiency even without the variant. (As written, p.15 grants it as part of the Defense Bonus variant, to balance that variant.)</label>
     </fieldset>
     ${field("Cthulhu Mythos ranks", inp("mythos", ch.mythos, 'type="number" min="0"'), "Never bought with skill points: starts at 0 and rises through play (Mythos insanity, tomes). Maximum Sanity = 99 − Mythos ranks − any Mythos bonus (misc).")}
     ${field("Background & description", `<textarea data-bind="notes" rows="4">${esc(ch.notes)}</textarea>`)}`;
@@ -407,7 +407,7 @@
       ${field("Armor weight (lb)", `<input type="number" min="0" step="0.5" data-bind="armorWeight" value="${esc(ch.armorWeight || "")}" />`, "Table 6-4 gives no weights; enter your own if your GM tracks them.")}
       <p class="hint">Gear carried or worn: <strong>${d.gearWeight} lb</strong>. The rulebook has no carrying-capacity table for investigators; the only weight rule is Swim: −1 per 5 lb of gear (p.37), applied automatically (${Math.floor(d.gearWeight / 5) ? "−" + Math.floor(d.gearWeight / 5) : "no penalty"}).</p>
       <h3>Weapons</h3>
-      <div class="row"><select id="weaponPreset" aria-label="Weapon preset">${C.WEAPON_PRESETS.map((w, i) => `<option value="${i}">${esc(w.name)} (${esc(w.damage)})</option>`).join("")}</select><button class="btn small" data-action="weapon-add">Add weapon</button><button class="btn small ghost" data-action="weapon-add-custom">Add custom</button></div>
+      <div class="row"><select id="weaponPreset" aria-label="Weapon preset">${[["Melee (Table 6-1)", (w) => w.category === "melee" || w.category === "unarmed"], ["Generic firearms (Table 6-3)", (w) => w.category !== "melee" && w.category !== "unarmed" && !w.source], ["Specific firearms (Table 6-5)", (w) => w.source === "Table 6-5"]].map(([label, f]) => `<optgroup label="${label}">${C.WEAPON_PRESETS.map((w, i) => [w, i]).filter(([w]) => f(w)).map(([w, i]) => `<option value="${i}">${esc(w.name)} (${esc(w.damage)})</option>`).join("")}</optgroup>`).join("")}</select><button class="btn small" data-action="weapon-add">Add weapon</button><button class="btn small ghost" data-action="weapon-add-custom">Add custom</button></div>
       ${weapons ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Name</th><th>Category</th><th>Damage</th><th>Crit</th><th>Range</th><th>Cap.</th><th>lb</th><th></th><th>Attack</th><th></th></tr></thead><tbody>${weapons}</tbody></table></div>` : '<p class="muted">No weapons.</p>'}
       <h3>Equipment</h3>
       <div class="row"><input id="itemName" placeholder="Flashlight, notebook, camera…" aria-label="New item" /><button class="btn small" data-action="item-add">Add item</button></div>

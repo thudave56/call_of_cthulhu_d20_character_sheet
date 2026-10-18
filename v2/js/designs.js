@@ -85,6 +85,12 @@
         <button class="btn ok" data-action="san-gain" title="Gain Sanity (capped at maximum)">Gain</button>
         ${opts.compact ? "" : `<button class="btn ghost small" data-action="san-therapy" title="Psychoanalysis: cannot raise Sanity above starting Sanity">Therapy</button>`}
       </div>
+      <div class="sanroll-row no-print">
+        <label class="sr-only" for="sanRoll-${opts.id || "a"}">Sanity loss (success/failure)</label>
+        <input class="sanroll" id="sanRoll-${opts.id || "a"}" list="sanExamples" placeholder="0/1d6" autocomplete="off" />
+        <button class="btn" data-action="san-roll" title="Roll d% against current Sanity, then roll and apply the success or failure loss">Roll check &amp; apply</button>
+        <datalist id="sanExamples">${C.SANITY_LOSS_EXAMPLES.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</datalist>
+      </div>
       <div class="row no-print">
         <button class="btn small" data-action="san-check">Sanity check (d%)</button>
         <button class="btn small ghost" data-action="san-hour" title="Start a new in-game hour for the 20% indefinite-insanity tracker">New hour</button>
@@ -322,7 +328,22 @@
     const v = input ? parseInt(input.value, 10) : NaN;
     return Number.isFinite(v) && v > 0 ? v : 0;
   }
+  /** Remove the alert holding a given roll button once it has been used. */
+  function dropAlert(action) { const k = playAlerts.findIndex((x) => x.html.includes(`data-action="${action}"`)); if (k >= 0) playAlerts.splice(k, 1); }
   function addAlert(kind, html) { playAlerts.unshift({ kind, html }); if (playAlerts.length > 4) playAlerts.pop(); }
+
+  /** Apply a Sanity loss and raise the rule alerts it triggers (p.47-50). */
+  function applyLoss(ch, d, n, reason, api) {
+    const res = C.loseSanity(ch, n, reason);
+    const s = C.sanity(res.character);
+    for (const t of res.triggers) {
+      if (t === "temporary") addAlert("warn", `<strong>Lost ${n} in one roll (≥ ½ Wis = ${d.sanity.tempThreshold}).</strong> The GM calls for a Sanity check: on a failure the investigator goes temporarily insane. <button class="btn small" data-action="roll-temp-insanity">Roll Tables 4-1 &amp; 4-2/4-3</button>`);
+      if (t === "indefinite") addAlert("danger", `<strong>Lost ${s.hourLoss} Sanity this hour (≥ 20% = ${s.indefiniteThreshold}).</strong> The investigator goes indefinitely insane when the GM judges it. <button class="btn small" data-action="roll-indef-insanity">Roll Table 4-4</button>`);
+      if (t === "zero") addAlert("danger", `<strong>Sanity at ${s.current}.</strong> The character loses 1 more Sanity each round until −10 unless stabilized with Psychoanalysis.`);
+      if (t === "permanent") addAlert("danger", `<strong>Sanity −10 or lower: permanent insanity.</strong> The character becomes an NPC.`);
+    }
+    api.update(() => { const c = res.character; api.pushLog(c, `Lost ${n} Sanity (${d.sanity.current} → ${s.current})${reason ? " — " + reason : ""}`); if (res.triggers.includes("permanent")) c.sanity.insanity = "permanent"; return c; });
+  }
 
   function handleAction(a, el, api) {
     const ch = api.state.ch;
@@ -393,18 +414,33 @@
         c.hp.subdual = 0;
         api.pushLog(c, `Rested a day: +${c.hp.current - d.hp.current} HP`);
       }); break;
+      case "san-roll": {
+        const input = (el.closest(".panel") || document).querySelector("input.sanroll");
+        const notation = input ? input.value : "";
+        const chk = C.sanityCheck(ch, notation);
+        if (!chk) { api.toast("Enter the loss as success/failure, e.g. 0/1d6 or 1/1d4+1."); break; }
+        api.toast(`<strong>Sanity check ${api.esc(notation)}</strong><br><span class="roll-big">${chk.roll}</span> vs ${chk.current} — <strong>${chk.success ? "success" : "failure"}</strong>: lose ${chk.amount}${chk.dice.length ? ` (${api.esc(chk.expr)}: ${chk.dice.join("+")}${chk.bonus ? " " + C.fmt(chk.bonus) : ""})` : ""}`, 7000);
+        applyLoss(ch, d, chk.amount, `Sanity check ${notation}: d% ${chk.roll} vs ${chk.current}, ${chk.success ? "success" : "failure"}`, api);
+        break;
+      }
+      case "roll-temp-insanity": {
+        const r = C.rollTemporaryInsanity();
+        dropAlert("roll-temp-insanity");
+        addAlert("warn", `<strong>${r.kind}: ${r.length}</strong> (Table 4-1 d10 ${r.d10}; ${r.duration}).<br>${api.esc(r.effect)} <span class="muted">(${r.kind.startsWith("Short") ? "Table 4-2" : "Table 4-3"} d% ${r.roll}${r.rerolled ? `, then Table 4-3 d% ${r.rerolled}` : ""})</span>`);
+        api.update((c) => { c.sanity.insanity = "temporary"; api.pushLog(c, `Temporary insanity: ${r.length} — ${r.effect}`); });
+        break;
+      }
+      case "roll-indef-insanity": {
+        const r = C.rollIndefiniteInsanity();
+        dropAlert("roll-indef-insanity");
+        addAlert("danger", `<strong>Indefinite insanity: ${r.months} game month${r.months > 1 ? "s" : ""}</strong> (1d6).<br>${api.esc(r.disorder)} <span class="muted">(Table 4-4 d% ${r.roll}; the GM may choose instead)</span>`);
+        api.update((c) => { c.sanity.insanity = "indefinite"; api.pushLog(c, `Indefinite insanity (${r.months} months): ${r.disorder}`); });
+        break;
+      }
       case "san-lose": {
         const n = amount(el);
         if (!n) { api.toast("Enter an amount first."); break; }
-        const res = C.loseSanity(ch, n, "");
-        const s = C.sanity(res.character);
-        for (const t of res.triggers) {
-          if (t === "temporary") addAlert("warn", `<strong>Lost ${n} in one roll (≥ ½ Wis = ${d.sanity.tempThreshold}).</strong> The GM calls for a Sanity check: on a failure the investigator goes temporarily insane (Table 4-1).`);
-          if (t === "indefinite") addAlert("danger", `<strong>Lost ${s.hourLoss} Sanity this hour (≥ 20% = ${s.indefiniteThreshold}).</strong> The investigator goes indefinitely insane (Table 4-4) when the GM judges it.`);
-          if (t === "zero") addAlert("danger", `<strong>Sanity at ${s.current}.</strong> The character loses 1 more Sanity each round until −10 unless stabilized with Psychoanalysis.`);
-          if (t === "permanent") addAlert("danger", `<strong>Sanity −10 or lower: permanent insanity.</strong> The character becomes an NPC.`);
-        }
-        api.update(() => { const c = res.character; api.pushLog(c, `Lost ${n} Sanity (${d.sanity.current} → ${s.current})`); if (res.triggers.includes("permanent")) c.sanity.insanity = "permanent"; return c; });
+        applyLoss(ch, d, n, "", api);
         break;
       }
       case "san-gain": case "san-therapy": {

@@ -30,7 +30,8 @@ All three draw from the same calculated sheet (`CoC.derive`), so every number is
 
 - Three columns: vitals (HP and Sanity with Damage/Heal/Lose/Gain), combat (AC, initiative, BAB, saves, weapons, abilities) and a searchable skill list.
 - Tap any skill, save, ability, attack or damage entry to roll it. The result appears as a pop-up and in the log.
-- Rule alerts appear at the top: dying, disabled, a Sanity check after losing ½ Wis, and 20%-per-hour indefinite insanity.
+- Rule alerts appear at the top: dying, disabled, a Sanity check after losing ½ Wis, and 20%-per-hour indefinite insanity. The insanity alerts have buttons that roll Tables 4-1 to 4-4.
+- **Roll check & apply** takes the book's loss notation (for example `1/1d6+1`). Pick one of the p.48 examples or type your own. The sheet rolls d% against current Sanity, then rolls and applies the success or failure loss.
 
 ### 2. Classic Sheet: record-sheet layout that prints on two pages
 ![Classic Sheet](docs/screens/design-2-sheet.png)
@@ -105,13 +106,19 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 | Weapon stats | Tables 6-1 and 6-3, p.94–95 | `WEAPON_PRESETS` | — |
 | Sanity: start 5×Wis, max 99−Mythos, ½ Wis per roll → check, 20%/hour → indefinite, 0 → slide, −10 permanent, +1d6 per level (cap at max), therapy capped at starting, Mythos insanity +2 then +1 | p.47–51 | `sanity`, `loseSanity`, `gainSanity`, `mythosInsanity` | ✓ |
 | Money: (1d6 + profession, min 1) × era; Wealth windfall and +2 income | Tables 1-13 and 1-14, p.15, p.42 | `money` | ✓ |
-| Variant defense bonus (+ Offense bonus Weapon Proficiency; table option to grant it always) | Table 1-15, p.15 | `defenseBonus`, `offenseBonusFeat`, `featSlots` | ✓ |
+| Insanity: Table 4-1 duration, 4-2/4-3 effects (00 on 4-2 goes to 4-3), 4-4 disorder plus 1d6 months; Sanity checks with "success/failure" loss notation and the p.48 examples | Tables 4-1 to 4-4, p.48–50 | `sanityCheck`, `rollTemporaryInsanity`, `rollIndefiniteInsanity` | ✓ |
+| Specific firearms | Table 6-5, p.98–99 | `SPECIFIC_FIREARMS` | ✓ |
+| Variant defense bonus (+ Offense bonus Weapon Proficiency; house-rule switch to grant it always) | Table 1-15, p.15 | `defenseBonus`, `offenseBonusFeat`, `featSlots` | ✓ |
 
-**Data provenance.** Every table the app uses was checked against the rulebook page images in `docs/rulebook/EXTRACTION_REVIEW.md` §2: Tables 1-8 to 1-15, the profession templates, Tables 2-1, 2-4, 3-1, 3-2, 6-1, 6-3 and 6-4, and the Sanity and combat rules. The tables that review could not verify are not used by the app: 1-12 (height and weight), 2-2, 2-5, 4-2 and 4-3, the 5-x combat tables, and 6-5 onwards (specific firearms). Players enter specific firearms by hand.
+**Data provenance.** Every table the app uses was checked against the rulebook page images:
+- Verified in `docs/rulebook/EXTRACTION_REVIEW.md` §2: Tables 1-8 to 1-15, the profession templates, Tables 2-1, 2-4, 3-1, 3-2, 6-1, 6-3, 6-4 and 6-5 (pistols, rifles, automatic rifles and SMGs), and the Sanity and combat rules.
+- Checked from the page images (PDF 50–52) while building the insanity helpers: Tables 4-1 to 4-4 and the Sanity Loss Examples.
+
+The app does not use any table that hasn't been verified. That means Table 1-12 (height and weight), the DC example Tables 2-2 and 2-5, the 5-x combat-modifier tables, and Table 6-8 (shotgun damage by gauge) are left to the GM and the book. For shotguns the sheet offers only the generic one from Table 6-3.
 
 ## Rulebook ambiguities and how they are resolved
 
-The source has a few inconsistencies. Each one below is resolved from the rulebook's own text, and the resolution is covered by a test. The one genuine judgment call is a table option, so the sheet is correct whichever reading your group uses.
+The source has a few inconsistencies. Each one below is resolved from the rulebook's own text, and the resolution is covered by a test. Where a group may prefer something else, the sheet offers a clearly labelled house-rule switch, defaulting to rules as written.
 
 | # | Issue | Resolution | Evidence |
 |---|---|---|---|
@@ -122,7 +129,7 @@ The source has a few inconsistencies. Each one below is resolved from the rulebo
 | 5 | **Maximum Sanity: "99 − Mythos ranks" or "99 − Mythos modifier"** | **99 − (Mythos ranks + any Mythos bonus).** Mythos has no key ability, so its modifier is ranks plus bonuses, which satisfies both wordings. Enter a bonus as the Mythos "misc". | p.47: "This number (99 minus Cthulhu Mythos ranks and any bonuses) is the character's maximum Sanity." The worked example on p.50 (99 − 3 ranks = 96) agrees. |
 | 6 | **"Loses one-half her Wisdom score"** with an odd Wisdom | **A loss of at least half.** Wis 15 means 7.5, so a loss of 8 triggers it. | p.47 |
 | 7 | **Skill points after an Int increase** | **Not retroactive.** The sheet records the Int modifier at each level; levels gained after an increase get the new value. | p.9 (Claire's example) |
-| 8 | **Offense option's extra Weapon Proficiency** is printed only inside the Defense Bonus variant box (p.15) | **Table option.** By default it is granted with the variant ("to balance the two options"). Groups that read it as a core rule can tick "Table ruling: give Offense characters the bonus Weapon Proficiency even without the variant" on the Basics step. | p.15 |
+| 8 | **Offense option's extra Weapon Proficiency** is printed only inside the Defense Bonus variant box (p.15) | **Rules as written: it comes with the variant.** The sentence sits inside the variant box and says it is there "to balance the two options" once Defense characters get the bigger AC bonus. Groups that prefer otherwise can switch on a clearly labelled **house rule** on the Basics step. | p.15 |
 
 ## A/B deployment
 

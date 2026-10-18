@@ -189,6 +189,9 @@ input.spec { width: 9em; padding: .2rem .4rem; }
 .state-note { font-size: .9rem; margin: .5rem 0 0; }
 .amount-row { display: flex; gap: .4rem; margin-top: .75rem; flex-wrap: wrap; }
 .amount-row input.amt { width: 5.5em; font-size: 1.1rem; text-align: center; }
+.sanroll-row { display: flex; gap: .4rem; margin-top: .6rem; flex-wrap: wrap; }
+.sanroll-row input.sanroll { width: 8em; font-family: var(--mono); }
+.alert .btn { margin-top: .35rem; }
 .san-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: .25rem; margin: .6rem 0 0; }
 .san-facts div { background: var(--surface-2); border-radius: 6px; padding: .3rem .4rem; text-align: center; }
 .san-facts dt { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
