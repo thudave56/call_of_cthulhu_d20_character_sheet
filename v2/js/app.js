@@ -215,7 +215,7 @@
         </div>
       </div>
       ${items.length ? `<div class="card-grid">${cards}</div>` : `<div class="empty"><p>No investigators yet.</p><p class="muted">Create one, or import a <code>.json</code> file exported from this or the original sheet.</p></div>`}
-      <p class="muted small">Rules: Call of Cthulhu d20 core rulebook. The original sheet is still available at <a href="../index.html">../index.html</a>.</p>
+      <p class="muted small">Rules: Call of Cthulhu d20 core rulebook. You can still open <a href="../index.html?v1">the original sheet (v1)</a>.</p>
     </section>`;
   }
 

@@ -12,6 +12,10 @@ Open `v2/index.html` in a browser; there is no build step. Run the rules tests w
 
 ---
 
+## Switching versions
+
+Both versions have a slim **Version** bar at the top: Original sheet (v1) or New: Investigator Sheets (v2). The choice is remembered in this browser, so the main page (`/`) opens whichever version you picked last. Add `?v1` to the address to force the original. Each version keeps its own saved characters. The first time v2 opens, it copies over any characters saved in v1.
+
 ## Saving characters
 
 - Each character is saved in this browser automatically, about 0.3 s after every change, so there is no Save button to forget.
