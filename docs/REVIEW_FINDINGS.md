@@ -153,4 +153,4 @@ These came from driving the original app in headless Chromium at desktop, tablet
 
 ## 7. Status
 
-A rebuilt sheet in `v2/` addresses every item above. It does so as a separate variant (B), so the original (A) stays deployable for comparison. See `v2/DESIGNS.md` for the design review, a hand-worked sample character, the rule-by-rule checklist, and the 7 rulebook ambiguities that need a decision. The calculations are covered by `node --test v2/tests/*.test.js`.
+A rebuilt sheet in `v2/` addresses every item above. It does so as a separate variant (B), so the original (A) stays deployable for comparison. See `v2/DESIGNS.md` for the design review, a hand-worked sample character, the rule-by-rule checklist, and how each rulebook ambiguity is resolved (with the page that settles it). The calculations are covered by `node --test v2/tests/*.test.js`.

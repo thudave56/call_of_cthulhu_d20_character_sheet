@@ -278,3 +278,67 @@ test("normalize() repairs partial data", () => {
   assert.ok(Array.isArray(c.feats));
   assert.equal(c.schemaVersion, CoC.SCHEMA_VERSION);
 });
+
+test("Worked sample in v2/DESIGNS.md matches the hand calculation", () => {
+  const c = CoC.sampleCharacter();
+  const d = CoC.derive(c);
+  const sc = Object.fromEntries(CoC.ABILITIES.map((a) => [a, [d.scores[a].permanent, d.scores[a].mod]]));
+  assert.deepEqual(sc, { Str: [9, -1], Dex: [11, 0], Con: [12, 1], Int: [16, 3], Wis: [15, 2], Cha: [12, 1] });
+  assert.deepEqual([d.skillPoints.available, d.skillPoints.spent], [66, 66]);
+  assert.deepEqual([d.saves.fort.total, d.saves.ref.total, d.saves.will.total], [2, 3, 7]);
+  assert.deepEqual(d.combat.sequence, [1]);
+  assert.equal(d.combat.ac, 10);
+  assert.equal(d.combat.init, 0);
+  assert.equal(d.hp.max, 16);
+  assert.deepEqual([d.sanity.starting, d.sanity.max, d.sanity.current, d.sanity.tempThreshold, d.sanity.indefiniteThreshold], [75, 99, 75, 8, 15]);
+  assert.deepEqual([d.money.savings, d.money.income], [8000, 4000]);
+  assert.equal(d.weapons[0].bonus, 1);
+  const t = (id) => d.skills.find((r) => r.id === id).total;
+  assert.equal(t("Spot"), 10);
+  assert.equal(t("Knowledge (occult)"), 9);
+  assert.equal(t("Drive"), 3);
+  assert.equal(d.gearWeight, 6.5);
+  assert.equal(t("Swim"), -2); // Str −1, gear 6.5 lb → −1
+  assert.deepEqual(CoC.validate(c), []);
+});
+
+test("Swim: armor check penalty (p.37 header, Table 2-1) and −1 per 5 lb of gear (p.37)", () => {
+  const c = CoC.sampleCharacter();
+  c.equipment.push({ name: "Rope, 50 ft", qty: 1, weight: 10 });     // 16.5 lb → −3
+  c.armor = "Bullet resistant vest";                                     // −1
+  const swim = CoC.skillTable(c).find((r) => r.id === "Swim");
+  assert.equal(swim.parts.gear, -3);
+  assert.equal(swim.parts.armor, -1);
+  assert.equal(swim.total, -1 - 3 - 1);
+  assert.equal(CoC.skillTable(c).find((r) => r.id === "Climb").parts.gear, 0);
+});
+
+test("Maximum Sanity = 99 − Cthulhu Mythos modifier (ranks + any bonus) (p.47)", () => {
+  const c = CoC.sampleCharacter();
+  c.mythos = 3;
+  assert.equal(CoC.sanity(c).max, 96);
+  c.skills["Cthulhu Mythos"] = { ranks: 0, misc: 2 };
+  assert.equal(CoC.sanity(c).max, 94);
+  assert.equal(CoC.skillTable(c).find((r) => r.id === "Cthulhu Mythos").total, 5);
+});
+
+test("Key abilities come from Table 2-1 (Agent's printed 'Computer Use [Cha]' is a misprint)", () => {
+  const c = CoC.normalize({ profession: "Agent", coreSkills: CoC.templateCore("Agent"), abilities: { Int: 16, Cha: 6 } });
+  const cu = CoC.skillTable(c).find((r) => r.id === "Computer Use");
+  assert.equal(cu.ability, "Int");
+  assert.equal(cu.parts.ability, 3);
+});
+
+test("Offense bonus Weapon Proficiency: with the variant, or by table ruling", () => {
+  const base = { level: 1, attackOption: "offense" };
+  assert.equal(CoC.featSlots(Object.assign({}, base, { options: {} })), 2);
+  assert.equal(CoC.featSlots(Object.assign({}, base, { options: { defenseBonus: true } })), 3);
+  assert.equal(CoC.featSlots(Object.assign({}, base, { options: { offenseWeaponProficiency: true } })), 3);
+  assert.equal(CoC.featSlots({ level: 1, attackOption: "defense", options: { offenseWeaponProficiency: true } }), 2);
+});
+
+test("Temporary insanity threshold is ≥ half the Wisdom score (odd Wis rounds up)", () => {
+  const c = CoC.sampleCharacter(); // Wis 15 → 7.5, so a loss of 8
+  assert.equal(CoC.loseSanity(c, 7).triggers.includes("temporary"), false);
+  assert.equal(CoC.loseSanity(c, 8).triggers.includes("temporary"), true);
+});

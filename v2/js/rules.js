@@ -290,8 +290,17 @@
   function featSlots(c) {
     const L = toInt(c.level, 1);
     let n = 2 + Math.floor(L / 3);                       // p.11: two at 1st, +1 at 3,6,9…
-    if (c.options && c.options.defenseBonus && c.attackOption === "offense") n += 1; // p.15 variant: bonus Weapon Proficiency
+    if (offenseBonusFeat(c)) n += 1;                     // p.15: Offense option's extra Weapon Proficiency
     return n;
+  }
+  /**
+   * p.15 states the Offense option's extra Weapon Proficiency inside the Defense
+   * Bonus variant box. By default it comes with that variant; a table can choose
+   * to grant it always (options.offenseWeaponProficiency).
+   */
+  function offenseBonusFeat(c) {
+    const o = c.options || {};
+    return c.attackOption === "offense" && !!(o.defenseBonus || o.offenseWeaponProficiency);
   }
   function abilityIncreaseLevels(level) {
     const out = [];
@@ -338,7 +347,8 @@
       weapons: [],
       equipment: [],
       notes: "", sessionNotes: "",
-      options: { defenseBonus: false },
+      options: { defenseBonus: false, offenseWeaponProficiency: false },
+      armorWeight: 0,          // lb, entered by the player (Table 6-4 lists no weights)
       log: [],
       created: now, updated: now,
     };
@@ -479,13 +489,15 @@
   function sanity(c) {
     const wis = abilityScores(c).Wis;
     const starting = wis.permanent * 5;                 // 5 × Wisdom score
-    const mythos = Math.max(0, toInt(c.mythos, 0));
-    const max = 99 - mythos;                            // 99 − Cthulhu Mythos ranks
+    const mythosRanks = Math.max(0, toInt(c.mythos, 0));
+    const mythosBonus = toInt(c.skills && c.skills["Cthulhu Mythos"] && c.skills["Cthulhu Mythos"].misc, 0);
+    const mythos = Math.max(0, mythosRanks + mythosBonus); // Mythos modifier: ranks + any bonuses (no key ability)
+    const max = 99 - mythos;                            // 99 − Cthulhu Mythos modifier (p.47)
     const current = c.sanity && c.sanity.current !== null && c.sanity.current !== undefined ? toInt(c.sanity.current, starting) : Math.min(starting, max);
     const hourStart = c.sanity && c.sanity.hourStart !== null && c.sanity.hourStart !== undefined ? toInt(c.sanity.hourStart) : current;
     const hourLoss = Math.max(0, toInt(c.sanity && c.sanity.hourLoss, 0));
     return {
-      starting, max, current, mythos,
+      starting, max, current, mythos, mythosRanks, mythosBonus,
       tempThreshold: Math.ceil(wis.permanent / 2),          // loss ≥ ½ Wis in one roll → Sanity check or temporary insanity
       hourStart, hourLoss, indefiniteThreshold: Math.max(1, Math.ceil(hourStart * 0.2)), // lose 20% of current Sanity within 1 hour
       state: sanityState(current),
@@ -544,6 +556,14 @@
     const s = sanity(next);
     if (s.current > s.max) next.sanity.current = s.max;
     return next;
+  }
+
+  /** Total gear carried or worn, in lb (weapons, equipment × quantity, armor). */
+  function gearWeight(c) {
+    let w = toNum(c.armorWeight, 0);
+    for (const x of c.weapons || []) w += toNum(x.weight, 0);
+    for (const x of c.equipment || []) w += toNum(x.weight, 0) * Math.max(0, toNum(x.qty, 1));
+    return Math.round(w * 10) / 10;
   }
 
   // ---------------------------------------------------------------------------
@@ -611,11 +631,12 @@
       const emph = emphasis.has(id) ? 3 : 0;
       const syn = synergy[id] || 0;
       const acp = def.acp ? cb.acp : 0;
-      const total = effRanks + abil + misc + feat + emph + syn + acp;
+      const gear = base === "Swim" ? -Math.floor(gearWeight(c) / 5) : 0; // Swim: −1 per 5 lb of gear (p.37)
+      const total = effRanks + abil + misc + feat + emph + syn + acp + gear;
       const usable = def.untrained || effRanks > 0;
       return {
         id, base, specialty: skillSpecialty(id), def, core, ranks, effRanks, ability: def.ability,
-        parts: { ranks: effRanks, ability: abil, misc, feat, emphasis: emph, synergy: syn, armor: acp },
+        parts: { ranks: effRanks, ability: abil, misc, feat, emphasis: emph, synergy: syn, armor: acp, gear },
         total, usable,
         max: def.mythos ? Infinity : core ? coreMaxRanks(level) : noncoreMaxRanks(level),
         cost: def.mythos ? 0 : core ? ranks : ranks * 2,
@@ -704,7 +725,7 @@
       seen.add(f.name); seen.add(key);
       for (const m of featPrereqIssues(c, f)) err(m);
     }
-    if (c.options && c.options.defenseBonus && c.attackOption === "offense" && !hasFeat(c, "Weapon Proficiency")) warn("Offense option (defense-bonus variant) gets a bonus Weapon Proficiency feat — pick one.");
+    if (offenseBonusFeat(c) && !hasFeat(c, "Weapon Proficiency")) warn("The Offense option's bonus feat must be a Weapon Proficiency (p.15) — pick one.");
     // Level log
     const L = toInt(c.level, 1);
     if ((c.levelLog || []).length !== L) err(`Level history has ${(c.levelLog || []).length} entries for level ${L}.`);
@@ -753,7 +774,7 @@
     c.sanity = Object.assign(newCharacter().sanity, c.sanity || {});
     c.hp = Object.assign({ current: null, subdual: 0, stable: false }, c.hp || {});
     c.money = Object.assign({ roll: null, cash: null, notes: "" }, c.money || {});
-    c.options = Object.assign({ defenseBonus: false }, c.options || {});
+    c.options = Object.assign({ defenseBonus: false, offenseWeaponProficiency: false }, c.options || {});
     for (const k of ["feats", "weapons", "equipment", "coreSkills", "goodSaves", "log"]) if (!Array.isArray(c[k])) c[k] = [];
     if (!c.skills || typeof c.skills !== "object") c.skills = {};
     c.schemaVersion = SCHEMA_VERSION;
@@ -768,10 +789,32 @@
     return {
       scores, saves: saves(c), combat: combat(c), hp: Object.assign({}, hp, { current, state: hpState(current), subdual: toInt(c.hp && c.hp.subdual, 0) }),
       sanity: sanity(c), skills: skillTable(c), skillPoints: skillPoints(c), featSlots: featSlots(c),
-      money: money(c), aging: agingCategory(c.age),
+      money: money(c), aging: agingCategory(c.age), gearWeight: gearWeight(c),
       weapons: (c.weapons || []).map((w) => Object.assign({ weapon: w }, weaponAttack(c, w))),
       profession: PROFESSION_BY_NAME[c.profession] || null,
     };
+  }
+
+  /** Worked example used by v2/DESIGNS.md and the tests (3rd-level Professor, age 52). */
+  function sampleCharacter() {
+    const c = newCharacter({
+      name: "Dr. Kristof Lehmann (sample)", gender: "M", age: 52, era: "1921-1940", profession: "Professor", level: 3,
+      attackOption: "defense", goodSaves: ["ref", "will"],
+      abilities: { Str: 10, Dex: 12, Con: 13, Int: 15, Wis: 14, Cha: 11 },
+      coreSkills: ["Concentration", "Diplomacy", "Gather Information", "Knowledge (history)", "Knowledge (occult)", "Knowledge (archaeology)", "Research", "Speak Other Language (Latin)", "Spot", "Listen", "Search", "Heal"],
+      skills: {
+        "Knowledge (occult)": { ranks: 6 }, "Knowledge (history)": { ranks: 6 }, "Knowledge (archaeology)": { ranks: 5 }, Research: { ranks: 6 },
+        Spot: { ranks: 6 }, Listen: { ranks: 6 }, "Speak Other Language (Latin)": { ranks: 4 }, Search: { ranks: 6 }, Heal: { ranks: 4 },
+        Concentration: { ranks: 4 }, Diplomacy: { ranks: 4 }, "Gather Information": { ranks: 3 }, Drive: { ranks: 3 },
+      },
+      feats: [{ name: "Alertness" }, { name: "Weapon Proficiency", choice: "pistol" }, { name: "Iron Will" }],
+      money: { roll: 4, cash: null, notes: "" },
+      weapons: [{ id: uid(), name: "Handgun (9mm)", category: "pistol", damage: "1d10", critical: "×3", range: "20 ft", capacity: 9, ammo: 9, rof: "Multifire", weight: 2 }],
+      equipment: [{ id: uid(), name: "Flashlight", qty: 1, weight: 1 }, { id: uid(), name: "Notebook & pencil", qty: 1, weight: 0.5 }, { id: uid(), name: "First aid kit", qty: 1, weight: 3 }],
+      notes: "Assistant professor of history. Sample character for checking the sheet's numbers.",
+    });
+    c.levelLog = [{ level: 1, intMod: null, hpRoll: null }, { level: 2, intMod: null, hpRoll: 4 }, { level: 3, intMod: null, hpRoll: 3 }];
+    return lockIntMods(normalize(c), 1);
   }
 
   return {
@@ -780,7 +823,7 @@
     toInt, toNum, fmt, abilityMod, rollDie, uid, clone,
     skillBase, skillSpecialty, skillDef,
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
-    abilityIncreaseLevels, defenseBonus, agingCategory,
+    abilityIncreaseLevels, defenseBonus, agingCategory, offenseBonusFeat, gearWeight, sampleCharacter,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,

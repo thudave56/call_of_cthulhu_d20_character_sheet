@@ -59,7 +59,7 @@ The editor is a seven-step wizard: Basics, Abilities, Skills, Feats, HP & Money,
 
 Click **Add sample** on the character list. The sample is **Dr. Kristof Lehmann**: a 3rd-level Professor, Defense option, good Reflex and Will saves, age 52, 1921–40 era, Alertness, Weapon Proficiency (pistol) and Iron Will.
 
-Each line below is worked by hand from the rulebook and should match the sheet exactly. The same values are asserted by the app, and the rules are covered by `v2/tests/rules.test.js`.
+Each line below is worked by hand from the rulebook and should match the sheet exactly. The test "Worked sample in v2/DESIGNS.md matches the hand calculation" in `v2/tests/rules.test.js` checks every value automatically.
 
 | What | Working (printed page) | Expected |
 |---|---|---|
@@ -78,6 +78,7 @@ Each line below is worked by hand from the rulebook and should match the sheet e
 | Spot | 6 ranks + 2 Wis + 2 Alertness | **+10** |
 | Knowledge (occult) | 6 ranks + 3 Int | **+9** |
 | Drive (noncore) | 3 ranks (costs 6 points) + 0 Dex | **+3** |
+| Swim | 0 ranks − 1 Str − 1 gear (pistol 2 + flashlight 1 + notebook 0.5 + first aid kit 3 = 6.5 lb → −1, p.37) | **−2** |
 
 To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with a 10% roll button. Deal 9 more and it shows **Dead** at −10. Lose 8 Sanity and an alert asks the GM for a Sanity check. Lose 15 within the same hour and the indefinite-insanity alert appears.
 
@@ -96,26 +97,32 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 | Skill points (8+Int)×4, then 8+Int per level (min 1); core 1 pt/rank; noncore 1 pt per ½ rank; half ranks don't count | p.16–18 | `skillPoints`, `skillTable` | ✓ |
 | Trained-only skills, key abilities, armor-penalty skills | Table 2-1, p.18 | `SKILLS` | ✓ |
 | Synergy +2 at 5 ranks | Table 2-4, p.22 | `SYNERGIES` | ✓ |
-| Cthulhu Mythos can't be bought, has no max, lowers max Sanity | p.18, p.27, p.47 | `mythos` field, `sanity` | ✓ |
+| Cthulhu Mythos can't be bought, has no max; max Sanity = 99 − (ranks + bonuses) | p.18, p.27, p.47 | `mythos` field, `sanity` | ✓ |
+| Swim −1 per 5 lb of gear; no other encumbrance rule exists | p.37 | `gearWeight`, `skillTable` | ✓ |
 | Feat prerequisites, choices, multi/stacking; aptitude bonuses don't stack | Tables 3-1, 3-2, p.39–45 | `FEATS`, `featPrereqIssues` | ✓ |
 | Weapon Proficiency by category (nonproficient −4); Finesse, Focus, Improved Critical | p.40–43 | `weaponAttack` | ✓ |
 | Armor: AC bonus and check penalty (to skills and attacks); no Max Dex | Table 6-4, p.94–95 | `ARMOR`, `combat` | ✓ |
 | Weapon stats | Tables 6-1 and 6-3, p.94–95 | `WEAPON_PRESETS` | — |
 | Sanity: start 5×Wis, max 99−Mythos, ½ Wis per roll → check, 20%/hour → indefinite, 0 → slide, −10 permanent, +1d6 per level (cap at max), therapy capped at starting, Mythos insanity +2 then +1 | p.47–51 | `sanity`, `loseSanity`, `gainSanity`, `mythosInsanity` | ✓ |
 | Money: (1d6 + profession, min 1) × era; Wealth windfall and +2 income | Tables 1-13 and 1-14, p.15, p.42 | `money` | ✓ |
-| Variant defense bonus (+ Offense bonus Weapon Proficiency) | Table 1-15, p.15 | `defenseBonus`, `featSlots` | ✓ |
+| Variant defense bonus (+ Offense bonus Weapon Proficiency; table option to grant it always) | Table 1-15, p.15 | `defenseBonus`, `offenseBonusFeat`, `featSlots` | ✓ |
 
-## Calls that need your confirmation
+**Data provenance.** Every table the app uses was checked against the rulebook page images in `docs/rulebook/EXTRACTION_REVIEW.md` §2: Tables 1-8 to 1-15, the profession templates, Tables 2-1, 2-4, 3-1, 3-2, 6-1, 6-3 and 6-4, and the Sanity and combat rules. The tables that review could not verify are not used by the app: 1-12 (height and weight), 2-2, 2-5, 4-2 and 4-3, the 5-x combat tables, and 6-5 onwards (specific firearms). Players enter specific firearms by hand.
 
-The book is ambiguous or inconsistent on these points. Each one has a sensible default in the app, but please confirm or overrule:
+## Rulebook ambiguities and how they are resolved
 
-1. **Armor check penalty on Swim.** Table 2-1 marks Swim ††, but the armor sidebar on p.94 lists 7 skills without it. *The app follows Table 2-1 and applies it to Swim.*
-2. **The Offense option's extra Weapon Proficiency** appears only inside the Defense Bonus variant box (p.15). *The app grants it only when that variant is switched on.*
-3. **Agent template: Computer Use [Cha]** (p.12). Everywhere else it is Int. *The app uses Int.*
-4. **Maximum Sanity is "99 − Mythos ranks" or "99 − Mythos modifier".** *The app uses ranks*, as the book's worked example does.
-5. **Encumbrance.** The rulebook has no carrying-capacity table for investigators, so *v2 does not invent load penalties*. Variant A's Str×3/×6/×10 thresholds are not from this book.
-6. **Skill points after an Int increase.** These are not retroactive (p.9). *The app records the Int modifier at each level.* Characters made directly at a higher level use their current Int for every level.
-7. **Temporary insanity threshold for an odd Wisdom.** "One-half her Wisdom score" is taken as rounded up (Wis 15 → 8).
+The source has a few inconsistencies. Each one below is resolved from the rulebook's own text, and the resolution is covered by a test. The one genuine judgment call is a table option, so the sheet is correct whichever reading your group uses.
+
+| # | Issue | Resolution | Evidence |
+|---|---|---|---|
+| 1 | Armor check penalty on **Swim**: the armor sidebar (p.94) lists 7 skills without Swim | **Applies.** The sidebar is an incomplete summary. | Table 2-1 marks Swim †† (p.18), and the Swim entry header reads "SWIM (STR; ARMOR CHECK PENALTY)" (p.37). Every other skill entry with that header matches the 8 skills the sheet uses. |
+| 2 | **Swim and gear weight** | **−1 to Swim per 5 lb of gear carried or worn**, from the weights entered on the Gear step | Swim, Special (p.37). It is the only gear-weight rule for investigators. |
+| 3 | **Encumbrance / carrying capacity** | **Not applied.** The rulebook has no investigator carrying-capacity table, so v2 invents none. The original app's Str×3/×6/×10 loads are not from this book. | A full-text search finds carrying capacity only in animal stat blocks (horse, camel). |
+| 4 | **Agent template prints "Computer Use [Cha]"** (p.12) | **Int.** A skill's key ability belongs to the skill. | "The key ability of a skill is noted in its description and on Table 2-1" (p.17). Table 2-1 and the other three templates with Computer Use say Int. |
+| 5 | **Maximum Sanity: "99 − Mythos ranks" or "99 − Mythos modifier"** | **99 − (Mythos ranks + any Mythos bonus).** Mythos has no key ability, so its modifier is ranks plus bonuses, which satisfies both wordings. Enter a bonus as the Mythos "misc". | p.47: "This number (99 minus Cthulhu Mythos ranks and any bonuses) is the character's maximum Sanity." The worked example on p.50 (99 − 3 ranks = 96) agrees. |
+| 6 | **"Loses one-half her Wisdom score"** with an odd Wisdom | **A loss of at least half.** Wis 15 means 7.5, so a loss of 8 triggers it. | p.47 |
+| 7 | **Skill points after an Int increase** | **Not retroactive.** The sheet records the Int modifier at each level; levels gained after an increase get the new value. | p.9 (Claire's example) |
+| 8 | **Offense option's extra Weapon Proficiency** is printed only inside the Defense Bonus variant box (p.15) | **Table option.** By default it is granted with the variant ("to balance the two options"). Groups that read it as a core rule can tick "Table ruling: give Offense characters the bonus Weapon Proficiency even without the variant" on the Basics step. | p.15 |
 
 ## A/B deployment
 

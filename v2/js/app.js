@@ -264,8 +264,9 @@
     </fieldset>
     <fieldset class="field"><legend class="lbl">Optional rules</legend>
       <label class="check"><input type="checkbox" data-action="opt-defense" ${ch.options.defenseBonus ? "checked" : ""}/> Variant: Defense bonus by level (Table 1-15, p.15) — adds to AC; Offense characters also get a bonus Weapon Proficiency feat.</label>
+      <label class="check"><input type="checkbox" data-action="opt-offense-wp" ${ch.options.offenseWeaponProficiency ? "checked" : ""}/> Table ruling: give Offense characters the bonus Weapon Proficiency even without the variant (p.15 prints it inside the variant box; off by default).</label>
     </fieldset>
-    ${field("Cthulhu Mythos ranks", inp("mythos", ch.mythos, 'type="number" min="0"'), "Never bought with skill points: starts at 0 and rises through play (Mythos insanity, tomes). Lowers maximum Sanity.")}
+    ${field("Cthulhu Mythos ranks", inp("mythos", ch.mythos, 'type="number" min="0"'), "Never bought with skill points: starts at 0 and rises through play (Mythos insanity, tomes). Maximum Sanity = 99 − Mythos ranks − any Mythos bonus (misc).")}
     ${field("Background & description", `<textarea data-bind="notes" rows="4">${esc(ch.notes)}</textarea>`)}`;
   }
 
@@ -334,7 +335,7 @@
     const p = r.parts; const out = [`${p.ranks} ranks`];
     if (r.ability) out.push(`${fmt(p.ability)} ${r.ability}`);
     if (p.feat) out.push(`${fmt(p.feat)} feat`); if (p.emphasis) out.push(`+3 Skill Emphasis`);
-    if (p.synergy) out.push(`+2 synergy`); if (p.armor) out.push(`${p.armor} armor`); if (p.misc) out.push(`${fmt(p.misc)} misc`);
+    if (p.synergy) out.push(`+2 synergy`); if (p.armor) out.push(`${p.armor} armor`); if (p.gear) out.push(`${p.gear} gear weight`); if (p.misc) out.push(`${fmt(p.misc)} misc`);
     return out.join(", ");
   }
 
@@ -362,7 +363,7 @@
       return `<li class="${disabled ? "dim" : ""}"><button class="btn small" data-action="feat-add" data-name="${esc(f.name)}" ${disabled ? "disabled" : ""}>Add</button> <strong>${esc(f.name)}</strong>${f.psychic ? ' <span class="tag">Psychic</span>' : ""}${f.multi ? ' <span class="tag" title="Can be taken more than once">×</span>' : ""}
         <span class="hint">${esc(f.text)}${pre ? ` <em>Requires: ${esc(pre)}.</em>` : ""}${probs.length ? ` <span class="bad">(${probs.map(esc).join("; ")})</span>` : ""}</span></li>`;
     }).join("");
-    return `<div class="sp-tracker ${ch.feats.length > d.featSlots ? "bad" : ch.feats.length === d.featSlots ? "ok" : ""}">Feats: <strong>${ch.feats.length}</strong> / ${d.featSlots} <span class="muted">(2 at 1st level, +1 at every level divisible by 3${ch.options.defenseBonus && ch.attackOption === "offense" ? ", +1 bonus Weapon Proficiency (variant)" : ""})</span></div>
+    return `<div class="sp-tracker ${ch.feats.length > d.featSlots ? "bad" : ch.feats.length === d.featSlots ? "ok" : ""}">Feats: <strong>${ch.feats.length}</strong> / ${d.featSlots} <span class="muted">(2 at 1st level, +1 at every level divisible by 3${C.offenseBonusFeat(ch) ? ", +1 bonus Weapon Proficiency for the Offense option" : ""})</span></div>
       <p class="hint">No character is proficient with weapons by default: without the right Weapon Proficiency feat, attacks take −4 (p.43). Psychic feats need GM approval.</p>
       <h3>Your feats</h3><ul class="feat-list chosen">${chosen || '<li class="muted">None yet.</li>'}</ul>
       <h3>Available feats</h3><ul class="feat-list">${avail}</ul>`;
@@ -395,19 +396,22 @@
       <td><input data-action="weapon" data-i="${i}" data-k="critical" value="${esc(w.weapon.critical)}" size="7" aria-label="Critical" /></td>
       <td><input data-action="weapon" data-i="${i}" data-k="range" value="${esc(w.weapon.range || "")}" size="6" aria-label="Range" /></td>
       <td><input type="number" data-action="weapon" data-i="${i}" data-k="capacity" value="${esc(w.weapon.capacity || "")}" style="width:4em" aria-label="Capacity" /></td>
+      <td><input type="number" min="0" step="0.5" data-action="weapon" data-i="${i}" data-k="weight" value="${esc(w.weapon.weight ?? "")}" style="width:4em" aria-label="Weight (lb)" /></td>
       <td>${w.ranged ? "" : `<label class="check"><input type="checkbox" data-action="weapon-check" data-i="${i}" data-k="twoHanded" ${w.weapon.twoHanded ? "checked" : ""}/> 2H</label>`}
           ${!w.ranged && w.weapon.category === "melee" ? `<select data-action="weapon" data-i="${i}" data-k="finesseAs" aria-label="Weapon Finesse group"><option value="">no finesse</option>${C.FINESSE_WEAPONS.map((f) => `<option ${w.weapon.finesseAs === f ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>` : ""}</td>
       <td class="num strong">${fmt(w.bonus)}${C.isProficient(ch, w.weapon) ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
       <td><button class="btn small ghost" data-action="weapon-remove" data-i="${i}" aria-label="Remove weapon">✕</button></td></tr>`).join("");
-    const items = ch.equipment.map((e, i) => `<tr><td><input data-action="item" data-i="${i}" data-k="name" value="${esc(e.name)}" aria-label="Item" /></td><td><input type="number" min="0" data-action="item" data-i="${i}" data-k="qty" value="${esc(e.qty ?? 1)}" style="width:4em" aria-label="Quantity" /></td><td><input data-action="item" data-i="${i}" data-k="notes" value="${esc(e.notes || "")}" aria-label="Notes" /></td><td><button class="btn small ghost" data-action="item-remove" data-i="${i}" aria-label="Remove item">✕</button></td></tr>`).join("");
+    const items = ch.equipment.map((e, i) => `<tr><td><input data-action="item" data-i="${i}" data-k="name" value="${esc(e.name)}" aria-label="Item" /></td><td><input type="number" min="0" data-action="item" data-i="${i}" data-k="qty" value="${esc(e.qty ?? 1)}" style="width:4em" aria-label="Quantity" /></td><td><input type="number" min="0" step="0.5" data-action="item" data-i="${i}" data-k="weight" value="${esc(e.weight ?? "")}" style="width:4em" aria-label="Weight each (lb)" /></td><td><input data-action="item" data-i="${i}" data-k="notes" value="${esc(e.notes || "")}" aria-label="Notes" /></td><td><button class="btn small ghost" data-action="item-remove" data-i="${i}" aria-label="Remove item">✕</button></td></tr>`).join("");
     return `<h3>Armor (Table 6-4)</h3>
       ${field("Worn armor", `<select data-bind="armor">${C.ARMOR.map((a) => `<option ${a.name === ch.armor ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select>`, `AC ${d.combat.ac} (10 ${fmt(d.combat.acParts.dex)} Dex + ${d.combat.acParts.armor} armor${d.combat.acParts.defense ? ` + ${d.combat.acParts.defense} defense bonus` : ""}). ${d.combat.armor.note ? esc(d.combat.armor.note) + ". " : ""}${d.combat.acp ? `Armor check penalty ${d.combat.acp} to Balance, Climb, Escape Artist, Hide, Jump, Move Silently, Swim, Tumble and attack rolls.` : ""}`)}
+      ${field("Armor weight (lb)", `<input type="number" min="0" step="0.5" data-bind="armorWeight" value="${esc(ch.armorWeight || "")}" />`, "Table 6-4 gives no weights; enter your own if your GM tracks them.")}
+      <p class="hint">Gear carried or worn: <strong>${d.gearWeight} lb</strong>. The rulebook has no carrying-capacity table for investigators; the only weight rule is Swim: −1 per 5 lb of gear (p.37), applied automatically (${Math.floor(d.gearWeight / 5) ? "−" + Math.floor(d.gearWeight / 5) : "no penalty"}).</p>
       <h3>Weapons</h3>
       <div class="row"><select id="weaponPreset" aria-label="Weapon preset">${C.WEAPON_PRESETS.map((w, i) => `<option value="${i}">${esc(w.name)} (${esc(w.damage)})</option>`).join("")}</select><button class="btn small" data-action="weapon-add">Add weapon</button><button class="btn small ghost" data-action="weapon-add-custom">Add custom</button></div>
-      ${weapons ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Name</th><th>Category</th><th>Damage</th><th>Crit</th><th>Range</th><th>Cap.</th><th></th><th>Attack</th><th></th></tr></thead><tbody>${weapons}</tbody></table></div>` : '<p class="muted">No weapons.</p>'}
+      ${weapons ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Name</th><th>Category</th><th>Damage</th><th>Crit</th><th>Range</th><th>Cap.</th><th>lb</th><th></th><th>Attack</th><th></th></tr></thead><tbody>${weapons}</tbody></table></div>` : '<p class="muted">No weapons.</p>'}
       <h3>Equipment</h3>
       <div class="row"><input id="itemName" placeholder="Flashlight, notebook, camera…" aria-label="New item" /><button class="btn small" data-action="item-add">Add item</button></div>
-      ${items ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Item</th><th>Qty</th><th>Notes</th><th></th></tr></thead><tbody>${items}</tbody></table></div>` : ""}`;
+      ${items ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Item</th><th>Qty</th><th>lb each</th><th>Notes</th><th></th></tr></thead><tbody>${items}</tbody></table></div>` : ""}`;
   }
 
   function edReview(ch, d, issues) {
@@ -463,7 +467,7 @@
       case "print": window.print(); break;
       case "clear-banners": state.banners = []; render(); break;
       case "import": document.getElementById("importFile").click(); break;
-      case "sample": { const c = S.save(sampleCharacter()).character; toast(`Added ${esc(c.name)}.`); render(); break; }
+      case "sample": { const c = S.save(C.sampleCharacter()).character; toast(`Added ${esc(c.name)}.`); render(); break; }
       case "export-all": download(`investigators-${new Date().toISOString().slice(0, 10)}.json`, S.exportData()); break;
       case "export-one": { const c = S.load(el.dataset.id); if (c) download(`${(c.name || "investigator").replace(/[^\w-]+/g, "_")}.json`, S.exportData([c.id])); break; }
       case "dup": S.duplicate(el.dataset.id); render(); toast("Duplicated."); break;
@@ -529,6 +533,7 @@
         c.goodSaves = list;
       }); break;
       case "opt-defense": update((c) => { c.options.defenseBonus = el.checked; }); break;
+      case "opt-offense-wp": update((c) => { c.options.offenseWeaponProficiency = el.checked; }); break;
       case "ability-increase": update((c) => { c.levelLog[+el.dataset.level - 1].abilityIncrease = el.value || null; return C.lockIntMods(c, +el.dataset.level); }); break;
       case "core-spec": update((c) => {
         const slot = +el.dataset.slot; const t = C.templateCore(c.profession)[slot];
@@ -555,32 +560,9 @@
       case "money-set": update((c) => { c.money.roll = el.value ? Math.max(1, Math.min(6, +el.value)) : null; }); break;
       case "weapon": update((c) => { const k = el.dataset.k; c.weapons[i][k] = el.type === "number" ? (el.value === "" ? null : +el.value) : el.value; }); break;
       case "weapon-check": update((c) => { c.weapons[i][el.dataset.k] = el.checked; }); break;
-      case "item": update((c) => { const k = el.dataset.k; c.equipment[i][k] = el.type === "number" ? +el.value : el.value; }, { render: false }); break;
+      case "item": update((c) => { const k = el.dataset.k; c.equipment[i][k] = el.type === "number" ? +el.value : el.value; }, { render: el.type === "number" }); break;
       default: D.handleChange && D.handleChange(a, el, api);
     }
-  }
-
-  /** A fully built 3rd-level investigator whose numbers are worked by hand in v2/DESIGNS.md. */
-  function sampleCharacter() {
-    const c = C.newCharacter({
-      name: "Dr. Kristof Lehmann (sample)", player: "", gender: "M", age: 52, era: "1921-1940", profession: "Professor", level: 3,
-      attackOption: "defense", goodSaves: ["ref", "will"],
-      abilities: { Str: 10, Dex: 12, Con: 13, Int: 15, Wis: 14, Cha: 11 },
-      coreSkills: ["Concentration", "Diplomacy", "Gather Information", "Knowledge (history)", "Knowledge (occult)", "Knowledge (archaeology)", "Research", "Speak Other Language (Latin)", "Spot", "Listen", "Search", "Heal"],
-      skills: {
-        "Knowledge (occult)": { ranks: 6 }, "Knowledge (history)": { ranks: 6 }, "Knowledge (archaeology)": { ranks: 5 }, Research: { ranks: 6 },
-        Spot: { ranks: 6 }, Listen: { ranks: 6 }, "Speak Other Language (Latin)": { ranks: 4 }, Search: { ranks: 6 }, Heal: { ranks: 4 },
-        Concentration: { ranks: 4 }, Diplomacy: { ranks: 4 }, "Gather Information": { ranks: 3 }, Drive: { ranks: 3 },
-      },
-      feats: [{ name: "Alertness" }, { name: "Weapon Proficiency", choice: "pistol" }, { name: "Iron Will" }],
-      money: { roll: 4, cash: null, notes: "" },
-      armor: "None",
-      weapons: [{ id: C.uid(), name: "Handgun (9mm)", category: "pistol", damage: "1d10", critical: "×3", range: "20 ft", capacity: 9, ammo: 9, rof: "Multifire" }],
-      equipment: [{ id: C.uid(), name: "Flashlight", qty: 1 }, { id: C.uid(), name: "Notebook & pencil", qty: 1 }, { id: C.uid(), name: "First aid kit", qty: 1 }],
-      notes: "Assistant professor of history. Sample character for checking the sheet's numbers.",
-    });
-    c.levelLog = [{ level: 1, intMod: null, hpRoll: null }, { level: 2, intMod: null, hpRoll: 4 }, { level: 3, intMod: null, hpRoll: 3 }];
-    return C.lockIntMods(C.normalize(c), 1);
   }
 
   // API handed to designs.js for play-mode actions.
