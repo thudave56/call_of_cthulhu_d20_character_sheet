@@ -147,7 +147,7 @@
         <div class="stat" title="10 ${x.fmt(cb.acParts.dex)} Dex + ${cb.acParts.armor} armor${cb.acParts.defense ? ` + ${cb.acParts.defense} defense` : ""}"><span class="lbl">AC</span><span class="val">${cb.ac}</span><span class="sub">touch ${cb.touch} · flat ${cb.flatFooted}</span></div>
         <button class="stat-btn" data-action="roll-init" title="Dex ${x.fmt(cb.initParts.dex)}${cb.initParts.feat ? " + 4 Improved Initiative" : ""}"><span class="lbl">Initiative</span><span class="val">${x.fmt(cb.init)}</span></button>
         <div class="stat"><span class="lbl">Base attack</span><span class="val">${cb.sequence.map(x.fmt).join("/")}</span></div>
-        <div class="stat"><span class="lbl">Speed</span><span class="val">${cb.speed} ft</span></div>
+        <div class="stat"><span class="lbl">Speed</span><span class="val">${cb.speed} ft</span>${cb.conditions.halfSpeed ? '<span class="sub">half (condition)</span>' : ""}</div>
       </div>
       <div class="stat-row saves">${saveBtn("fort")}${saveBtn("ref")}${saveBtn("will")}</div>
       <div class="stat-row">
@@ -158,9 +158,35 @@
     </section>`;
   }
 
+  /** Combat tracking: initiative and rounds, plus conditions (p.91). */
+  function encounterBlock(ch, d, x) {
+    const { esc } = x;
+    const enc = ch.encounter;
+    const on = new Set(ch.conditions);
+    const chips = C.CONDITIONS.map((k) => `<button class="chip ${on.has(k.key) ? "on" : ""}" data-action="cond-toggle" data-k="${k.key}" aria-pressed="${on.has(k.key)}" title="${esc(k.text)}">${esc(k.name)}</button>`).join("");
+    const active = d.combat.conditions.list;
+    return `<section class="panel encounter no-print" aria-label="Encounter and conditions"><h2>Encounter</h2>
+      ${enc ? `<div class="enc-row"><div class="enc-round"><span class="lbl">Round</span><strong>${enc.round}</strong></div><div class="enc-round"><span class="lbl">Initiative</span><strong>${enc.init ?? "—"}</strong></div>
+        <button class="btn primary" data-action="enc-next">Next round</button><button class="btn ghost" data-action="enc-end">End combat</button></div>`
+        : `<div class="enc-row"><button class="btn primary" data-action="enc-start" title="Rolls initiative (d20 ${x.fmt(d.combat.init)}) and marks you flat-footed until your first turn">Start combat</button><span class="muted small">Rolls initiative and counts rounds.</span></div>`}
+      <h3 class="sub-h">Conditions</h3>
+      <div class="chips" role="group" aria-label="Conditions">${chips}</div>
+      ${active.length ? `<ul class="cond-list">${active.map((k) => `<li><strong>${esc(k.name)}:</strong> ${esc(k.text)}</li>`).join("")}</ul><p class="hint">Applied to the numbers on this sheet: ability penalties, attack penalties, initiative, speed and Dex to AC (Character Condition Summary, p.91).</p>` : ""}
+    </section>`;
+  }
+
+  /** Free-form dice roller ("3d6+2", "d%"). */
+  function diceBlock(ch, d, x) {
+    const dice = ["d4", "d6", "d8", "d10", "d12", "d20", "d%"];
+    return `<section class="panel dice no-print" aria-label="Dice roller"><h2>Dice</h2>
+      <div class="dice-row"><label class="sr-only" for="diceExpr">Dice to roll</label><input id="diceExpr" class="dice-expr" placeholder="3d6+2" autocomplete="off" data-enter="dice-roll" value="${x.esc(x.state.diceExpr || "")}" /><button class="btn" data-action="dice-roll">Roll</button></div>
+      <div class="dice-quick">${dice.map((k) => `<button class="btn ghost" data-action="dice-quick" data-v="${k}" aria-label="Roll ${k === "d%" ? "percentile dice" : "1" + k}">${k}</button>`).join("")}</div>
+    </section>`;
+  }
+
   /** Attack-bonus breakdown shown as a tooltip. */
   function attackTitle(w, fmt) {
-    return `BAB ${fmt(w.parts.bab)} ${fmt(w.parts.ability)} ${w.ability}${w.parts.focus ? " +1 focus" : ""}${w.parts.armor ? ` ${w.parts.armor} armor` : ""}${w.parts.nonproficient ? " −4 nonproficient" : ""}`;
+    return `BAB ${fmt(w.parts.bab)} ${fmt(w.parts.ability)} ${w.ability}${w.parts.focus ? " +1 focus" : ""}${w.parts.armor ? ` ${w.parts.armor} armor` : ""}${w.parts.nonproficient ? " −4 nonproficient" : ""}${w.parts.condition ? ` ${w.parts.condition} conditions` : ""}`;
   }
   const rounds = (wp) => (wp.ammo ?? wp.capacity);
 
@@ -303,10 +329,10 @@
       ${header(ch, d, x)}${alertsBlock(ch, d, x)}
       <div class="tracker-grid">
         <div class="col vitals-col">${hpBlock(ch, d, x, { id: "t" })}${sanityBlock(ch, d, x, { id: "t" })}</div>
-        <div class="col combat-col">${combatBlock(ch, d, x)}${weaponsBlock(ch, d, x, { cards: true })}${abilitiesBlock(ch, d, x)}</div>
+        <div class="col combat-col">${encounterBlock(ch, d, x)}${combatBlock(ch, d, x)}${weaponsBlock(ch, d, x, { cards: true })}${abilitiesBlock(ch, d, x)}</div>
         <div class="col skills-col">${skillsBlock(ch, d, x)}</div>
       </div>
-      <div class="tracker-bottom">${featsBlock(ch, d, x)}${gearBlock(ch, d, x)}${notesBlock(ch, d, x)}${logBlock(ch, d, x)}</div>
+      <div class="tracker-bottom">${diceBlock(ch, d, x)}${featsBlock(ch, d, x)}${gearBlock(ch, d, x)}${notesBlock(ch, d, x)}${logBlock(ch, d, x)}</div>
       ${referenceBlock(ch, d, x)}
     </div>`;
   }
@@ -363,7 +389,7 @@
         ${featsBlock(ch, d, x)}
         ${gearBlock(ch, d, x)}
         ${notesBlock(ch, d, x)}
-        <div class="no-print sheet-vitals">${hpBlock(ch, d, x, { id: "s" })}${sanityBlock(ch, d, x, { id: "s" })}</div>
+        <div class="no-print sheet-vitals">${hpBlock(ch, d, x, { id: "s" })}${sanityBlock(ch, d, x, { id: "s" })}${encounterBlock(ch, d, x)}${diceBlock(ch, d, x)}</div>
         ${referenceBlock(ch, d, x)}
       </div>
     </div>`;
@@ -375,7 +401,7 @@
     const body = {
       vitals: hpBlock(ch, d, x, { id: "p", compact: false }) + sanityBlock(ch, d, x, { id: "p", compact: false }) + abilitiesBlock(ch, d, x),
       skills: skillsBlock(ch, d, x),
-      combat: combatBlock(ch, d, x) + weaponsBlock(ch, d, x, { cards: true }),
+      combat: encounterBlock(ch, d, x) + combatBlock(ch, d, x) + weaponsBlock(ch, d, x, { cards: true }) + diceBlock(ch, d, x),
       gear: gearBlock(ch, d, x) + featsBlock(ch, d, x),
       notes: notesBlock(ch, d, x) + logBlock(ch, d, x) + referenceBlock(ch, d, x),
     }[tab];
@@ -386,7 +412,7 @@
           <button class="pv hp state-${d.hp.state.key}" data-action="pocket-tab" data-k="vitals"><span>HP</span><strong>${d.hp.current}</strong><small>/${d.hp.max}</small></button>
           <button class="pv san state-${d.sanity.state.key}" data-action="pocket-tab" data-k="vitals"><span>SAN</span><strong>${d.sanity.current}</strong><small>/${d.sanity.max}</small></button>
           <div class="pv"><span>AC</span><strong>${d.combat.ac}</strong></div>
-          <button class="pv" data-action="roll-init"><span>INIT</span><strong>${x.fmt(d.combat.init)}</strong></button>
+          ${ch.encounter ? `<button class="pv enc" data-action="pocket-tab" data-k="combat"><span>ROUND</span><strong>${ch.encounter.round}</strong></button>` : `<button class="pv" data-action="roll-init"><span>INIT</span><strong>${x.fmt(d.combat.init)}</strong></button>`}
         </div>
       </div>
       ${recentBlock(ch, x)}${alertsBlock(ch, d, x)}
@@ -457,6 +483,54 @@
     const d = C.derive(ch);
     const i = el.dataset.i !== undefined ? +el.dataset.i : null;
     switch (a) {
+      case "enc-start": {
+        const r = C.rollDie(20);
+        const init = r + d.combat.init;
+        api.toast(`<strong>Initiative</strong><br><span class="roll-big">${init}</span> <span class="muted">(d20 ${r} ${C.fmt(d.combat.init)})</span><br>Round 1 — flat-footed until your first turn.`);
+        api.update((c) => {
+          c.encounter = { round: 1, init };
+          if (!c.conditions.includes("flatFooted")) c.conditions.push("flatFooted");
+          api.pushLog(c, `Combat started: initiative ${init} (d20 ${r} ${C.fmt(d.combat.init)})`);
+        }, { undo: "Start combat" });
+        break;
+      }
+      case "enc-next": {
+        const round = (ch.encounter ? ch.encounter.round : 0) + 1;
+        api.update((c) => {
+          c.encounter = Object.assign({}, c.encounter, { round });
+          c.conditions = c.conditions.filter((k) => k !== "flatFooted");
+          api.pushLog(c, `Round ${round}`);
+        }, { undo: "Next round" });
+        if (d.hp.state.key === "dying" && !ch.hp.stable) api.toast(`<strong>Round ${round}</strong><br>Dying: make the 10% roll on the Hit Points panel (p.69).`, 6000);
+        else if (d.sanity.current <= 0 && d.sanity.current > -10) api.toast(`<strong>Round ${round}</strong><br>Sanity ${d.sanity.current}: lose 1 more Sanity this round unless stabilized (p.47).`, 6000);
+        break;
+      }
+      case "enc-end": api.update((c) => {
+        api.pushLog(c, `Combat ended after ${c.encounter ? c.encounter.round : 0} round(s)`);
+        c.encounter = null;
+        c.conditions = c.conditions.filter((k) => k !== "flatFooted");
+      }, { undo: "End combat" }); break;
+      case "cond-toggle": {
+        const k = el.dataset.k;
+        const def = C.CONDITION_BY_KEY[k];
+        if (!def) break;
+        const has = ch.conditions.includes(k);
+        api.update((c) => {
+          c.conditions = has ? c.conditions.filter((x) => x !== k) : c.conditions.concat(k);
+          api.pushLog(c, `${has ? "No longer" : "Now"} ${def.name.toLowerCase()}`);
+        }, { undo: `${def.name} ${has ? "off" : "on"}` });
+        break;
+      }
+      case "dice-roll": case "dice-quick": {
+        const input = document.getElementById("diceExpr");
+        const expr = a === "dice-quick" ? (el.dataset.v === "d%" ? "d%" : "1" + el.dataset.v) : (input ? input.value : "");
+        if (a === "dice-roll") api.state.diceExpr = expr;
+        const r = C.rollDiceExpr(expr);
+        if (!r) { api.toast("Type dice like 3d6+2, 1d20+1d4 or d%."); break; }
+        api.toast(`<strong>${api.esc(expr)}</strong><br><span class="roll-big">${r.total}</span> <span class="muted">${api.esc(r.detail)}</span>`);
+        api.update((c) => api.pushLog(c, `Rolled ${expr}: ${r.total} (${r.detail})`));
+        break;
+      }
       case "pocket-tab": api.state.pocketTab = el.dataset.k; api.render(); window.scrollTo(0, 0); break;
       case "skill-mode": api.state.skillMode = el.dataset.k; api.render(); break;
       case "alert-dismiss": api.update((c) => { c.alerts.splice(i, 1); }); break;

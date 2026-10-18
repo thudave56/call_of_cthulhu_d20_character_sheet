@@ -462,3 +462,36 @@ test("Unarmed line is always derived, with Str damage and the armor check penalt
   c.feats.push({ name: "Martial Artist" });
   assert.equal(CoC.derive(c).unarmed.damage, "1d4");
 });
+
+test("Conditions (p.91): penalties apply and don't stack; Dex to AC is lost", () => {
+  const c = CoC.sampleCharacter();
+  c.abilities.Dex = 16;
+  const base = CoC.derive(c);
+  c.conditions = ["fatigued", "exhausted"];          // most severe applies: −6, not −8
+  let d = CoC.derive(c);
+  assert.equal(d.scores.Dex.score, base.scores.Dex.score - 6);
+  assert.equal(d.combat.speed, 15);
+  c.conditions = ["flatFooted"];
+  d = CoC.derive(c);
+  assert.equal(d.combat.ac, base.combat.ac - Math.max(0, base.scores.Dex.mod));
+  c.conditions = ["helpless"];
+  assert.equal(CoC.derive(c).combat.acParts.dex, -5);
+  c.conditions = ["prone", "deafened"];
+  d = CoC.derive(c);
+  assert.equal(d.combat.melee, base.combat.melee - 4);
+  assert.equal(d.combat.ranged, base.combat.ranged);
+  assert.equal(d.combat.init, base.combat.init - 4);
+  assert.equal(d.weapons[0].bonus, base.weapons[0].bonus);          // firearms unaffected by prone
+  assert.equal(d.unarmed.bonus, base.unarmed.bonus - 4);
+  assert.deepEqual(CoC.normalize({ conditions: ["prone", "bogus", "prone"] }).conditions, ["prone"]);
+});
+
+test("Dice roller reads NdM±K expressions and rejects junk", () => {
+  const max = () => 0.999999, min = () => 0;
+  assert.equal(CoC.rollDiceExpr("3d6+2", max).total, 20);
+  assert.equal(CoC.rollDiceExpr("3d6+2", min).total, 5);
+  assert.equal(CoC.rollDiceExpr("1d20+1d4-1", max).total, 23);
+  assert.equal(CoC.rollDiceExpr("d%", max).total, 100);
+  assert.equal(CoC.rollDiceExpr("2d10 - 3", min).total, -1);
+  for (const bad of ["", "abc", "3d", "d1", "200d6", "1d6+<script>"]) assert.equal(CoC.rollDiceExpr(bad), null, bad);
+});

@@ -499,6 +499,8 @@
       levelLogArchive: {},     // level -> entry removed by lowering the level, restored on raising it
       xp: 0,                   // experience points (Table 1-10)
       alerts: [],              // rule alerts shown on the play screen until dismissed
+      conditions: [],          // keys from CONDITIONS (p.91)
+      encounter: null,         // { round, init } while a combat is being tracked
       rev: 0,                  // save revision, used to detect edits from another tab
       log: [],
       created: now, updated: now,
@@ -506,19 +508,55 @@
     return Object.assign(c, overrides);
   }
 
-  /** Effective ability scores: rolled + aging + level increases − damage (min 1 before damage). */
+  // ---------------------------------------------------------------------------
+  // Conditions — Character Condition Summary (p.91). Effects the sheet applies:
+  // str/dex: effective ability penalty; attack/melee: attack-roll penalty;
+  // init: initiative; loseDex: no positive Dex bonus to AC; helpless: Dex
+  // modifier to AC counts as −5; halfSpeed. When effects can't combine, the
+  // most severe applies (p.91), so ability penalties don't stack.
+  // Disabled, staggered and unconscious come from hit points, not this list.
+  // ---------------------------------------------------------------------------
+  const CONDITIONS = [
+    { key: "blinded", name: "Blinded", loseDex: true, halfSpeed: true, text: "Everything has full concealment (50% miss chance); enemies get +2 to hit; half speed; −4 on most Str- and Dex-based skills; no Spot checks or reading." },
+    { key: "cowering", name: "Cowering", loseDex: true, text: "Frozen in fear: no actions; foes get +2 to hit." },
+    { key: "deafened", name: "Deafened", init: -4, text: "−4 initiative; 20% spell failure with verbal components; no Listen checks." },
+    { key: "entangled", name: "Entangled", attack: -2, dex: -4, halfSpeed: true, text: "−2 attacks, −4 effective Dex; half speed (none if anchored), no running or charging; casting needs Concentration DC 15." },
+    { key: "exhausted", name: "Exhausted", str: -6, dex: -6, halfSpeed: true, text: "Half speed, −6 effective Str and Dex. 1 hour of complete rest → fatigued." },
+    { key: "fatigued", name: "Fatigued", str: -2, dex: -2, text: "Can't run or charge, −2 effective Str and Dex. 8 hours of complete rest ends it." },
+    { key: "flatFooted", name: "Flat-footed", loseDex: true, text: "Hasn't acted yet this combat: loses Dex bonus to AC." },
+    { key: "grappled", name: "Grappled", loseDex: true, text: "Can't move, cast, fire a ranged weapon or use more than a barehanded attack or a Tiny/Small weapon; loses Dex bonus to AC against others." },
+    { key: "helpless", name: "Helpless", helpless: true, text: "Bound, asleep, paralyzed or unconscious: melee attacks against you get +4; coup de grace possible; Dex counts as 0 (−5 to AC)." },
+    { key: "nauseated", name: "Nauseated", text: "Can't attack, cast or concentrate; only a single move action per turn." },
+    { key: "paralyzed", name: "Paralyzed", helpless: true, text: "Rigid and helpless; effective Str and Dex 0, but purely mental actions are possible." },
+    { key: "prone", name: "Prone", melee: -4, text: "−4 melee attacks (firearms unaffected). Foes get +4 in melee, −4 at range. Standing is a move action." },
+    { key: "stunned", name: "Stunned", loseDex: true, text: "No actions; loses Dex bonus to AC; attackers get +2; drops anything held." },
+  ];
+  const CONDITION_BY_KEY = Object.fromEntries(CONDITIONS.map((x) => [x.key, x]));
+  /** Combined effects of the character's conditions. */
+  function conditionEffects(c) {
+    const list = (c.conditions || []).map((k) => CONDITION_BY_KEY[k]).filter(Boolean);
+    const min = (k) => Math.min(0, ...list.map((x) => x[k] || 0));
+    return {
+      list, str: min("str"), dex: min("dex"), attack: min("attack"), melee: min("melee"), init: min("init"),
+      loseDex: list.some((x) => x.loseDex || x.helpless), helpless: list.some((x) => x.helpless), halfSpeed: list.some((x) => x.halfSpeed),
+    };
+  }
+
+  /** Effective ability scores: rolled + aging + level increases − damage (min 1 before damage) − condition penalties. */
   function abilityScores(c) {
     const aging = agingCategory(c.age);
     const inc = {};
     for (const e of c.levelLog || []) if (e && e.abilityIncrease) inc[e.abilityIncrease] = (inc[e.abilityIncrease] || 0) + 1;
     const out = {};
+    const cond = conditionEffects(c);
     for (const a of ABILITIES) {
       const base = toInt(c.abilities && c.abilities[a], 10);
       const ageMod = ["Str", "Dex", "Con"].includes(a) ? aging.physical : aging.mental;
       const permanent = Math.max(1, base + ageMod + (inc[a] || 0));
       const dmg = Math.max(0, toInt(c.abilityDamage && c.abilityDamage[a], 0));
-      const score = Math.max(0, permanent - dmg);
-      out[a] = { base, ageMod, increases: inc[a] || 0, permanent, damage: dmg, score, mod: abilityMod(score) };
+      const condition = a === "Str" ? cond.str : a === "Dex" ? cond.dex : 0;
+      const score = Math.max(0, permanent - dmg + condition);
+      out[a] = { base, ageMod, increases: inc[a] || 0, permanent, damage: dmg, condition, score, mod: abilityMod(score) };
     }
     return out;
   }
@@ -554,15 +592,19 @@
     const bab = baseAttackBonus(c.level, c.attackOption);
     const armor = armorDef(c);
     const defBonus = c.options && c.options.defenseBonus ? defenseBonus(c.level, c.attackOption) : 0;
-    const ac = 10 + m.Dex + armor.bonus + defBonus;
+    const cond = conditionEffects(c);
+    // Conditions (p.91): helpless counts Dex as 0 (−5); others lose only a positive Dex bonus.
+    const dexAC = cond.helpless ? -5 : cond.loseDex ? Math.min(0, m.Dex) : m.Dex;
+    const ac = 10 + dexAC + armor.bonus + defBonus;
     const initFeat = featCount(c, "Improved Initiative") ? 4 : 0;
     return {
       bab, sequence: attackSequence(bab),
-      melee: bab + m.Str, ranged: bab + m.Dex,
-      ac, acParts: { base: 10, dex: m.Dex, armor: armor.bonus, defense: defBonus },
-      flatFooted: ac - Math.max(0, m.Dex), touch: 10 + m.Dex + defBonus,
-      init: m.Dex + initFeat, initParts: { dex: m.Dex, feat: initFeat },
-      speed: 30, armor, acp: armor.acp,
+      melee: bab + m.Str + cond.attack + cond.melee, ranged: bab + m.Dex + cond.attack,
+      ac, acParts: { base: 10, dex: dexAC, armor: armor.bonus, defense: defBonus },
+      flatFooted: ac - Math.max(0, dexAC), touch: 10 + dexAC + defBonus,
+      init: m.Dex + initFeat + cond.init, initParts: { dex: m.Dex, feat: initFeat, condition: cond.init },
+      speed: cond.halfSpeed ? 15 : 30, armor, acp: armor.acp,
+      conditions: cond,
     };
   }
 
@@ -593,8 +635,9 @@
     const chosen = (f) => f.choice && (f.choice === weapon.id || f.choice === weapon.name);
     const focus = (c.feats || []).some((f) => f.name === "Weapon Focus" && chosen(f)) ? 1 : 0;
     const acp = cb.acp; // armor check penalty also applies to attack rolls (p.94)
-    const bonus = cb.bab + m[abil] + prof + focus + acp;
-    const seq = cb.sequence.map((b) => b + m[abil] + prof + focus + acp);
+    const cond = cb.conditions.attack + (ranged ? 0 : cb.conditions.melee);
+    const bonus = cb.bab + m[abil] + prof + focus + acp + cond;
+    const seq = cb.sequence.map((b) => b + m[abil] + prof + focus + acp + cond);
     let dmgBonus = 0;
     if (!ranged && weapon.category !== "thrown") dmgBonus = weapon.twoHanded ? Math.floor(m.Str * 1.5) : m.Str;
     if (weapon.category === "thrown") dmgBonus = m.Str;
@@ -604,7 +647,7 @@
     const mult = (String(weapon.critical || "").match(/[×x](\d)/) || [0, 2])[1];
     return {
       ranged, ability: abil, bonus, sequence: seq,
-      parts: { bab: cb.bab, ability: m[abil], nonproficient: prof, focus, armor: acp },
+      parts: { bab: cb.bab, ability: m[abil], nonproficient: prof, focus, armor: acp, condition: cond },
       damage: weapon.damage, damageBonus: dmgBonus,
       critical: `${threat < 20 ? threat + "-20" : "20"}/×${mult}`, threat, multiplier: +mult,
       pointBlank: ranged && hasFeat(c, "Point Blank Shot"),
@@ -1039,6 +1082,9 @@
       kind: a.kind === "danger" ? "danger" : "warn", title: str(a.title, 200), text: str(a.text, 600),
       action: ALERT_ACTIONS.includes(a.action) ? a.action : "",
     }));
+    c.conditions = [...new Set(arr(c.conditions).filter((k) => CONDITION_BY_KEY[k]))];
+    const enc = isObj(c.encounter) ? c.encounter : null;
+    c.encounter = enc ? { round: Math.max(1, Math.min(9999, toInt(enc.round, 1))), init: numOrNull(enc.init) } : null;
     c.schemaVersion = SCHEMA_VERSION;
     const out = syncLevelLog(c);
     // Current Sanity can never exceed maximum Sanity (p.50).
@@ -1147,6 +1193,30 @@
     const rolls = Array.from({ length: n }, () => rollDie(sides, rng));
     return { total: Math.max(0, rolls.reduce((a, b) => a + b, 0) + bonus), rolls, bonus };
   }
+  /**
+   * General dice roller: "3d6+2", "1d20+1d4-1", "d%", "2d10". Up to 100 dice of
+   * up to 1000 sides. Returns { total, detail, terms } or null if unreadable.
+   */
+  function rollDiceExpr(expr, rng = Math.random) {
+    const e = String(expr || "").toLowerCase().replace(/\s+/g, "").replace(/d%/g, "d100");
+    if (!e || e.length > 60 || !/^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/.test(e)) return null;
+    const terms = [];
+    let dice = 0;
+    for (const [, sign, body] of e.matchAll(/([+-]?)(\d*d\d+|\d+)/g)) {
+      const k = sign === "-" ? -1 : 1;
+      const m = body.match(/^(\d*)d(\d+)$/);
+      if (!m) { terms.push({ text: sign + body, rolls: [], value: k * +body }); continue; }
+      const n = +(m[1] || 1), sides = +m[2];
+      dice += n;
+      if (n < 1 || sides < 2 || sides > 1000 || dice > 100) return null;
+      const rolls = Array.from({ length: n }, () => rollDie(sides, rng));
+      terms.push({ text: sign + body, rolls, value: k * rolls.reduce((a, b) => a + b, 0) });
+    }
+    const total = terms.reduce((a, t) => a + t.value, 0);
+    const detail = terms.map((t, i) => `${i && t.value >= 0 ? "+ " : t.value < 0 ? "− " : ""}${t.rolls.length ? `${t.text.replace(/^[+-]/, "")} [${t.rolls.join(", ")}]` : Math.abs(t.value)}`).join(" ");
+    return { total, detail, terms };
+  }
+
   /** Parse Sanity loss notation "success/failure", e.g. "0/1d6" or "1/1d4+1". */
   function parseSanityLoss(text) {
     const parts = String(text || "").split("/").map((x) => x.trim());
@@ -1211,7 +1281,7 @@
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    firearmFullAttack, lookup, rollExpr, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    firearmFullAttack, lookup, rollExpr, rollDiceExpr, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
