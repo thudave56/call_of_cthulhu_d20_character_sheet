@@ -97,6 +97,27 @@ test("v1 migration maps profession, skills, Mythos, feats and vitals", () => {
   assert.equal(c.hp.current, 5);
   assert.equal(c.sanity.current, 40);
   assert.deepEqual(c.goodSaves, ["fort"]);
+  assert.ok(c.levelLog.every((e) => e.intMod !== null), "Int modifier locked at every level");
+});
+
+test("v1 migration keeps armor, insanity, chosen core skills and lists what to check", () => {
+  const c = Store.fromLegacy("Ada", {
+    profession: CoC.PROFESSIONS.findIndex((p) => p.name === "Antiquarian"), level: "1", insanityState: "temporary",
+    armor: { name: "Vest", bonus: "4", weight: "6" }, shield: { name: "Riot Shield", bonus: "3" },
+    skills: [{ index: 18, ranks: "2", isCustomCore: true }, { index: 22, ranks: "3" }],
+    weapons: [{ name: "Rifle", type: "ranged" }],
+  });
+  assert.equal(c.armor, "Bullet resistant vest");
+  assert.equal(c.armorWeight, 6);
+  assert.equal(c.sanity.insanity, "temporary");
+  assert.ok(c.coreSkills.includes("Hide"));
+  assert.match(c.notes, /shields/);
+  assert.match(c.notes, /ranged weapons/);
+  const ant = Store.fromLegacy("Cy", { profession: CoC.PROFESSIONS.findIndex((p) => p.name === "Antiquarian"), skills: [{ index: 22, ranks: "3" }] });   // Antiquarian: 3 "Knowledge (any)" slots
+  assert.equal(ant.coreSkills.filter((id) => id === "Knowledge (general)").length, 1);
+  const odd = Store.fromLegacy("Bo", { armor: { name: "Leather", bonus: "1" } });
+  assert.equal(odd.armor, "None");
+  assert.match(odd.notes, /isn't in Table 6-4/);
 });
 
 test("lowering the level and raising it again keeps hit-die rolls and ability increases", () => {

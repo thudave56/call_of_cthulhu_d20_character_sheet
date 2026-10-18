@@ -16,7 +16,8 @@
   const PREFIX = "cocd20v2:";
   const INDEX_KEY = PREFIX + "index";
   const LEGACY_KEY = "cocd20_characters";
-  const LEGACY_DONE_KEY = PREFIX + "legacyImported";
+  const LEGACY_DONE_KEY = PREFIX + "legacyImported";        // set by older versions: "everything copied once"
+  const LEGACY_NAMES_KEY = PREFIX + "legacyImportedNames";  // names already copied, so later v1 characters are picked up
 
   // Legacy (v1) array orders, used to translate index-based saves.
   const LEGACY_FEATS = "Acrobatic|Alertness|Ambidexterity|Animal Affinity|Athletic|Blind-Fight|Cautious|Combat Casting|Dodge|Mobility|Spring Attack|Drive-By Attack|Endurance|Expertise|Gearhead|Great Fortitude|Improved Critical|Improved Initiative|Iron Will|Lightning Reflexes|Martial Artist|Nimble|Persuasive|Point Blank Shot|Far Shot|Precise Shot|Rapid Shot|Multishot|Shot on the Run|Rolling Shot|Power Attack|Cleave|Quick Draw|Run|Sharp-Eyed|Skill Emphasis|Stealthy|Toughness|Track|Trustworthy|Two-Weapon Fighting|Wealth|Weapon Finesse|Sensitive|Biofeedback Trance|Remote Viewing|Dowsing|Mind Reading|Mind Probe|Psychokinesis|Psychometry|Second Sight|Telepathy".split("|");
@@ -137,8 +138,12 @@
     return { imported: ready.map((c) => save(c, { force: true }).character), skipped };
   }
 
-  /** Convert a v1 (original sheet) character to the v2 model. */
+  /**
+   * Convert a v1 (original sheet) character to the v2 model. Returns the
+   * character with `migrationNotes` (things a player should check) in its notes.
+   */
   function fromLegacy(name, old) {
+    const review = [];
     const prof = CoC.PROFESSIONS[parseInt(old.profession, 10)] || CoC.PROFESSIONS[0];
     const c = CoC.newCharacter({
       name, player: old.playerName || "", gender: old.gender || "", age: parseInt(old.age, 10) || 30,
@@ -148,6 +153,7 @@
     c.goodSaves = ["fort", "ref", "will"].filter((k) => old.goodSaves && old.goodSaves[k]);
     for (const a of CoC.ABILITIES) c.abilities[a] = parseInt(old.abilities && old.abilities[a], 10) || 10;
     // Skills: v1 had a single Knowledge/Craft/Performance row; keep ranks under a "(general)" specialty.
+    const customCore = [];
     for (const s of old.skills || []) {
       const base = LEGACY_SKILLS[parseInt(s.index, 10)];
       if (!base) continue;
@@ -156,31 +162,79 @@
       const ranks = parseFloat(s.ranks) || 0;
       if (base === "Cthulhu Mythos") { c.mythos = ranks; continue; }
       if (ranks || parseInt(s.misc, 10)) c.skills[id] = { ranks, misc: parseInt(s.misc, 10) || 0 };
+      if (s.isCustomCore) customCore.push(id);
     }
-    c.coreSkills = CoC.templateCore(prof.name).filter((id) => !id.includes("*"));
+    // Template "any one" slots take the matching "(general)" skill, so its ranks stay core.
+    const tmpl = CoC.templateCore(prof.name);
+    const used = new Set();
+    const core = tmpl.map((t) => {
+      if (!t.includes("*")) return t;
+      const general = `${CoC.skillBase(t)} (general)`;
+      if (!c.skills[general] || t.includes("local:") || used.has(general) || tmpl.includes(general)) return t;
+      used.add(general);
+      return general;
+    });
+    if (core.some((t) => t.includes("*"))) review.push("pick the specialty for each \"any one\" template skill (Skills step)");
+    if (Object.keys(c.skills).some((id) => id.endsWith("(general)"))) review.push("Knowledge, Craft, Performance and similar ranks were merged into \"(general)\"; rename them to real specialties");
+    const extra = customCore.filter((id) => !core.includes(id)).slice(0, 3);
+    c.coreSkills = core.concat(extra);
+    if (extra.length < 3) review.push(`choose ${3 - extra.length} more core skill${extra.length === 2 ? "" : "s"} of your own (Skills step)`);
     c.feats = (old.feats || []).map((i) => LEGACY_FEATS[parseInt(i, 10)]).filter(Boolean).map((n) => ({ name: n }));
+    if (c.feats.some((f) => (CoC.FEAT_BY_NAME[f.name] || {}).choice)) review.push("choose the weapon, category or skill for feats that need one (Feats step)");
     c.hp.current = old.currentHP === "" || old.currentHP === undefined ? null : parseInt(old.currentHP, 10);
     c.sanity.current = old.currentSanity === "" || old.currentSanity === undefined ? null : parseInt(old.currentSanity, 10);
+    if (["temporary", "indefinite", "permanent"].includes(old.insanityState)) c.sanity.insanity = old.insanityState;
+    // Armor: v1 used its own presets; v2 uses Table 6-4. Keep the closest match by AC bonus.
+    const arm = old.armor || {};
+    const bonus = parseInt(arm.bonus, 10) || 0;
+    if (bonus > 0) {
+      const match = CoC.ARMOR.filter((a) => a.bonus > 0).reduce((best, a) => (Math.abs(a.bonus - bonus) < Math.abs(best.bonus - bonus) ? a : best));
+      if (match.bonus === bonus) c.armor = match.name;
+      else review.push(`armor "${arm.name || arm.preset || "armor"}" (+${bonus}) isn't in Table 6-4; pick the right armor on the Gear step`);
+    }
+    c.armorWeight = parseFloat(arm.weight) || 0;
+    if (old.shield && parseInt(old.shield.bonus, 10)) review.push(`the rulebook has no shields; "${old.shield.name || "shield"}" was not copied`);
     c.weapons = (old.weapons || []).map((w) => ({ id: CoC.uid(), name: w.name || "Weapon", category: w.type === "ranged" ? "pistol" : "melee", damage: w.damage || "", critical: w.critical || "×2", range: w.range || "", weight: parseFloat(w.weight) || 0 }));
+    if (c.weapons.some((w) => w.category === "pistol")) review.push("ranged weapons were copied as pistols; set the right category, capacity and rate of fire (Gear step)");
     c.equipment = (old.equipment || []).map((e) => ({ id: CoC.uid(), name: e.name || "", qty: parseInt(e.quantity, 10) || 1, weight: parseFloat(e.weight) || 0, notes: e.notes || "" }));
     c.money.cash = old.currentMoney ? parseFloat(old.currentMoney) : null;
     c.sessionNotes = old.sessionNotes || "";
-    c.notes = "Imported from the original sheet. Review: specialty skills were merged into \"(general)\", core-skill choices, HP rolls and starting money need re-entering.";
-    return CoC.normalize(c);
+    review.push("re-enter the hit-die roll for each level and the starting-money roll (HP & Money step)");
+    c.notes = `Copied from the original sheet. To check: ${review.join("; ")}.`;
+    // Skill points at each level use the Intelligence at that time (p.16): fix them now.
+    return CoC.lockIntMods(CoC.normalize(c), 1);
   }
 
-  /** One-time copy of characters saved by the original sheet (they are left untouched). */
-  function importLegacyOnce() {
-    if (get(LEGACY_DONE_KEY)) return [];
-    let old = {};
-    try { old = JSON.parse(get(LEGACY_KEY) || "{}"); } catch (e) { old = {}; }
+  function legacyCharacters() {
+    try { const v = JSON.parse(get(LEGACY_KEY) || "{}"); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch (e) { return {}; }
+  }
+  function copiedNames() {
+    try { const v = JSON.parse(get(LEGACY_NAMES_KEY) || "null"); if (Array.isArray(v)) return v; } catch (e) { /* fall through */ }
+    // Older versions copied everything once and only stored a timestamp.
+    return get(LEGACY_DONE_KEY) ? Object.keys(legacyCharacters()) : [];
+  }
+  /** Names of original-sheet characters in this browser, and which are not copied yet. */
+  function legacyStatus() {
+    const names = Object.keys(legacyCharacters());
+    const done = new Set(copiedNames());
+    return { names, pending: names.filter((n) => !done.has(n)) };
+  }
+  /**
+   * Copy characters saved by the original sheet (they are left untouched).
+   * By default only ones not copied before; { all: true } copies them all again.
+   */
+  function importLegacy({ all = false } = {}) {
+    const old = legacyCharacters();
+    const done = new Set(copiedNames());
     const out = [];
-    for (const [name, data] of Object.entries(old || {})) {
-      try { out.push(save(fromLegacy(name, data), { force: true }).character); } catch (e) { /* skip bad record */ }
+    for (const [name, data] of Object.entries(old)) {
+      if (!all && done.has(name)) continue;
+      try { out.push(save(fromLegacy(name, data || {}), { force: true }).character); done.add(name); } catch (e) { /* skip bad record */ }
     }
-    set(LEGACY_DONE_KEY, new Date().toISOString());
+    set(LEGACY_NAMES_KEY, JSON.stringify([...done]));
     return out;
   }
+  function importLegacyOnce() { return importLegacy(); }
 
-  return { list, load, save, remove, duplicate, exportData, importData, fromLegacy, importLegacyOnce, rememberLast, lastOpened, setPref, getPref, persistent };
+  return { list, load, save, remove, duplicate, exportData, importData, fromLegacy, importLegacy, importLegacyOnce, legacyStatus, rememberLast, lastOpened, setPref, getPref, persistent };
 });

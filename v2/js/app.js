@@ -262,6 +262,7 @@
   function renderList() {
     const items = S.list();
     const last = S.lastOpened();
+    const legacy = S.legacyStatus();
     const cards = items.map((e) => {
       const hpPct = e.hpMax > 0 ? Math.max(0, Math.min(100, (e.hp / e.hpMax) * 100)) : 0;
       const sanPct = e.sanMax > 0 ? Math.max(0, Math.min(100, (e.san / e.sanMax) * 100)) : 0;
@@ -295,6 +296,7 @@
           <button class="btn ghost" data-action="import">Import file</button>
           <button class="btn ghost" data-action="sample" title="Adds the worked example from the rulebook-check document">Add sample</button>
           ${items.length ? '<button class="btn ghost" data-action="export-all">Export all</button>' : ""}
+          ${legacy.names.length ? `<button class="btn ghost" data-action="legacy-import" title="Copy characters saved by the original sheet in this browser">Copy from original sheet${legacy.pending.length ? ` (${legacy.pending.length} new)` : ""}</button>` : ""}
         </div>
       </div>
       ${items.length ? `<div class="card-grid">${cards}</div>` : `<div class="empty"><p>No investigators yet.</p><p class="muted">Create one, or import a <code>.json</code> file exported from this or the original sheet.</p></div>`}
@@ -616,6 +618,13 @@
       case "clear-banners": state.banners = []; render(); break;
       case "import": document.getElementById("importFile").click(); break;
       case "sample": { const c = S.save(C.sampleCharacter(), { force: true }).character; toast(`Added ${esc(c.name)}.`); render(); break; }
+      case "legacy-import": {
+        const st = S.legacyStatus();
+        const copy = (all) => { const got = S.importLegacy({ all }); render(); toast(`Copied ${got.length} character${got.length === 1 ? "" : "s"} from the original sheet. Each one's Background notes list what to check.`, 7000); };
+        if (st.pending.length) copy(false);
+        else confirmDialog(`<h2>Copy again?</h2><p>All ${st.names.length} original-sheet character${st.names.length === 1 ? " has" : "s have"} been copied already. Copy ${st.names.length === 1 ? "it" : "them"} again as new entries?</p>`, "Copy again").then((ok) => ok && copy(true));
+        break;
+      }
       case "export-all": download(`investigators-${new Date().toISOString().slice(0, 10)}.json`, S.exportData()); break;
       case "export-one": { const c = S.load(el.dataset.id); if (c) download(`${(c.name || "investigator").replace(/[^\w-]+/g, "_")}.json`, S.exportData([c.id])); break; }
       case "dup": S.duplicate(el.dataset.id); render(); toast("Duplicated."); break;
@@ -836,7 +845,7 @@
   setTopbarHeight();
 
   const migrated = S.importLegacyOnce();
-  if (migrated.length) setTimeout(() => toast(`Copied ${migrated.length} character(s) from the original sheet. Review their skills and HP on the edit screen.`, 7000), 300);
+  if (migrated.length) setTimeout(() => toast(`Copied ${migrated.length} character(s) from the original sheet. Each one's Background notes list what to check.`, 7000), 300);
   if (!location.hash && S.lastOpened() && S.load(S.lastOpened())) history.replaceState(null, "", "#/");
   onRoute();
   window.App = api;

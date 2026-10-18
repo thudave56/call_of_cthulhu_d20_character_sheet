@@ -1,12 +1,12 @@
 # Investigator Sheets (v2): designs and rules check
 
-v2 is a rebuilt Call of Cthulhu d20 character sheet that sits next to the original app, so the two can be deployed side by side as an A/B comparison.
+v2 is a rebuilt Call of Cthulhu d20 character sheet. It is now the default: the site root opens v2, and the original app stays available next to it.
 
 | | Variant A (original) | Variant B (this) |
 |---|---|---|
 | Path | `/index.html` | `/v2/index.html` |
 | Code | `script.js`, `equipment_functions.js` | `v2/js/rules.js` (rules), `store.js` (saving), `app.js` (list and editor), `designs.js` (play views) |
-| Saved data | `localStorage["cocd20_characters"]` | `localStorage["cocd20v2:*"]`. On its first run, B copies A's characters once and leaves A's data untouched. |
+| Saved data | `localStorage["cocd20_characters"]` | `localStorage["cocd20v2:*"]`. B copies A's characters (any not copied before) when it opens, and leaves A's data untouched. |
 
 Open `v2/index.html` in a browser; there is no build step. Run the rules tests with `node --test v2/tests/*.test.js`.
 
@@ -14,7 +14,7 @@ Open `v2/index.html` in a browser; there is no build step. Run the rules tests w
 
 ## Switching versions
 
-Both versions have a slim **Version** bar at the top: Original sheet (v1) or New: Investigator Sheets (v2). The choice is remembered in this browser, so the main page (`/`) opens whichever version you picked last. Add `?v1` to the address to force the original. Each version keeps its own saved characters. The first time v2 opens, it copies over any characters saved in v1.
+Both versions have a slim **Version** bar at the top: Investigator Sheets (v2) or Original sheet (v1). **v2 is the default**: the main page (`/`) opens v2 unless this browser chose the original sheet. Add `?v1` to the address to force the original. Each version keeps its own saved characters. When v2 opens, it copies any v1 characters it hasn't copied yet; **Copy from original sheet** on the character list does the same on demand. Each copied character's Background notes list what to check (specialties, extra core skills, armor that isn't in Table 6-4, hit-die rolls).
 
 ## Saving characters
 
@@ -118,6 +118,12 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 | Natural 20/1 on attack rolls only | p.19, p.66 | `rollD20` (app.js) | — |
 | Play reference: DCs, ability checks, attack modifiers, cover, concealment | Tables 2-2, 2-5, 5-4, 5-5, 5-6 | `DC_EXAMPLES`, `ATTACK_MODIFIERS`, `COVER`, `CONCEALMENT` | ✓ |
 | Variant defense bonus (+ Offense bonus Weapon Proficiency; house-rule switch to grant it always) | Table 1-15, p.15 | `defenseBonus`, `offenseBonusFeat`, `featSlots` | ✓ |
+| XP thresholds: 1,000 × level × (level − 1) / 2 | Table 1-10, p.11 | `xpForLevel` | ✓ |
+| Ability score 0: Con dead, Str/Dex can't move, Int/Wis/Cha helpless | p.62 | `derive().abilityZero` | ✓ |
+| Ability damage heals 1 point per day of rest per damaged ability; drain is permanent | p.74, p.128 | Rest a day, `abilityDrain` | ✓ |
+| Conditions: blinded, cowering, deafened, entangled, exhausted, fatigued, flat-footed, grappled, helpless, nauseated, paralyzed, prone, stunned — ability, attack, initiative, speed and Dex-to-AC effects; the most severe applies | Character Condition Summary, p.91 | `CONDITIONS`, `conditionEffects`, `combat` | ✓ |
+| Spells: no magic points; cost is Sanity plus ability damage or permanent drain, paid when casting completes; save DC 15 + Int bonus; Unmastered Magic variant | p.126–128, p.151 | `parseSpellCost`, `spellSaveDC`, play actions | ✓ |
+| Tomes: initial Sanity loss; study check 1d20 + level + Int + earlier checks vs DC; completion Sanity loss and Mythos ranks; consulting a read tome | p.119–121 | `tomeStudyBonus`, play actions | ✓ |
 
 **Data provenance.** Every rule table the app uses has been checked against the rulebook page images:
 - Tables 1-8 to 1-15, the profession templates, 2-1, 2-4, 3-1, 3-2, 6-1, 6-3, 6-4 and 6-5, plus the Sanity and combat rules, are in `docs/rulebook/EXTRACTION_REVIEW.md` §2.
@@ -156,4 +162,4 @@ The source has a few inconsistencies. Each one below is resolved from the rulebo
 
 - **GitHub Pages (simplest).** Serve the repository root. Players reach A at `/` and B at `/v2/`. Both keep their own storage keys, so testers can use both in the same browser.
 - **Split by link.** Give half the table the A link and half the B link, and compare: time to build a character, errors the GM catches, and which design players keep using during a session.
-- If B wins, point `/` at `v2/` (or move `v2/` to the root) and retire A. A's saved characters are already copied into B on first launch.
+- **Done:** B won, and `/` now sends players to `v2/` unless they chose A. A's saved characters are copied into B automatically.
