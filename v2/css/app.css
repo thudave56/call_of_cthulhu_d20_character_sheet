@@ -341,11 +341,14 @@ input.spec { width: 9em; padding: .2rem .4rem; }
   .topbar { padding: .4rem 16px; }
   .brand-text { display: none; }
   .topbar { position: static; flex-wrap: nowrap; }
-  .topnav { flex-wrap: nowrap; gap: .25rem; }
+  .topnav { flex-wrap: wrap; justify-content: flex-end; gap: .25rem; min-width: 0; }  /* wraps rather than overflow with wide fonts */
   .navlink { padding: .3rem .45rem; }
   .layout-menu { padding-left: .35rem; }
   .layout-lbl { font-size: .7rem; }
   .save-state { display: none; }
+}
+@media (max-width: 440px) {
+  .layout-lbl { display: none; }
   .pocket-top { top: 0; }
   .play-header-actions .undo-lbl { display: none; }
   h1 { font-size: 1.35rem; }
