@@ -23,7 +23,7 @@ Open `v2/index.html` in a browser; there is no build step. Run the rules tests w
 
 ## The three play designs
 
-All three draw from the same calculated sheet (`CoC.derive`), so every number is identical whichever you choose. Switch with the design picker in the top bar; the choice is remembered. **Print always produces the Classic Sheet layout.**
+All three draw from the same calculated sheet (`CoC.derive`), so every number is identical whichever you choose. Choose one with the **Layout** menu at the top of every page: the character list, the editor and the play screen. The choice is saved as your layout preference (cookie `cocd20_design`, plus `localStorage`), and every character opens in that layout when you press Play. You can switch layouts in the middle of a session without losing anything. **Print always produces the Classic Sheet layout.**
 
 ### 1. Table Tracker: laptop or tablet at the table
 ![Table Tracker](docs/screens/design-1-tracker.png)

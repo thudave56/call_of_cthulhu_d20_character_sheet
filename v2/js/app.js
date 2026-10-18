@@ -159,14 +159,17 @@
 
   function renderNav() {
     const r = state.route;
-    if (r.view === "list") { $nav.innerHTML = ""; return; }
     const id = state.ch && state.ch.id;
-    const designs = D.list.map((d) => `<option value="${d.key}" ${d.key === state.design ? "selected" : ""}>${esc(d.name)}</option>`).join("");
-    $nav.innerHTML = `
+    // The layout menu is on every page; the choice is saved (cookie + localStorage)
+    // and used whenever a character is played.
+    const layouts = D.list.map((d) => `<option value="${d.key}" ${d.key === state.design ? "selected" : ""} title="${esc(d.blurb)}">${esc(d.name)}</option>`).join("");
+    const layoutMenu = `<label class="layout-menu" title="Choose how the play screen is laid out"><span class="layout-lbl">Layout</span><select data-action="design" aria-label="Layout preference">${layouts}</select></label>`;
+    const charLinks = r.view === "list" || !id ? "" : `
       <a class="navlink ${r.view === "edit" ? "active" : ""}" href="#/edit/${id}/${r.step || "basics"}">Edit</a>
-      <a class="navlink ${r.view === "play" ? "active" : ""}" href="#/play/${id}">Play</a>
-      ${r.view === "play" ? `<label class="design-pick"><span class="sr-only">Sheet design</span><select data-action="design" aria-label="Sheet design">${designs}</select></label>
-      <button class="btn small ghost" data-action="print" title="Print this sheet">Print</button>` : ""}
+      <a class="navlink ${r.view === "play" ? "active" : ""}" href="#/play/${id}">Play</a>`;
+    $nav.innerHTML = `${charLinks}
+      ${layoutMenu}
+      ${r.view === "play" ? `<button class="btn small ghost" data-action="print" title="Print this sheet (always uses the Classic Sheet layout)">Print</button>` : ""}
       <span class="save-state" id="saveState" aria-live="polite"></span>`;
   }
 
@@ -540,7 +543,13 @@
     if (!a) return;
     const i = el.dataset.i !== undefined ? +el.dataset.i : null;
     switch (a) {
-      case "design": state.design = el.value; S.setPref("design", el.value); render(); break;
+      case "design": {
+        state.design = el.value;
+        S.setPref("design", el.value);
+        render();
+        if (state.route.view !== "play") toast(`Layout set to <strong>${esc((D.list.find((d) => d.key === el.value) || {}).name || el.value)}</strong>. Characters open in this layout when you press Play.`);
+        break;
+      }
       case "profession": update((c) => { c.profession = el.value; c.coreSkills = C.templateCore(el.value); }); break;
       case "attack-option": update((c) => { c.attackOption = el.value; const need = C.goodSaveCount(el.value); c.goodSaves = c.goodSaves.slice(0, need); }); break;
       case "good-save": update((c) => {
