@@ -520,3 +520,16 @@ test("Permanent drain lowers the score, HP and saves; study bonus and spell DC",
   assert.equal(n.tomes[0].status, "unread");
   assert.equal(n.tomes[0].dc, 20);
 });
+
+test("Paralyzed: effective Str and Dex 0 (p.91), without the ability-0 damage alert", () => {
+  const c = CoC.sampleCharacter();
+  const base = CoC.derive(c);
+  c.conditions = ["paralyzed"];
+  const d = CoC.derive(c);
+  assert.equal(d.scores.Str.score, 0);
+  assert.equal(d.scores.Dex.score, 0);
+  assert.equal(d.saves.ref.total, base.saves.ref.total - base.scores.Dex.mod - 5);
+  assert.equal(d.combat.acParts.dex, -5);
+  assert.deepEqual(d.abilityZero, []);
+  assert.equal(d.scores.Con.score, base.scores.Con.score);
+});

@@ -41,6 +41,21 @@ async function main() {
   await page.waitForFunction(() => CoC.derive(App.state.ch).hp.current === 16);
   step("damage with Enter, then undo");
 
+  // Rolls in between keep Undo available, and stay in the log.
+  await page.click('.vital.hp [data-action="hp-damage"][data-n="5"]');
+  await page.click('.design-tracker [data-action="roll-init"]');
+  await page.click('[data-action="undo"]');
+  await page.waitForFunction(() => CoC.derive(App.state.ch).hp.current === 16);
+  assert.ok(await page.evaluate(() => App.state.ch.log.some((l) => l.text.startsWith("Initiative"))), "roll kept in the log");
+  // Undo never rolls back a newer edit (here: notes typed after the damage).
+  await page.click('.vital.hp [data-action="hp-damage"][data-n="1"]');
+  await page.fill('[data-live="session-notes"]', "clue: the cellar");
+  await page.click('[data-action="undo"]');
+  await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(() => App.state.ch.sessionNotes), "clue: the cellar");
+  assert.equal(await page.evaluate(() => CoC.derive(App.state.ch).hp.current), 15);
+  step("undo keeps newer edits and rolls");
+
   await page.click('.wcard [data-action="roll-attack"]');
   await page.waitForFunction(() => App.state.ch.weapons[0].ammo === 8);
   step("attack spends a round");

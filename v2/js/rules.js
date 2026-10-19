@@ -544,7 +544,7 @@
   // ---------------------------------------------------------------------------
   // Conditions — Character Condition Summary (p.91). Effects the sheet applies:
   // str/dex: effective ability penalty; attack/melee: attack-roll penalty;
-  // init: initiative; loseDex: no positive Dex bonus to AC; helpless: Dex
+  // init: initiative; zero: abilities whose effective score is 0; loseDex: no positive Dex bonus to AC; helpless: Dex
   // modifier to AC counts as −5; halfSpeed. When effects can't combine, the
   // most severe applies (p.91), so ability penalties don't stack.
   // Disabled, staggered and unconscious come from hit points, not this list.
@@ -560,7 +560,7 @@
     { key: "grappled", name: "Grappled", loseDex: true, text: "Can't move, cast, fire a ranged weapon or use more than a barehanded attack or a Tiny/Small weapon; loses Dex bonus to AC against others." },
     { key: "helpless", name: "Helpless", helpless: true, text: "Bound, asleep, paralyzed or unconscious: melee attacks against you get +4; coup de grace possible; Dex counts as 0 (−5 to AC)." },
     { key: "nauseated", name: "Nauseated", text: "Can't attack, cast or concentrate; only a single move action per turn." },
-    { key: "paralyzed", name: "Paralyzed", helpless: true, text: "Rigid and helpless; effective Str and Dex 0, but purely mental actions are possible." },
+    { key: "paralyzed", name: "Paralyzed", helpless: true, zero: ["Str", "Dex"], text: "Rigid and helpless; effective Str and Dex 0, but purely mental actions are possible." },
     { key: "prone", name: "Prone", melee: -4, text: "−4 melee attacks (firearms unaffected). Foes get +4 in melee, −4 at range. Standing is a move action." },
     { key: "stunned", name: "Stunned", loseDex: true, text: "No actions; loses Dex bonus to AC; attackers get +2; drops anything held." },
   ];
@@ -571,6 +571,7 @@
     const min = (k) => Math.min(0, ...list.map((x) => x[k] || 0));
     return {
       list, str: min("str"), dex: min("dex"), attack: min("attack"), melee: min("melee"), init: min("init"),
+      zero: [...new Set(list.flatMap((x) => x.zero || []))],
       loseDex: list.some((x) => x.loseDex || x.helpless), helpless: list.some((x) => x.helpless), halfSpeed: list.some((x) => x.halfSpeed),
     };
   }
@@ -589,7 +590,7 @@
       const permanent = Math.max(0, Math.max(1, base + ageMod + (inc[a] || 0)) - drained);
       const dmg = Math.max(0, toInt(c.abilityDamage && c.abilityDamage[a], 0));
       const condition = a === "Str" ? cond.str : a === "Dex" ? cond.dex : 0;
-      const score = Math.max(0, permanent - dmg + condition);
+      const score = cond.zero.includes(a) ? 0 : Math.max(0, permanent - dmg + condition);
       out[a] = { base, ageMod, increases: inc[a] || 0, drained, permanent, damage: dmg, condition, score, mod: abilityMod(score) };
     }
     return out;
@@ -1164,7 +1165,7 @@
       money: money(c), aging: agingCategory(c.age), gearWeight: gearWeight(c),
       weapons: (c.weapons || []).map((w) => Object.assign({ weapon: w }, weaponAttack(c, w))),
       unarmed: Object.assign({ weapon: UNARMED }, weaponAttack(c, UNARMED)),
-      abilityZero: ABILITIES.filter((a) => scores[a].score === 0).map((a) => ({ ability: a, text: ABILITY_ZERO[a], dead: a === "Con" })),
+      abilityZero: ABILITIES.filter((a) => scores[a].permanent - scores[a].damage <= 0).map((a) => ({ ability: a, text: ABILITY_ZERO[a], dead: a === "Con" })),
       xp: { current: toInt(c.xp, 0), level: xpForLevel(c.level), next: c.level >= 20 ? null : xpForLevel(toInt(c.level, 1) + 1) },
       profession: PROFESSION_BY_NAME[c.profession] || null,
     };

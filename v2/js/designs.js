@@ -567,7 +567,7 @@
         const r = C.rollDiceExpr(expr);
         if (!r) { api.toast("Type dice like 3d6+2, 1d20+1d4 or d%."); break; }
         api.toast(`<strong>${api.esc(expr)}</strong><br><span class="roll-big">${r.total}</span> <span class="muted">${api.esc(r.detail)}</span>`);
-        api.update((c) => api.pushLog(c, `Rolled ${expr}: ${r.total} (${r.detail})`));
+        api.update((c) => api.pushLog(c, `Rolled ${expr}: ${r.total} (${r.detail})`), { logOnly: true });
         break;
       }
       case "spell-cast": {
@@ -683,7 +683,7 @@
         const r = rollWeaponDamage(w, crit ? w.multiplier : 1, api);
         if (!r) { api.toast(`Roll ${api.esc(w.weapon.damage)} by hand.`); break; }
         api.toast(`<strong>${api.esc(w.weapon.name)} ${crit ? `critical damage (×${w.multiplier})` : "damage"}</strong><br><span class="roll-big">${r.total}</span> <span class="muted">${r.detail}</span>`);
-        api.update((c) => api.pushLog(c, `${w.weapon.name} ${crit ? "critical " : ""}damage: ${r.total}`));
+        api.update((c) => api.pushLog(c, `${w.weapon.name} ${crit ? "critical " : ""}damage: ${r.total}`), { logOnly: true });
         break;
       }
       case "ammo": api.update((c) => {
@@ -777,7 +777,7 @@
         const r = C.rollDie(100);
         const ok = r <= d.sanity.current;
         api.toast(`<strong>Sanity check</strong><br><span class="roll-big">${r}</span> vs ${d.sanity.current} — <strong class="${ok ? "ok" : "bad"}">${ok ? "success (lose the smaller amount)" : "failure (lose the larger amount)"}</strong>`, 6000);
-        api.update((c) => api.pushLog(c, `Sanity check: ${r} vs ${d.sanity.current} — ${ok ? "success" : "failure"}`));
+        api.update((c) => api.pushLog(c, `Sanity check: ${r} vs ${d.sanity.current} — ${ok ? "success" : "failure"}`), { logOnly: true });
         break;
       }
       case "san-hour": api.update(() => { const c = C.newSanityHour(ch); api.pushLog(c, "New game hour (20% tracker reset)"); return c; }, { undo: "New hour" }); api.toast("New game hour — the 20% indefinite-insanity tracker starts again."); break;

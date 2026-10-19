@@ -80,23 +80,29 @@
   }
   /**
    * Mutate the current character, re-normalise, save and re-render. Pass
-   * `undo: "label"` to let the player take this change back with Undo.
+   * `undo: "label"` to let the player take this change back with Undo. Any other
+   * change clears Undo (so it can never roll back a newer edit), except log-only
+   * updates such as rolls, which pass `logOnly: true`.
    */
-  function update(fn, { render: doRender = true, undo = null } = {}) {
+  function update(fn, { render: doRender = true, undo = null, logOnly = false } = {}) {
     const before = state.ch;
     const next = C.clone(state.ch);
     const result = fn(next);
     state.ch = C.normalize(result || next);
     if (undo) state.undo = { ch: before, label: undo };
+    else if (!logOnly) state.undo = null;
     state.dirty = true;
     persist();
     if (doRender) render();
   }
   function undoLast() {
     const u = state.undo;
-    if (!u || !state.ch || u.ch.id !== state.ch.id) return;
+    if (!u || !state.ch || u.ch.id !== state.ch.id) { state.undo = null; render(); toast("Nothing to undo: there's been a newer change."); return; }
     const restored = C.clone(u.ch);
     restored.rev = state.ch.rev;   // a newer save of our own, not a conflict
+    // Rolls made since stay in the log; only the labelled change is taken back.
+    restored.log = state.ch.log;
+    pushLog(restored, `Undid: ${u.label}`);
     state.ch = restored;
     state.undo = null;
     state.dirty = true;
@@ -120,7 +126,7 @@
       else if (r >= threat) { tag = ` <span class="nat nat20">${r === 20 ? "natural 20 — hits; " : ""}critical threat: roll again to confirm</span>`; note = ` — ${r === 20 ? "nat 20, hit, " : ""}threat`; }
     }
     toast(`<strong>${esc(label)}</strong><br><span class="roll-big">${total}</span> <span class="muted">(d20 ${r} ${fmt(mod)})</span>${tag}`);
-    update((ch) => { pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${note}`); if (opts.spend) opts.spend(ch); }, { render: state.route.view === "play", undo: opts.spend ? label : null });
+    update((ch) => { pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${note}`); if (opts.spend) opts.spend(ch); }, { render: state.route.view === "play", undo: opts.spend ? label : null, logOnly: !opts.spend });
     return total;
   }
   function rollDice(expr) {
