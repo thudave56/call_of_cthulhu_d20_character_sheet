@@ -41,9 +41,54 @@ async function main() {
   await page.waitForFunction(() => CoC.derive(App.state.ch).hp.current === 16);
   step("damage with Enter, then undo");
 
+  // Rolls in between keep Undo available, and stay in the log.
+  await page.click('.vital.hp [data-action="hp-damage"][data-n="5"]');
+  await page.click('.design-tracker [data-action="roll-init"]');
+  await page.click('[data-action="undo"]');
+  await page.waitForFunction(() => CoC.derive(App.state.ch).hp.current === 16);
+  assert.ok(await page.evaluate(() => App.state.ch.log.some((l) => l.text.startsWith("Initiative"))), "roll kept in the log");
+  // Undo never rolls back a newer edit (here: notes typed after the damage).
+  await page.click('.vital.hp [data-action="hp-damage"][data-n="1"]');
+  await page.fill('[data-live="session-notes"]', "clue: the cellar");
+  await page.click('[data-action="undo"]');
+  await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(() => App.state.ch.sessionNotes), "clue: the cellar");
+  assert.equal(await page.evaluate(() => CoC.derive(App.state.ch).hp.current), 15);
+  // Undoing "Clear log" brings the entries back, and a roll made since stays.
+  const before = await page.evaluate(() => App.state.ch.log.length);
+  await page.click('[data-action="clear-log"]');
+  await page.click('.design-tracker [data-action="roll-init"]');
+  await page.click('[data-action="undo"]');
+  await page.waitForFunction((n) => App.state.ch.log.length >= n + 2, before);
+  step("undo keeps newer edits and rolls");
+
   await page.click('.wcard [data-action="roll-attack"]');
   await page.waitForFunction(() => App.state.ch.weapons[0].ammo === 8);
   step("attack spends a round");
+
+  // Equipment & money: add, quantity, spend; weapons can be put away and equipped again.
+  await page.fill("#gearNew", "Lantern");
+  await page.press("#gearNew", "Enter");
+  await page.waitForFunction(() => App.state.ch.equipment.some((e) => e.name === "Lantern"));
+  const lantern = await page.evaluate(() => App.state.ch.equipment.findIndex((e) => e.name === "Lantern"));
+  await page.click(`[data-action="gear-qty"][data-i="${lantern}"][data-v="1"]`);
+  await page.waitForFunction((i) => App.state.ch.equipment[i].qty === 2, lantern);
+  const cash0 = await page.evaluate(() => Number(document.querySelector('[data-live="cash"]').value));
+  await page.fill("#cashAmt", "12.50");
+  await page.press("#cashAmt", "Enter");
+  await page.waitForFunction((c0) => Math.abs(App.state.ch.money.cash - (c0 - 12.5)) < 0.001, cash0);
+  await page.click('[data-action="weapon-equip"][data-i="0"]');
+  await page.waitForFunction(() => App.state.ch.weapons[0].equipped === false && !document.querySelector('.wcard [data-action="roll-attack"][data-i="0"]'));
+  await page.click('[data-action="weapon-equip"][data-i="0"]');
+  await page.waitForSelector('.wcard [data-action="roll-attack"][data-i="0"]');
+  // Renaming an item, then pressing a button next to it at human speed, must not lose the click.
+  await page.fill('input[data-action="gear-name"][data-i="0"]', "Big flashlight");
+  const plus = await page.locator('[data-action="gear-qty"][data-i="1"][data-v="1"]').boundingBox();
+  const qty1 = await page.evaluate(() => App.state.ch.equipment[1].qty);
+  await page.mouse.move(plus.x + plus.width / 2, plus.y + plus.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(80); await page.mouse.up();
+  await page.waitForFunction((q) => App.state.ch.equipment[1].qty === q + 1 && App.state.ch.equipment[0].name === "Big flashlight", qty1);
+  step("equipment, money and equipping weapons");
 
   await page.reload();
   await page.waitForSelector(".design-tracker");

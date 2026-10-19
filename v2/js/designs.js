@@ -245,12 +245,14 @@
 
   function weaponsBlock(ch, d, x, opts = {}) {
     const { esc, fmt } = x;
-    const pbs = C.hasFeat(ch, "Point Blank Shot") ? `<p class="hint">Point Blank Shot: +1 attack and damage with ranged weapons within 30 ft (not included).</p>` : "";
+    const stowed = d.weapons.filter((w) => !w.weapon.equipped).length;
+    const pbs = (C.hasFeat(ch, "Point Blank Shot") ? `<p class="hint">Point Blank Shot: +1 attack and damage with ranged weapons within 30 ft (not included).</p>` : "")
+      + (stowed ? `<p class="hint no-print">${stowed} weapon${stowed > 1 ? "s" : ""} carried but not equipped — equip ${stowed > 1 ? "them" : "it"} under Equipment &amp; Money.</p>` : "");
     if (opts.cards) {
-      const cards = d.weapons.map((w, i) => weaponCard(ch, w, i, x)).join("") + weaponCard(ch, d.unarmed, "u", x);
+      const cards = d.weapons.map((w, i) => (w.weapon.equipped ? weaponCard(ch, w, i, x) : "")).join("") + weaponCard(ch, d.unarmed, "u", x);
       return `<section class="panel weapons" aria-label="Weapons"><h2>Weapons</h2><div class="wcards">${cards}</div>${pbs}</section>`;
     }
-    const all = d.weapons.map((w, i) => [w, i]).concat([[d.unarmed, "u"]]);
+    const all = d.weapons.map((w, i) => [w, i]).filter(([w]) => w.weapon.equipped).concat([[d.unarmed, "u"]]);
     const rows = all.map(([w, i]) => {
       const wp = w.weapon;
       const prof = C.isProficient(ch, wp);
@@ -264,7 +266,7 @@
         <td>${ammo}</td>
       </tr>`;
     }).join("");
-    const fa = d.weapons.map((w, i) => [w, i]).filter(([w]) => w.fullAttack && w.fullAttack.normal).map(([w, i]) => {
+    const fa = d.weapons.map((w, i) => [w, i]).filter(([w]) => w.weapon.equipped && w.fullAttack && w.fullAttack.normal).map(([w, i]) => {
       const f = w.fullAttack.normal, rp = w.fullAttack.rapid;
       return `<li><strong>${esc(w.weapon.name)}</strong> — <button class="roll-link" data-action="fire-full" data-i="${i}" data-mode="normal">full attack (${f.mode}): ${f.sequence.map(fmt).join("/")}</button>${rp ? `; <button class="roll-link" data-action="fire-full" data-i="${i}" data-mode="rapid">with Rapid Shot: ${rp.sequence.map(fmt).join("/")}</button>` : ""}${f.bulletsPerAttack > 1 ? " · 3 rounds per attack" : ""}</li>`;
     }).join("");
@@ -308,16 +310,37 @@
     }).join("")}</ul></section>`;
   }
 
+  /** Equipment and money, editable in play: add, rename, −/+ quantity, remove; spend or receive cash. */
   function gearBlock(ch, d, x) {
     const { esc } = x;
     const m = d.money;
-    return `<section class="panel gear" aria-label="Equipment"><h2>Equipment & Money</h2>
-      ${ch.equipment.length ? `<ul class="gear-list">${ch.equipment.map((e) => `<li>${esc(e.name)}${e.qty > 1 ? ` ×${e.qty}` : ""}${e.notes ? ` <span class="muted">— ${esc(e.notes)}</span>` : ""}</li>`).join("")}</ul>` : '<p class="muted">No equipment listed.</p>'}
+    const cash = cashOnHand(ch, d);
+    const items = ch.equipment.map((e, i) => `<li class="gear-item">
+        <input class="gear-name no-print" data-action="gear-name" data-i="${i}" value="${esc(e.name)}" aria-label="Item name" />
+        <span class="print-only">${esc(e.name)}${e.qty > 1 ? ` ×${e.qty}` : ""}</span>
+        <span class="gear-qty no-print"><button class="mini-btn" data-action="gear-qty" data-i="${i}" data-v="-1" ${e.qty <= 1 ? "disabled" : ""} aria-label="One fewer ${esc(e.name)}">−</button><span aria-label="Quantity">${e.qty}</span><button class="mini-btn" data-action="gear-qty" data-i="${i}" data-v="1" aria-label="One more ${esc(e.name)}">+</button></span>
+        <button class="mini-btn no-print" data-action="gear-remove" data-i="${i}" aria-label="Remove ${esc(e.name)}">✕</button>
+        ${e.notes ? `<span class="muted small gear-notes">${esc(e.notes)}</span>` : ""}</li>`).join("");
+    const weapons = ch.weapons.map((w, i) => `<li class="gear-item weapon-item ${w.equipped ? "is-equipped" : ""}">
+        <span class="gear-wname">${esc(w.name)} <span class="muted small">${esc([w.damage, w.capacity ? `${w.ammo ?? w.capacity}/${w.capacity} rds` : ""].filter(Boolean).join(" · "))}</span></span>
+        <span class="print-only">${w.equipped ? "(equipped)" : ""}</span>
+        <button class="btn small ${w.equipped ? "primary" : "ghost"} no-print equip-btn" data-action="weapon-equip" data-i="${i}" aria-pressed="${w.equipped}" title="${w.equipped ? "Equipped: shown in the attack list. Tap to put it away." : "Carried but not ready. Tap to equip it."}">${w.equipped ? "Equipped" : "Equip"}</button></li>`).join("");
+    return `<section class="panel gear" aria-label="Equipment and money"><h2>Equipment & Money</h2>
+      <h3 class="sub-h">Weapons</h3>
+      ${weapons ? `<ul class="gear-list editable">${weapons}</ul>` : '<p class="muted small">No weapons. Add them on the Gear step of Edit.</p>'}
+      <h3 class="sub-h">Equipment</h3>
+      ${items ? `<ul class="gear-list editable">${items}</ul>` : '<p class="muted">No equipment listed.</p>'}
+      <div class="gear-add no-print"><label class="sr-only" for="gearNew">New item</label><input id="gearNew" placeholder="Add an item…" autocomplete="off" data-enter="gear-add" /><button class="btn small" data-action="gear-add">Add</button></div>
       <div class="money-row">
-        <label class="field inline"><span class="lbl">Cash $</span><input type="number" step="0.01" data-live="cash" value="${esc(ch.money.cash ?? (m.rolled ? m.startingTotal : ""))}" aria-label="Cash on hand" /></label>
+        <label class="field inline"><span class="lbl">Cash $</span><input type="number" step="0.01" data-live="cash" value="${esc(cash ?? "")}" aria-label="Cash on hand" /></label>
         ${m.rolled ? `<span class="muted">Savings $${m.savings.toLocaleString()} · income $${m.income.toLocaleString()}/yr</span>` : ""}
-      </div></section>`;
+      </div>
+      <div class="cash-row no-print"><label class="sr-only" for="cashAmt">Amount ($)</label><input id="cashAmt" class="cash-amt" type="number" min="0" step="0.01" inputmode="decimal" placeholder="$0.00" data-enter="cash-spend" />
+        <button class="btn small danger" data-action="cash-spend">Spend</button><button class="btn small ok" data-action="cash-receive">Receive</button></div>
+    </section>`;
   }
+  /** Cash on hand: the amount entered, or the starting money (Tables 1-13, 1-14) until one is entered. */
+  function cashOnHand(ch, d) { return ch.money.cash ?? (d.money.rolled ? d.money.startingTotal : null); }
 
   function notesBlock(ch, d, x) {
     return `<section class="panel notes" aria-label="Session notes"><h2>Session notes</h2>
@@ -567,7 +590,7 @@
         const r = C.rollDiceExpr(expr);
         if (!r) { api.toast("Type dice like 3d6+2, 1d20+1d4 or d%."); break; }
         api.toast(`<strong>${api.esc(expr)}</strong><br><span class="roll-big">${r.total}</span> <span class="muted">${api.esc(r.detail)}</span>`);
-        api.update((c) => api.pushLog(c, `Rolled ${expr}: ${r.total} (${r.detail})`));
+        api.update((c) => api.pushLog(c, `Rolled ${expr}: ${r.total} (${r.detail})`), { logOnly: true });
         break;
       }
       case "spell-cast": {
@@ -637,6 +660,42 @@
         api.rollD20((row ? row.total : C.toInt(ch.mythos)) + t.mythos, `Cthulhu Mythos (consulting ${t.name}, 1d4 hours)`);
         break;
       }
+      case "weapon-equip": {
+        const w = ch.weapons[i];
+        api.update((c) => { c.weapons[i].equipped = !w.equipped; api.pushLog(c, `${w.equipped ? "Put away" : "Equipped"} ${w.name}`); }, { undo: `${w.equipped ? "Put away" : "Equip"} ${w.name}` });
+        break;
+      }
+      case "gear-add": {
+        const input = document.getElementById("gearNew");
+        const name = input ? input.value.trim() : "";
+        if (!name) { api.toast("Type the item's name first."); break; }
+        api.update((c) => { c.equipment.push({ id: C.uid(), name, qty: 1, weight: 0, notes: "" }); api.pushLog(c, `Added ${name}`); }, { undo: `Add ${name}` });
+        const again = document.getElementById("gearNew");
+        if (again) { again.value = ""; again.focus(); }
+        break;
+      }
+      case "gear-qty": api.update((c) => {
+        const e = c.equipment[i];
+        e.qty = Math.max(1, C.toInt(e.qty, 1) + C.toInt(el.dataset.v));
+        api.pushLog(c, `${e.name}: ×${e.qty}`);
+      }, { undo: `${ch.equipment[i].name} quantity` }); break;
+      case "gear-remove": {
+        const name = ch.equipment[i].name || "item";
+        api.update((c) => { c.equipment.splice(i, 1); api.pushLog(c, `Removed ${name}`); }, { undo: `Remove ${name}` });
+        api.toast(`Removed ${api.esc(name)}. Use Undo to bring it back.`);
+        break;
+      }
+      case "cash-spend": case "cash-receive": {
+        const input = document.getElementById("cashAmt");
+        const n = input ? Math.round(parseFloat(input.value) * 100) / 100 : NaN;
+        if (!(n > 0)) { api.toast("Enter an amount first."); break; }
+        const before = cashOnHand(ch, d) || 0;
+        const after = Math.round((before + (a === "cash-spend" ? -n : n)) * 100) / 100;
+        const label = `${a === "cash-spend" ? "Spent" : "Received"} $${n.toFixed(2)}`;
+        api.update((c) => { c.money.cash = after; api.pushLog(c, `${label} ($${before.toFixed(2)} → $${after.toFixed(2)})`); }, { undo: label });
+        if (after < 0) api.toast(`Cash is now <strong>−$${Math.abs(after).toFixed(2)}</strong>.`);
+        break;
+      }
       case "pocket-tab": api.state.pocketTab = el.dataset.k; api.render(); window.scrollTo(0, 0); break;
       case "skill-mode": api.state.skillMode = el.dataset.k; api.render(); break;
       case "alert-dismiss": api.update((c) => { c.alerts.splice(i, 1); }); break;
@@ -683,7 +742,7 @@
         const r = rollWeaponDamage(w, crit ? w.multiplier : 1, api);
         if (!r) { api.toast(`Roll ${api.esc(w.weapon.damage)} by hand.`); break; }
         api.toast(`<strong>${api.esc(w.weapon.name)} ${crit ? `critical damage (×${w.multiplier})` : "damage"}</strong><br><span class="roll-big">${r.total}</span> <span class="muted">${r.detail}</span>`);
-        api.update((c) => api.pushLog(c, `${w.weapon.name} ${crit ? "critical " : ""}damage: ${r.total}`));
+        api.update((c) => api.pushLog(c, `${w.weapon.name} ${crit ? "critical " : ""}damage: ${r.total}`), { logOnly: true });
         break;
       }
       case "ammo": api.update((c) => {
@@ -777,7 +836,7 @@
         const r = C.rollDie(100);
         const ok = r <= d.sanity.current;
         api.toast(`<strong>Sanity check</strong><br><span class="roll-big">${r}</span> vs ${d.sanity.current} — <strong class="${ok ? "ok" : "bad"}">${ok ? "success (lose the smaller amount)" : "failure (lose the larger amount)"}</strong>`, 6000);
-        api.update((c) => api.pushLog(c, `Sanity check: ${r} vs ${d.sanity.current} — ${ok ? "success" : "failure"}`));
+        api.update((c) => api.pushLog(c, `Sanity check: ${r} vs ${d.sanity.current} — ${ok ? "success" : "failure"}`), { logOnly: true });
         break;
       }
       case "san-hour": api.update(() => { const c = C.newSanityHour(ch); api.pushLog(c, "New game hour (20% tracker reset)"); return c; }, { undo: "New hour" }); api.toast("New game hour — the 20% indefinite-insanity tracker starts again."); break;
@@ -791,6 +850,13 @@
   }
 
   function handleChange(a, el, api) {
+    if (a === "gear-name") {
+      const i = +el.dataset.i;
+      const name = el.value.trim();
+      if (!name) { api.render(); return; }   // an item needs a name; put the old one back
+      api.update((c) => { c.equipment[i].name = name; }, { undo: "Rename item" });
+      return;
+    }
     if (a === "insanity") api.update((c) => { c.sanity.insanity = el.value; api.pushLog(c, `Insanity state: ${el.value}`); }, { undo: "Insanity state" });
   }
 

@@ -418,3 +418,20 @@ input.spec { width: 9em; padding: .2rem .4rem; }
 .spell-list .btn { justify-self: start; margin-top: .2rem; }
 .spell-head { display: flex; flex-wrap: wrap; gap: .35rem; align-items: baseline; }
 @media print { .magic .hint { display: none; } }
+
+/* Equipment & money, editable in play */
+.gear-list.editable { columns: auto; list-style: none; padding: 0; display: grid; gap: .3rem; }
+.gear-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .35rem; align-items: center; }
+.gear-item .gear-notes { grid-column: 1 / -1; margin-top: -.15rem; }
+.gear-name { width: 100%; min-width: 0; padding: .3rem .45rem; }
+.gear-qty { display: inline-flex; align-items: center; gap: .3rem; font-variant-numeric: tabular-nums; }
+.gear-qty span { min-width: 1.6em; text-align: center; font-weight: 700; }
+.gear-add, .cash-row { display: flex; gap: .4rem; margin: .5rem 0; }
+.gear-add input { flex: 1; min-width: 0; }
+.cash-row .cash-amt { width: 7em; }
+.mini-btn:disabled { opacity: .4; cursor: default; }
+.design-pocket .gear-item .mini-btn { min-width: var(--tap); min-height: var(--tap); }
+@media print { .gear-list.editable { display: block; columns: 2 200px; } .gear-item { display: list-item; list-style: disc; margin-left: 1.1rem; } }
+.weapon-item { grid-template-columns: minmax(0, 1fr) auto; }
+.weapon-item .gear-wname { min-width: 0; }
+.equip-btn { min-width: 6.5em; }

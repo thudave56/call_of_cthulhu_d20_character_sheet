@@ -80,23 +80,32 @@
   }
   /**
    * Mutate the current character, re-normalise, save and re-render. Pass
-   * `undo: "label"` to let the player take this change back with Undo.
+   * `undo: "label"` to let the player take this change back with Undo. Any other
+   * change clears Undo (so it can never roll back a newer edit), except log-only
+   * updates such as rolls, which pass `logOnly: true`.
    */
-  function update(fn, { render: doRender = true, undo = null } = {}) {
+  function update(fn, { render: doRender = true, undo = null, logOnly = false } = {}) {
     const before = state.ch;
     const next = C.clone(state.ch);
     const result = fn(next);
     state.ch = C.normalize(result || next);
     if (undo) state.undo = { ch: before, label: undo };
+    else if (!logOnly) state.undo = null;
     state.dirty = true;
     persist();
     if (doRender) render();
   }
   function undoLast() {
     const u = state.undo;
-    if (!u || !state.ch || u.ch.id !== state.ch.id) return;
+    if (!u || !state.ch || u.ch.id !== state.ch.id) { state.undo = null; render(); toast("Nothing to undo: there's been a newer change."); return; }
     const restored = C.clone(u.ch);
     restored.rev = state.ch.rev;   // a newer save of our own, not a conflict
+    // The log is history: keep the entries from before the change (so undoing
+    // "Clear log" brings them back) plus everything added since, rolls included.
+    const known = new Set((u.ch.log || []).map((l) => l.t + "|" + l.text));
+    const added = (state.ch.log || []).filter((l) => !known.has(l.t + "|" + l.text));
+    restored.log = added.concat(u.ch.log || []).slice(0, 60);
+    pushLog(restored, `Undid: ${u.label}`);
     state.ch = restored;
     state.undo = null;
     state.dirty = true;
@@ -120,7 +129,7 @@
       else if (r >= threat) { tag = ` <span class="nat nat20">${r === 20 ? "natural 20 — hits; " : ""}critical threat: roll again to confirm</span>`; note = ` — ${r === 20 ? "nat 20, hit, " : ""}threat`; }
     }
     toast(`<strong>${esc(label)}</strong><br><span class="roll-big">${total}</span> <span class="muted">(d20 ${r} ${fmt(mod)})</span>${tag}`);
-    update((ch) => { pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${note}`); if (opts.spend) opts.spend(ch); }, { render: state.route.view === "play", undo: opts.spend ? label : null });
+    update((ch) => { pushLog(ch, `${label}: ${total} (d20 ${r} ${fmt(mod)})${note}`); if (opts.spend) opts.spend(ch); }, { render: state.route.view === "play", undo: opts.spend ? label : null, logOnly: !opts.spend });
     return total;
   }
   function rollDice(expr) {
@@ -209,11 +218,24 @@
    * Render now, or — while a change event is being handled — just after it, so
    * a Tab press has already moved focus to the next field and we can keep it there.
    */
-  let deferRender = false, renderQueued = false;
+  let deferRender = false, renderQueued = false, pointerHeld = false;
   function render() {
-    if (deferRender) { if (!renderQueued) { renderQueued = true; setTimeout(() => { renderQueued = false; renderNow(); }, 0); } return; }
+    if (deferRender || pointerHeld) { if (!renderQueued) { renderQueued = true; setTimeout(flushRender, 0); } return; }
     renderNow();
   }
+  // A redraw while a mouse button or finger is down would replace the element
+  // being pressed, and the browser would then drop the click (e.g. editing an
+  // item's name and pressing "+" next to it). Wait until it is released.
+  function flushRender() {
+    if (pointerHeld) return;            // pointerup flushes it
+    renderQueued = false;
+    renderNow();
+  }
+  const releasePointer = () => { pointerHeld = false; if (renderQueued) setTimeout(flushRender, 0); };  // runs after the click
+  document.addEventListener("pointerdown", () => { pointerHeld = true; }, true);
+  document.addEventListener("pointerup", releasePointer, true);
+  document.addEventListener("pointercancel", releasePointer, true);
+  window.addEventListener("blur", releasePointer);
   function renderNow() {
     const active = document.activeElement;
     const sel = focusSelector(active);
@@ -527,6 +549,7 @@
       <td><input type="number" min="0" step="0.5" data-action="weapon" data-i="${i}" data-k="weight" value="${esc(w.weapon.weight ?? "")}" style="width:4em" aria-label="Weight (lb)" /></td>
       <td>${w.ranged ? "" : `<label class="check"><input type="checkbox" data-action="weapon-check" data-i="${i}" data-k="twoHanded" ${w.weapon.twoHanded ? "checked" : ""}/> 2H</label>`}
           ${!w.ranged && w.weapon.category === "melee" ? `<select data-action="weapon" data-i="${i}" data-k="finesseAs" aria-label="Weapon Finesse group"><option value="">no finesse</option>${C.FINESSE_WEAPONS.map((f) => `<option ${w.weapon.finesseAs === f ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>` : ""}</td>
+      <td><label class="check"><input type="checkbox" data-action="weapon-check" data-i="${i}" data-k="equipped" ${w.weapon.equipped ? "checked" : ""}/> Equipped</label></td>
       <td class="num strong">${fmt(w.bonus)}${C.isProficient(ch, w.weapon) ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
       <td><button class="btn small ghost" data-action="weapon-remove" data-i="${i}" aria-label="Remove weapon">✕</button></td></tr>`).join("");
     const items = ch.equipment.map((e, i) => `<tr><td><input data-action="item" data-i="${i}" data-k="name" value="${esc(e.name)}" aria-label="Item" /></td><td><input type="number" min="0" data-action="item" data-i="${i}" data-k="qty" value="${esc(e.qty ?? 1)}" style="width:4em" aria-label="Quantity" /></td><td><input type="number" min="0" step="0.5" data-action="item" data-i="${i}" data-k="weight" value="${esc(e.weight ?? "")}" style="width:4em" aria-label="Weight each (lb)" /></td><td><input data-action="item" data-i="${i}" data-k="notes" value="${esc(e.notes || "")}" aria-label="Notes" /></td><td><button class="btn small ghost" data-action="item-remove" data-i="${i}" aria-label="Remove item">✕</button></td></tr>`).join("");
@@ -536,7 +559,7 @@
       <p class="hint">Gear carried or worn: <strong>${d.gearWeight} lb</strong>. The rulebook has no carrying-capacity table for investigators; the only weight rule is Swim: −1 per 5 lb of gear (p.37), applied automatically (${Math.floor(d.gearWeight / 5) ? "−" + Math.floor(d.gearWeight / 5) : "no penalty"}).</p>
       <h3>Weapons</h3>
       <div class="row"><select id="weaponPreset" aria-label="Weapon preset">${[["Melee (Table 6-1)", (w) => w.category === "melee" || w.category === "unarmed"], ["Generic firearms (Table 6-3)", (w) => w.category !== "melee" && w.category !== "unarmed" && !w.source], ["Specific firearms (Table 6-5)", (w) => w.source === "Table 6-5"]].map(([label, f]) => `<optgroup label="${label}">${C.WEAPON_PRESETS.map((w, i) => [w, i]).filter(([w]) => f(w)).map(([w, i]) => `<option value="${i}">${esc(w.name)} (${esc(w.damage)})</option>`).join("")}</optgroup>`).join("")}</select><button class="btn small" data-action="weapon-add">Add weapon</button><button class="btn small ghost" data-action="weapon-add-custom">Add custom</button></div>
-      ${weapons ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Name</th><th>Category</th><th>Damage</th><th>Crit</th><th>Range</th><th>Cap.</th><th>lb</th><th></th><th>Attack</th><th></th></tr></thead><tbody>${weapons}</tbody></table></div>` : '<p class="muted">No weapons.</p>'}
+      ${weapons ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Name</th><th>Category</th><th>Damage</th><th>Crit</th><th>Range</th><th>Cap.</th><th>lb</th><th></th><th>Ready</th><th>Attack</th><th></th></tr></thead><tbody>${weapons}</tbody></table></div>` : '<p class="muted">No weapons.</p>'}
       <h3>Equipment</h3>
       <div class="row"><input id="itemName" placeholder="Flashlight, notebook, camera…" aria-label="New item" /><button class="btn small" data-action="item-add">Add item</button></div>
       ${items ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Item</th><th>Qty</th><th>lb each</th><th>Notes</th><th></th></tr></thead><tbody>${items}</tbody></table></div>` : ""}`;
