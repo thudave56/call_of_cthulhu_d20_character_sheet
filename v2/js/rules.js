@@ -1088,6 +1088,7 @@
       range: str(w.range, 30), rof: str(w.rof, 30), notes: str(w.notes, 300), finesseAs: FINESSE_WEAPONS.includes(w.finesseAs) ? w.finesseAs : "",
       twoHanded: !!w.twoHanded, capacity: numOrNull(w.capacity) === null ? null : Math.max(0, toInt(w.capacity)),
       ammo: numOrNull(w.ammo) === null ? null : Math.max(0, toInt(w.ammo)), weight: Math.max(0, toNum(w.weight, 0)),
+      equipped: w.equipped !== false,   // ready to use; unequipped weapons are carried but not in the attack list
     }));
     for (const w of c.weapons) if (w.capacity !== null && w.ammo !== null && w.ammo > w.capacity) w.ammo = w.capacity;
     c.equipment = arr(c.equipment).filter(isObj).map((e) => ({

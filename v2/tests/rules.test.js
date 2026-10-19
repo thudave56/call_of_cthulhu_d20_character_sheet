@@ -533,3 +533,9 @@ test("Paralyzed: effective Str and Dex 0 (p.91), without the ability-0 damage al
   assert.deepEqual(d.abilityZero, []);
   assert.equal(d.scores.Con.score, base.scores.Con.score);
 });
+
+test("Weapons are equipped unless marked otherwise (old saves keep theirs ready)", () => {
+  const c = CoC.normalize({ weapons: [{ name: "Old pistol", category: "pistol" }, { name: "Stowed rifle", category: "rifle", equipped: false }] });
+  assert.deepEqual(c.weapons.map((w) => w.equipped), [true, false]);
+  assert.equal(CoC.derive(c).weapons.length, 2);   // both still carried (weight, feats)
+});

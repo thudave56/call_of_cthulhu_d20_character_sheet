@@ -60,6 +60,23 @@ async function main() {
   await page.waitForFunction(() => App.state.ch.weapons[0].ammo === 8);
   step("attack spends a round");
 
+  // Equipment & money: add, quantity, spend; weapons can be put away and equipped again.
+  await page.fill("#gearNew", "Lantern");
+  await page.press("#gearNew", "Enter");
+  await page.waitForFunction(() => App.state.ch.equipment.some((e) => e.name === "Lantern"));
+  const lantern = await page.evaluate(() => App.state.ch.equipment.findIndex((e) => e.name === "Lantern"));
+  await page.click(`[data-action="gear-qty"][data-i="${lantern}"][data-v="1"]`);
+  await page.waitForFunction((i) => App.state.ch.equipment[i].qty === 2, lantern);
+  const cash0 = await page.evaluate(() => Number(document.querySelector('[data-live="cash"]').value));
+  await page.fill("#cashAmt", "12.50");
+  await page.press("#cashAmt", "Enter");
+  await page.waitForFunction((c0) => Math.abs(App.state.ch.money.cash - (c0 - 12.5)) < 0.001, cash0);
+  await page.click('[data-action="weapon-equip"][data-i="0"]');
+  await page.waitForFunction(() => App.state.ch.weapons[0].equipped === false && !document.querySelector('.wcard [data-action="roll-attack"][data-i="0"]'));
+  await page.click('[data-action="weapon-equip"][data-i="0"]');
+  await page.waitForSelector('.wcard [data-action="roll-attack"][data-i="0"]');
+  step("equipment, money and equipping weapons");
+
   await page.reload();
   await page.waitForSelector(".design-tracker");
   assert.equal(await page.evaluate(() => App.state.ch.weapons[0].ammo), 8);

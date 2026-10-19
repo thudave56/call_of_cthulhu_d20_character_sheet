@@ -20,6 +20,7 @@ The site opens **Investigator Sheets (v2)**, the rules-checked sheet in [`v2/`](
   - Take damage or Sanity loss with Enter or the −1/−5 buttons, and Undo the last change.
   - Track an encounter with initiative, rounds and conditions (p.91).
   - A dice roller handles expressions like `3d6+2`.
+  - Equipment & Money edits on the play screen: add, rename or remove items, change quantities, spend or receive cash, and equip or put away weapons. Only equipped weapons appear in the attack list.
 - **Sanity rules:**
   - Sanity checks with "success/failure" notation.
   - Automatic temporary, indefinite and permanent insanity alerts, with rolls on Tables 4-1 to 4-4.
