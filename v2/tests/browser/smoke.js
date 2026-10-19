@@ -81,6 +81,13 @@ async function main() {
   await page.waitForFunction(() => App.state.ch.weapons[0].equipped === false && !document.querySelector('.wcard [data-action="roll-attack"][data-i="0"]'));
   await page.click('[data-action="weapon-equip"][data-i="0"]');
   await page.waitForSelector('.wcard [data-action="roll-attack"][data-i="0"]');
+  // Renaming an item, then pressing a button next to it at human speed, must not lose the click.
+  await page.fill('input[data-action="gear-name"][data-i="0"]', "Big flashlight");
+  const plus = await page.locator('[data-action="gear-qty"][data-i="1"][data-v="1"]').boundingBox();
+  const qty1 = await page.evaluate(() => App.state.ch.equipment[1].qty);
+  await page.mouse.move(plus.x + plus.width / 2, plus.y + plus.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(80); await page.mouse.up();
+  await page.waitForFunction((q) => App.state.ch.equipment[1].qty === q + 1 && App.state.ch.equipment[0].name === "Big flashlight", qty1);
   step("equipment, money and equipping weapons");
 
   await page.reload();

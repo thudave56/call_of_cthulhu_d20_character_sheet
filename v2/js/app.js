@@ -218,11 +218,24 @@
    * Render now, or — while a change event is being handled — just after it, so
    * a Tab press has already moved focus to the next field and we can keep it there.
    */
-  let deferRender = false, renderQueued = false;
+  let deferRender = false, renderQueued = false, pointerHeld = false;
   function render() {
-    if (deferRender) { if (!renderQueued) { renderQueued = true; setTimeout(() => { renderQueued = false; renderNow(); }, 0); } return; }
+    if (deferRender || pointerHeld) { if (!renderQueued) { renderQueued = true; setTimeout(flushRender, 0); } return; }
     renderNow();
   }
+  // A redraw while a mouse button or finger is down would replace the element
+  // being pressed, and the browser would then drop the click (e.g. editing an
+  // item's name and pressing "+" next to it). Wait until it is released.
+  function flushRender() {
+    if (pointerHeld) return;            // pointerup flushes it
+    renderQueued = false;
+    renderNow();
+  }
+  const releasePointer = () => { pointerHeld = false; if (renderQueued) setTimeout(flushRender, 0); };  // runs after the click
+  document.addEventListener("pointerdown", () => { pointerHeld = true; }, true);
+  document.addEventListener("pointerup", releasePointer, true);
+  document.addEventListener("pointercancel", releasePointer, true);
+  window.addEventListener("blur", releasePointer);
   function renderNow() {
     const active = document.activeElement;
     const sel = focusSelector(active);
