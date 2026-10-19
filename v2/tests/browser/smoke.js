@@ -54,6 +54,12 @@ async function main() {
   await page.waitForTimeout(100);
   assert.equal(await page.evaluate(() => App.state.ch.sessionNotes), "clue: the cellar");
   assert.equal(await page.evaluate(() => CoC.derive(App.state.ch).hp.current), 15);
+  // Undoing "Clear log" brings the entries back, and a roll made since stays.
+  const before = await page.evaluate(() => App.state.ch.log.length);
+  await page.click('[data-action="clear-log"]');
+  await page.click('.design-tracker [data-action="roll-init"]');
+  await page.click('[data-action="undo"]');
+  await page.waitForFunction((n) => App.state.ch.log.length >= n + 2, before);
   step("undo keeps newer edits and rolls");
 
   await page.click('.wcard [data-action="roll-attack"]');

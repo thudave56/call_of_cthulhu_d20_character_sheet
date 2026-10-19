@@ -100,8 +100,11 @@
     if (!u || !state.ch || u.ch.id !== state.ch.id) { state.undo = null; render(); toast("Nothing to undo: there's been a newer change."); return; }
     const restored = C.clone(u.ch);
     restored.rev = state.ch.rev;   // a newer save of our own, not a conflict
-    // Rolls made since stay in the log; only the labelled change is taken back.
-    restored.log = state.ch.log;
+    // The log is history: keep the entries from before the change (so undoing
+    // "Clear log" brings them back) plus everything added since, rolls included.
+    const known = new Set((u.ch.log || []).map((l) => l.t + "|" + l.text));
+    const added = (state.ch.log || []).filter((l) => !known.has(l.t + "|" + l.text));
+    restored.log = added.concat(u.ch.log || []).slice(0, 60);
     pushLog(restored, `Undid: ${u.label}`);
     state.ch = restored;
     state.undo = null;
