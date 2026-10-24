@@ -105,6 +105,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; outline: none; }
 
 /* Toast & dialog */
 .toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translate(-50%, 150%); background: var(--ink); color: var(--bg); padding: .75rem 1.1rem; border-radius: 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, .25); z-index: 50; transition: transform .2s; max-width: min(92vw, 420px); text-align: center; }
+.toast:not(.show) { visibility: hidden; transition: transform .2s, visibility 0s .2s; }  /* fully gone when not showing */
 .toast.show { transform: translate(-50%, 0); }
 /* On wide screens the roll result sits in the corner, clear of the play panels. */
 @media (min-width: 1000px) { .toast { left: auto; right: 1.25rem; transform: translateY(150%); } .toast.show { transform: translateY(0); } }
@@ -175,6 +176,7 @@ input.spec { width: 9em; padding: .2rem .4rem; }
 .gear-table input { width: 100%; min-width: 4em; }
 .small-table { width: auto; }
 .review-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin: 1rem 0; }
+.review-grid .skills { grid-column: 1 / -1; }   /* the skill table needs the whole width */
 
 /* Shared play panels */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; box-shadow: var(--shadow); margin-bottom: 1rem; min-width: 0; }

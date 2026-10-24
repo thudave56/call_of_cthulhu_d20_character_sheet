@@ -294,7 +294,7 @@
         <div class="seg" role="group" aria-label="Show">${[["all", "All"], ["usable", "Usable"], ["trained", "Trained"]].map(([k, l]) => `<button class="seg-btn ${mode === k ? "on" : ""}" data-action="skill-mode" data-k="${k}" aria-pressed="${mode === k}">${l}</button>`).join("")}</div>
       </div>`;
     const body = opts.table
-      ? `<div class="table-wrap"><table class="stable"><thead><tr><th title="Core skill">C</th><th>Skill</th><th>Total</th><th>Ranks</th><th>Key</th><th>Abil</th><th>Misc</th></tr></thead><tbody>${items}</tbody></table></div><p class="hint">● core skill · T trained only · A armor check penalty applies</p>`
+      ? `<div class="table-wrap"><table class="stable"><thead><tr><th title="Core skill">C</th><th>Skill</th><th class="num">Total</th><th class="num">Ranks</th><th>Key</th><th class="num">Abil</th><th class="num">Misc</th></tr></thead><tbody>${items}</tbody></table></div><p class="hint">● core skill · T trained only · A armor check penalty applies</p>`
       : `<ul class="skill-list">${items || '<li class="muted">No matching skills.</li>'}</ul><p class="hint">Tap a skill to roll d20 + total. Core skills are marked; greyed skills can't be used untrained.</p>`;
     return `<section class="panel skills" aria-label="Skills"><h2>Skills</h2>${controls}${body}</section>`;
   }

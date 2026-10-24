@@ -211,6 +211,7 @@
   function focusSelector(el) {
     if (!el || el === document.body || !$app.contains(el) && !$nav.contains(el)) return null;
     if (el.id) return "#" + CSS.escape(el.id);
+    if (el.tagName === "A" && el.getAttribute("href")) return `a[href="${CSS.escape(el.getAttribute("href"))}"]`;
     const parts = FOCUS_KEYS.filter((k) => el.dataset[k] !== undefined).map((k) => `[data-${k.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase())}="${CSS.escape(el.dataset[k])}"]`);
     return parts.length ? el.tagName.toLowerCase() + parts.join("") : null;
   }
@@ -239,11 +240,14 @@
   function renderNow() {
     const active = document.activeElement;
     const sel = focusSelector(active);
+    // Several elements can match (e.g. the "Basics" step tab and the "← Basics" button): remember which one.
+    const nth = sel ? Array.prototype.indexOf.call(document.querySelectorAll(sel), active) : -1;
     const caret = active && typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd] : null;
     const scrollY = window.scrollY;
     paint();
     if (!sel) return;
-    const again = document.querySelector(sel);
+    const matches = document.querySelectorAll(sel);
+    const again = matches[nth] || matches[0];
     if (again && again !== document.activeElement) {
       again.focus({ preventScroll: true });
       if (caret) { try { again.setSelectionRange(caret[0], caret[1]); } catch (e) { /* number inputs */ } }
@@ -455,7 +459,7 @@
         <td class="num">${r.cost || ""}</td>
         <td class="num">${r.ability ? fmt(r.parts.ability) : "—"}</td>
         <td><input type="number" data-action="misc" data-id="${esc(r.id)}" value="${C.toInt((ch.skills[r.id] || {}).misc) || ""}" placeholder="0" aria-label="${esc(r.id)} misc" /></td>
-        <td class="num strong" title="${esc(breakdown(r))}">${fmt(r.total)}</td>
+        <td class="num strong" title="${esc(breakdown(r))}${r.usable ? "" : " — trained only: needs at least 1 rank"}">${r.usable ? fmt(r.total) : "—"}</td>
       </tr>`).join("");
     return `<div class="grid2">
       <div><h3>Template core skills (${esc(ch.profession)})</h3><ol class="tmpl">${slotHtml}</ol></div>
@@ -740,9 +744,11 @@
           c.profession = to;
           c.coreSkills = C.templateCore(to).concat(extra);
         }, { undo: "Change profession" });
-        const tmpl = C.templateCore(from).filter((id) => !id.includes("*"));
         const ranked = state.ch.coreSkills.slice(0, 9).filter((id) => C.toInt((state.ch.skills[id] || {}).ranks) > 0 && !C.templateCore(to).includes(id));
-        if (!tmpl.length && !ranked.length) { change(); break; }
+        // Nothing to lose yet (no ranks, no specialties chosen): change without asking.
+        const filled = state.ch.coreSkills.slice(0, 9).some((id, k) => id !== C.templateCore(from)[k]);
+        const anyRanks = Object.values(state.ch.skills).some((s) => C.toInt(s.ranks) > 0);
+        if (!filled && !anyRanks) { change(); break; }
         confirmDialog(`<h2>Change profession to ${esc(to)}?</h2><p>The 9 template core skills will become the ${esc(to)} template. Your 3 chosen core skills stay.</p>${ranked.length ? `<p class="warn">These skills have ranks and will stop being core, so their ranks may exceed the noncore maximum: ${ranked.map(esc).join(", ")}.</p>` : ""}`, "Change profession").then((ok) => { if (ok) change(); else render(); });
         break;
       }

@@ -99,6 +99,20 @@ async function main() {
   await page.waitForSelector('[data-bind="name"]');
   await page.fill('[data-bind="name"]', "Smoke Test");
   await page.press('[data-bind="name"]', "Tab");
+  // A fresh character changes profession without a confirmation (nothing to lose yet).
+  await page.selectOption('[data-action="profession"]', "Antiquarian");
+  await page.waitForFunction(() => App.state.ch.profession === "Antiquarian");
+  assert.equal(await page.$("dialog[open]"), null, "no confirmation for a fresh character");
+  // Tab out of the last ability score keeps keyboard focus on the page (the Next button).
+  await page.click('.steps a[href$="/abilities"]');
+  await page.waitForSelector('[data-bind="abilities.Cha"]');
+  await page.fill('[data-bind="abilities.Cha"]', "12");
+  await page.press('[data-bind="abilities.Cha"]', "Tab");
+  await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(() => !!document.activeElement.closest(".editor-foot")), true, "Tab from the last score goes to the Back/Next buttons");
+  // The hidden roll/toast bubble is invisible, not peeking at the bottom of the screen.
+  assert.equal(await page.$eval("#toast", (t) => t.classList.contains("show") || getComputedStyle(t).visibility), "hidden");
+  step("new investigator: profession, Tab focus, hidden toast");
   for (const s of ["abilities", "skills", "feats", "hp", "gear", "magic", "review"]) {
     await page.click(`.steps a[href$="/${s}"]`);
     await page.waitForSelector(".editor-body");
