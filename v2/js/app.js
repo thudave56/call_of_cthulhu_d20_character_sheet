@@ -578,7 +578,7 @@
       if (pricedEra && price == null) return;
       let g = groups.find((x) => x.label === item.group);
       if (!g) groups.push(g = { label: item.group, opts: [] });
-      g.opts.push(`<option value="${i}">${esc(item.name)}${price != null ? ` — ${usd(price)}${item.estimate ? " (est.)" : ""}` : ""}</option>`);
+      g.opts.push(`<option value="${i}">${esc(item.name)}${price != null ? ` — ${usd(price)}` : ""}</option>`);
     });
     const options = groups.map((g) => `<optgroup label="${esc(g.label)}">${g.opts.join("")}</optgroup>`).join("");
     const era = (C.ERAS[ch.era] || {}).label || ch.era;
@@ -593,7 +593,7 @@
         <button class="btn small primary" data-action="buy">Buy</button>
         <button class="btn small ghost" data-action="buy-free" title="For things the investigator already owns or was given">Add without paying</button>
       </div>
-      <p class="hint">${esc(era)}: ${esc(basis)} (Tables 6-2, 6-4, 6-9, 6-10, 6-11). The rulebook prints no prices for general gear: those marked "est." are typical prices for the period, so change the price if your GM sets a different one. Weapons arrive with their stats; removing something you bought refunds it.</p>`;
+      <p class="hint">${esc(era)}: ${esc(basis)} (Tables 6-2, 6-4, 6-9 to 6-12 and the equipment lists on pp.114–117). Change the price if your GM sets a different one; anything not listed goes under "Something else". Weapons arrive with their stats; removing something you bought refunds it.</p>`;
   }
 
   function edGear(ch, d) {
@@ -677,12 +677,12 @@
     update((c) => {
       if (item && item.kind === "weapon") {
         const p = C.WEAPON_PRESETS.find((w) => w.name === item.preset) || { category: item.category || "melee", damage: "", critical: "×2" };
-        for (let k = 0; k < qty; k++) c.weapons.push(Object.assign({}, C.clone(p), { id: C.uid(), name: item.name, ammo: p.capacity || null, equipped: true, cost: pay ? each : null, notes: [p.notes, item.preset && item.preset !== item.name ? `stats: ${item.preset}` : ""].filter(Boolean).join("; ") }));
+        for (let k = 0; k < qty; k++) c.weapons.push(Object.assign({}, C.clone(p), { id: C.uid(), name: item.name, ammo: p.capacity || null, equipped: true, cost: pay ? each : null, notes: [p.notes, item.preset && item.preset !== item.name ? `stats: ${item.preset}` : "", item.note].filter(Boolean).join("; ") }));
       } else if (item && item.kind === "armor") {
         c.armor = item.armor;
         c.equipment.push({ id: C.uid(), name: item.name, qty: 1, weight: 0, notes: "worn armor", cost: pay ? total : null });
       } else {
-        c.equipment.push({ id: C.uid(), name, qty, weight: 0, notes: "", cost: pay ? total : null });
+        c.equipment.push({ id: C.uid(), name, qty, weight: 0, notes: item && item.note ? item.note : "", cost: pay ? total : null });
       }
       if (pay) c.money.cash = Math.round((before - total) * 100) / 100;
       pushLog(c, pay ? `Bought ${qty > 1 ? qty + " × " : ""}${name} for ${usd(total)}` : `Added ${name}`);

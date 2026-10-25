@@ -111,6 +111,7 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 | Weapon stats | Tables 6-1 and 6-3, p.94–95 | `WEAPON_PRESETS` | — |
 | Sanity: start 5×Wis, max 99−Mythos, ½ Wis per roll → check, 20%/hour → indefinite, 0 → slide, −10 permanent, +1d6 per level (cap at max), therapy capped at starting, Mythos insanity +2 then +1 | p.47–51 | `sanity`, `loseSanity`, `gainSanity`, `mythosInsanity` | ✓ |
 | Money: (1d6 + profession, min 1) × era; Wealth windfall and +2 income | Tables 1-13 and 1-14, p.15, p.42 | `money` | ✓ |
+| Buying equipment at creation: 1920s prices for eras up to 1940, 2000s prices for 1981+, none printed for 1941–1980; overspending is flagged | Tables 6-2, 6-4, 6-9 to 6-12, pp.114–117 | `catalog.js`, `catalogPrice`, `cashOnHand` | ✓ |
 | Insanity: Table 4-1 duration, 4-2/4-3 effects (00 on 4-2 goes to 4-3), 4-4 disorder plus 1d6 months; Sanity checks with "success/failure" loss notation and the p.48 examples | Tables 4-1 to 4-4, p.48–50 | `sanityCheck`, `rollTemporaryInsanity`, `rollIndefiniteInsanity` | ✓ |
 | Specific firearms; shotgun damage by gauge | Tables 6-5 and 6-8, p.98–99 and p.107 | `SPECIFIC_FIREARMS`, `SHOTGUN_DAMAGE` | ✓ |
 | Random height and weight | Table 1-12, p.14 | `rollHeightWeight` | ✓ |

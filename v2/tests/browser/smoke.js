@@ -122,6 +122,20 @@ async function main() {
   await page.selectOption(`${pick}[data-slot="${slot}"]`, "occult");
   await page.waitForSelector('[data-action="ranks"][data-id="Knowledge (occult)"]');
   step("specialty dropdowns");
+
+  // Buying equipment at creation takes the rulebook price off the cash on hand.
+  await page.click('.steps a[href$="/hp"]');
+  await page.fill('[data-action="money-set"]', "4");
+  await page.press('[data-action="money-set"]', "Tab");
+  await page.click('.steps a[href$="/gear"]');
+  await page.waitForSelector("#buyItem");
+  const cashBefore = await page.evaluate(() => CoC.cashOnHand(App.state.ch));
+  const flashlight = await page.$$eval("#buyItem option", (o) => o.find((x) => /^Flashlight, 3 cell/.test(x.textContent)).value);
+  await page.selectOption("#buyItem", flashlight);
+  assert.equal(await page.inputValue("#buyPrice"), "3.1");
+  await page.click('[data-action="buy"]');
+  await page.waitForFunction((c0) => Math.abs(CoC.cashOnHand(App.state.ch) - (c0 - 3.1)) < 0.001, cashBefore);
+  step("buy equipment from the price list");
   for (const s of ["abilities", "skills", "feats", "hp", "gear", "magic", "review"]) {
     await page.click(`.steps a[href$="/${s}"]`);
     await page.waitForSelector(".editor-body");

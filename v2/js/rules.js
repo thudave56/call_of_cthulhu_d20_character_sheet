@@ -7,9 +7,9 @@
  * unit-tested in Node (tests/rules.test.js) and shared by every UI design.
  */
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory();
-  else root.CoC = factory();
-})(typeof self !== "undefined" ? self : this, function () {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("./catalog.js"));
+  else root.CoC = factory(root.CoCCatalog);
+})(typeof self !== "undefined" ? self : this, function (catalogRows) {
   "use strict";
 
   const SCHEMA_VERSION = 2;
@@ -511,25 +511,9 @@
     return Object.assign(c, overrides);
   }
 
-  // Equipment for sale at character creation. Weapons, ammunition, accessories
-  // and armor come from the rulebook price tables — CATALOG_PLACEHOLDER
-  const CATALOG = [];
-
-  // General gear. The rulebook prints no prices for these, so they are
-  // estimates (typical 1920s catalog and 2000s retail prices), marked "est."
-  // and editable before buying. null = not available in that period.
-  const GENERAL_GEAR = [
-    ["Flashlight", 1.00, 15], ["Kerosene lantern", 1.50, 25], ["Candles (dozen)", 0.30, 5], ["Matches (box)", 0.05, 1],
-    ["Rope, 50 ft.", 1.25, 15], ["Crowbar", 0.75, 15], ["Shovel", 1.25, 20], ["Hammer", 0.75, 12], ["Tool kit", 5.00, 50],
-    ["Lock picks", 2.00, 30], ["Magnifying glass", 0.50, 10], ["Compass", 1.00, 15], ["Binoculars", 15.00, 100],
-    ["Pocket watch", 2.00, null], ["Wristwatch", 5.00, 40], ["Notebook & pencils", 0.15, 5], ["Camera", 2.50, 200],
-    ["Film or memory card", 0.25, 10], ["First aid kit", 1.50, 25], ["Doctor's medical bag", 15.00, 150],
-    ["Gas mask", 5.00, 60], ["Backpack", 2.00, 50], ["Suitcase", 5.00, 80], ["Blanket or bedroll", 3.00, 40],
-    ["Tent", 10.00, 150], ["Canteen", 0.75, 10], ["Hip flask", 1.00, 15], ["Umbrella", 1.50, 15], ["Trench coat", 10.00, 150],
-    ["Good suit of clothes", 20.00, 300], ["Crucifix or holy symbol", 1.00, 20], ["Reference books", 3.00, 30],
-    ["Portable typewriter", 50.00, null], ["Laptop computer", null, 1000], ["Mobile phone", null, 100],
-    ["Automobile (Ford Model T)", 290.00, null], ["Automobile (used)", null, 5000],
-  ].map(([name, p1920, p2000]) => ({ group: "General gear (estimated prices)", name, p1920, p2000, kind: "gear", estimate: true }));
+  // Equipment for sale at character creation: the rulebook's price lists,
+  // kept in catalog.js (Tables 6-2, 6-4, 6-9 to 6-12 and pp.114–117).
+  const CATALOG = catalogRows || [];
 
   // ---------------------------------------------------------------------------
   // Specialties offered for the "any one" skills. Players may still enter any
@@ -1392,7 +1376,7 @@
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, CATALOG: CATALOG.concat(GENERAL_GEAR), catalogPrice, cashOnHand, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, CATALOG, catalogPrice, cashOnHand, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,

@@ -551,3 +551,28 @@ test("Every 'any one' template skill has a specialty list (p.27, p.32, p.33, p.3
   assert.equal(CoC.SPECIALTIES.Knowledge.length, 23);   // "the twenty-three standard fields of study" (p.32)
   assert.ok(CoC.SPECIALTIES["Speak Other Language"].includes("Latin"));
 });
+
+test("Equipment catalog: rulebook prices by era, weapon stats linked (Tables 6-2, 6-9, 6-10, pp.114-117)", () => {
+  const find = (name) => CoC.CATALOG.find((x) => x.name === name);
+  assert.ok(CoC.CATALOG.length > 400);
+  for (const x of CoC.CATALOG) {
+    for (const p of [x.p1920, x.p2000]) assert.ok(p === null || (typeof p === "number" && p >= 0), x.name);
+    if (x.kind === "weapon" && x.preset) assert.ok(CoC.WEAPON_PRESETS.some((w) => w.name === x.preset), x.preset);
+    if (x.kind === "armor") assert.ok(CoC.ARMOR.some((a) => a.name === x.armor), x.armor);
+  }
+  const tommy = find("Thompson M1921 .45 ACP");
+  assert.deepEqual([tommy.p1920, tommy.p2000], [225, 3000]);
+  assert.deepEqual(CoC.catalogPrice(tommy, "1921-1940"), { price: 225, basis: "1920s price" });
+  assert.deepEqual(CoC.catalogPrice(tommy, "1981+"), { price: 3000, basis: "2000s price" });
+  assert.equal(CoC.catalogPrice(tommy, "1961-1980").price, null);           // no price printed for that era
+  assert.equal(CoC.catalogPrice(find("Revolver, .357 magnum") || find(".357 Magnum revolver"), "1921-1940").price, null);
+  assert.equal(find("Flashlight, 3 cell").p1920, 3.10);
+});
+
+test("Cash on hand: starting money until entered; overspending is a Gear problem", () => {
+  const c = CoC.sampleCharacter();
+  const start = CoC.money(c).startingTotal;
+  assert.equal(CoC.cashOnHand(c), start);
+  c.money.cash = -5;
+  assert.ok(CoC.validate(c).some((i) => i.step === "gear" && /more than the cash/.test(i.msg)));
+});
