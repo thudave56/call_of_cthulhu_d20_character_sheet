@@ -576,3 +576,14 @@ test("Cash on hand: starting money until entered; overspending is a Gear problem
   c.money.cash = -5;
   assert.ok(CoC.validate(c).some((i) => i.step === "gear" && /more than the cash/.test(i.msg)));
 });
+
+test("Weapons without the matching Weapon Proficiency are flagged (-4, p.43)", () => {
+  const c = CoC.sampleCharacter();
+  c.feats = c.feats.filter((f) => f.name !== "Weapon Proficiency");
+  c.weapons.push({ id: "k", name: "Knife, combat", category: "melee", damage: "1d4", critical: "19-20/×2" });
+  const g = CoC.nonproficientWeapons(c);
+  assert.deepEqual(g.map((x) => x.category).sort(), ["melee", "pistol"]);
+  assert.ok(CoC.validate(c).some((i) => i.step === "feats" && /attacks are at −4/.test(i.msg)));
+  c.feats.push({ name: "Weapon Proficiency", choice: "pistol" }, { name: "Weapon Proficiency", choice: "melee" });
+  assert.deepEqual(CoC.nonproficientWeapons(c), []);
+});

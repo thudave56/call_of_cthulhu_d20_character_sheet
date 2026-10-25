@@ -515,6 +515,14 @@
     else if (def.choice === "skill") opts = C.skillIds(ch).filter((id) => id !== "Cthulhu Mythos").map((s) => [s, s]);
     return `<select data-action="feat-choice" data-i="${i}" aria-label="${esc(f.name)} choice"><option value="">— choose ${def.choice} —</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${f.choice === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
   }
+  /** "Add Weapon Proficiency (Pistol)" buttons for weapon types the character can't use without −4 (p.43). */
+  function proficiencyFixes(ch, d) {
+    const missing = C.nonproficientWeapons(ch);
+    if (!missing.length) return "";
+    const free = d.featSlots - ch.feats.length;
+    return `<div class="prof-fix"><strong>Attacks at −4:</strong> no character is proficient with weapons by default (p.43). ${missing.map((g) => `<button class="btn small" data-action="feat-add" data-name="Weapon Proficiency" data-choice="${esc(g.category)}" title="${esc(g.weapons.join(", "))}">Add Weapon Proficiency (${esc(g.label)})</button>`).join(" ")} <span class="muted small">${free > 0 ? `${free} feat slot${free > 1 ? "s" : ""} free.` : "No feat slot free: swap a feat on the Feats step, or accept the −4."}</span></div>`;
+  }
+
   function edFeats(ch, d) {
     const chosen = ch.feats.map((f, i) => {
       const probs = C.featPrereqIssues(ch, f);
@@ -534,7 +542,7 @@
       return `<li class="${disabled ? "dim" : ""}"><button class="btn small" data-action="feat-add" data-name="${esc(f.name)}" ${disabled ? "disabled" : ""}>Add</button> <strong>${esc(f.name)}</strong>${f.psychic ? ' <span class="tag">Psychic</span>' : ""}${f.multi ? ' <span class="tag" title="Can be taken more than once">×</span>' : ""}
         <span class="hint">${esc(f.text)}${pre ? ` <em>Requires: ${esc(pre)}.</em>` : ""}${probs.length ? ` <span class="bad">(${probs.map(esc).join("; ")})</span>` : ""}</span></li>`;
     }).join("");
-    return `<div class="sp-tracker ${ch.feats.length > d.featSlots ? "bad" : ch.feats.length === d.featSlots ? "ok" : ""}">Feats: <strong>${ch.feats.length}</strong> / ${d.featSlots} <span class="muted">(2 at 1st level, +1 at every level divisible by 3${C.offenseBonusFeat(ch) ? ", +1 bonus Weapon Proficiency for the Offense option" : ""})</span></div>
+    return `${proficiencyFixes(ch, d)}<div class="sp-tracker ${ch.feats.length > d.featSlots ? "bad" : ch.feats.length === d.featSlots ? "ok" : ""}">Feats: <strong>${ch.feats.length}</strong> / ${d.featSlots} <span class="muted">(2 at 1st level, +1 at every level divisible by 3${C.offenseBonusFeat(ch) ? ", +1 bonus Weapon Proficiency for the Offense option" : ""})</span></div>
       <p class="hint">No character is proficient with weapons by default: without the right Weapon Proficiency feat, attacks take −4 (p.43). Psychic feats need GM approval.</p>
       <h3>Your feats</h3><ul class="feat-list chosen">${chosen || '<li class="muted">None yet.</li>'}</ul>
       <h3>Available feats</h3>
@@ -611,7 +619,7 @@
       <td class="num strong">${fmt(w.bonus)}${C.isProficient(ch, w.weapon) ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
       <td><button class="btn small ghost" data-action="weapon-remove" data-i="${i}" aria-label="Remove weapon">✕</button></td></tr>`).join("");
     const items = ch.equipment.map((e, i) => `<tr><td><input data-action="item" data-i="${i}" data-k="name" value="${esc(e.name)}" aria-label="Item" /></td><td><input type="number" min="0" data-action="item" data-i="${i}" data-k="qty" value="${esc(e.qty ?? 1)}" style="width:4em" aria-label="Quantity" /></td><td><input type="number" min="0" step="0.5" data-action="item" data-i="${i}" data-k="weight" value="${esc(e.weight ?? "")}" style="width:4em" aria-label="Weight each (lb)" /></td><td><input data-action="item" data-i="${i}" data-k="notes" value="${esc(e.notes || "")}" aria-label="Notes" /></td><td><button class="btn small ghost" data-action="item-remove" data-i="${i}" aria-label="Remove item">✕</button></td></tr>`).join("");
-    return `${buyPanel(ch, d)}
+    return `${buyPanel(ch, d)}${proficiencyFixes(ch, d)}
       <h3>Armor (Table 6-4)</h3>
       ${field("Worn armor", `<select data-bind="armor">${C.ARMOR.map((a) => `<option ${a.name === ch.armor ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select>`, `AC ${d.combat.ac} (10 ${fmt(d.combat.acParts.dex)} Dex + ${d.combat.acParts.armor} armor${d.combat.acParts.defense ? ` + ${d.combat.acParts.defense} defense bonus` : ""}). ${d.combat.armor.note ? esc(d.combat.armor.note) + ". " : ""}${d.combat.acp ? `Armor check penalty ${d.combat.acp} to Balance, Climb, Escape Artist, Hide, Jump, Move Silently, Swim, Tumble and attack rolls.` : ""}`)}
       ${field("Armor weight (lb)", `<input type="number" min="0" step="0.5" data-bind="armorWeight" value="${esc(ch.armorWeight || "")}" />`, "Table 6-4 gives no weights; enter your own if your GM tracks them.")}
@@ -757,7 +765,7 @@
         update((c) => { c.skills[`${base} (${name})`] = c.skills[`${base} (${name})`] || { ranks: 0, misc: 0 }; });
         break;
       }
-      case "feat-add": update((c) => { c.feats.push({ name: el.dataset.name }); }); break;
+      case "feat-add": update((c) => { c.feats.push({ name: el.dataset.name, choice: el.dataset.choice || null }); }); break;
       case "feat-remove": update((c) => { c.feats.splice(i, 1); }); break;
       case "hp-roll-die": { const l = +el.dataset.level; const r = C.rollDie(6); update((c) => { c.levelLog[l - 1].hpRoll = r; }); toast(`Level ${l} hit die: ${r}`); break; }
       case "roll-height-weight": {

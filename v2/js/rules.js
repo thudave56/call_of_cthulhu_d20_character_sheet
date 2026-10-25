@@ -664,6 +664,18 @@
     };
   }
 
+  /** Weapon categories the character carries weapons in but isn't proficient with: [{ category, label, weapons }]. */
+  function nonproficientWeapons(c) {
+    const out = [];
+    for (const w of c.weapons || []) {
+      if (isProficient(c, w)) continue;
+      let g = out.find((x) => x.category === w.category);
+      if (!g) out.push(g = { category: w.category, label: WEAPON_CATEGORIES[w.category] || w.category, weapons: [] });
+      g.weapons.push(w.name);
+    }
+    return out;
+  }
+
   function isProficient(c, weapon) {
     if (!weapon || weapon.category === "unarmed") return true;
     return hasFeat(c, "Weapon Proficiency", weapon.category);
@@ -1025,6 +1037,8 @@
       for (const m of featPrereqIssues(c, f)) err(m, "feats");
     }
     if (offenseBonusFeat(c) && !hasFeat(c, "Weapon Proficiency")) warn("The Offense option's bonus feat must be a Weapon Proficiency (p.15) — pick one.", "feats");
+    // Weapons the character can't use without the −4 nonproficiency penalty (p.43).
+    for (const g of nonproficientWeapons(c)) warn(`Not proficient with ${g.label.toLowerCase()} (${g.weapons.join(", ")}): attacks are at −4 until you take Weapon Proficiency (${g.label.toLowerCase()}) (p.43).`, "feats");
     // Level log
     const L = toInt(c.level, 1);
     if ((c.levelLog || []).length !== L) err(`Level history has ${(c.levelLog || []).length} entries for level ${L}.`, "basics");
@@ -1378,7 +1392,7 @@
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
     firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, CATALOG, catalogPrice, cashOnHand, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
-    newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
+    newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, nonproficientWeapons, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,
     validate, syncLevelLog, lockIntMods, derive,
