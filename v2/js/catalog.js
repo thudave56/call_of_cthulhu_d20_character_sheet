@@ -26,7 +26,7 @@
     ["Melee weapons (Table 6-2, p.94)", "Machete w/scabbard", 1.0, 13.95, "weapon", "Machete", null],
     ["Melee weapons (Table 6-2, p.94)", "Brass knuckles", 1.0, 6.95, "weapon", "Brass knuckles", null],
     ["Melee weapons (Table 6-2, p.94)", "Billy club/police club", 0.85, 19.95, "weapon", "Nightstick or billy club", null],
-    ["Melee weapons (Table 6-2, p.94)", "Nunchaku", null, 19.95, "weapon", null, "requires the Martial Artist feat to use"],
+    ["Melee weapons (Table 6-2, p.94)", "Nunchaku", null, 19.95, "weapon", "Nunchaku", "requires the Martial Artist feat to use"],
     ["Pistols (Table 6-9, p.109)", "Single-action .45 revolver", 30.0, 300.0, "weapon", "Colt Single Action Army (.45 Colt)", null],
     ["Pistols (Table 6-9, p.109)", ".45 ACP semiautomatic", 40.0, 575.0, "weapon", "Colt M1911 (.45 ACP)", null],
     ["Pistols (Table 6-9, p.109)", "9mm Parabellum semiauto", 30.0, 600.0, "weapon", "Handgun (9mm)", null],

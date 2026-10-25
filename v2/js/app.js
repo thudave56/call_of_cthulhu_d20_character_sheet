@@ -146,11 +146,21 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-  function confirmDialog(html, okLabel = "OK") {
-    return new Promise((resolve) => {
+  /**
+   * Modal question. Resolves true for the main button and false for the other.
+   * With a custom `otherLabel` (a real second choice, not just Cancel), closing
+   * the dialog with Escape rejects instead, so nothing happens.
+   */
+  function confirmDialog(html, okLabel = "OK", otherLabel = null) {
+    return new Promise((resolve, reject) => {
       const dlg = document.getElementById("dialog");
-      dlg.innerHTML = `<form method="dialog" class="dialog-body">${html}<div class="dialog-actions"><button value="cancel" class="btn ghost">Cancel</button><button value="ok" class="btn primary">${esc(okLabel)}</button></div></form>`;
-      dlg.onclose = () => resolve(dlg.returnValue === "ok");
+      dlg.returnValue = "";
+      dlg.innerHTML = `<form method="dialog" class="dialog-body">${html}<div class="dialog-actions">${otherLabel ? '<button value="" class="btn ghost">Cancel</button>' : ""}<button value="other" class="btn ghost">${esc(otherLabel || "Cancel")}</button><button value="ok" class="btn primary">${esc(okLabel)}</button></div></form>`;
+      dlg.onclose = () => {
+        if (dlg.returnValue === "ok") resolve(true);
+        else if (dlg.returnValue === "other" || !otherLabel) resolve(false);
+        else reject(new Error("cancelled"));
+      };
       dlg.showModal();
     });
   }
@@ -521,7 +531,7 @@
     const missing = C.nonproficientWeapons(ch);
     if (!missing.length) return "";
     const free = d.featSlots - ch.feats.length;
-    return `<div class="prof-fix"><strong>Attacks at −4:</strong> no character is proficient with weapons by default (p.43). ${missing.map((g) => `<button class="btn small" data-action="feat-add" data-name="Weapon Proficiency" data-choice="${esc(g.category)}" title="${esc(g.weapons.join(", "))}">Add Weapon Proficiency (${esc(g.label)})</button>`).join(" ")} <span class="muted small">${free > 0 ? `${free} feat slot${free > 1 ? "s" : ""} free.` : "No feat slot free: swap a feat on the Feats step, or accept the −4."}</span></div>`;
+    return `<div class="prof-fix"><strong>Attacks at −4:</strong> no character is proficient with weapons by default (p.43). ${missing.map((g) => `<button class="btn small" data-action="feat-add" data-name="Weapon Proficiency" data-choice="${esc(g.category)}" title="${esc(g.weapons.join(", "))}" ${free > 0 ? "" : "disabled"}>Add Weapon Proficiency (${esc(g.label)})</button>`).join(" ")} <span class="muted small">${free > 0 ? `${free} feat slot${free > 1 ? "s" : ""} free.` : "No feat slot free: swap a feat on the Feats step, or accept the −4."}</span></div>`;
   }
 
   function edFeats(ch, d) {
@@ -671,6 +681,20 @@
   }
   function numOrStr(el) { return el.type === "number" ? (el.value === "" ? null : Number(el.value)) : el.value; }
 
+  /**
+   * Set the starting-money roll. If cash on hand was already entered or spent
+   * from, it moves by the same amount as the starting money, so purchases stay paid.
+   */
+  function setMoneyRoll(c, roll) {
+    const before = C.money(c);
+    c.money.roll = roll;
+    const after = C.money(c);
+    if (c.money.cash !== null && c.money.cash !== undefined) {
+      const delta = (after.rolled ? after.startingTotal : 0) - (before.rolled ? before.startingTotal : 0);
+      c.money.cash = Math.round((C.toNum(c.money.cash, 0) + delta) * 100) / 100;
+    }
+  }
+
   /** Buy (or just add) the item chosen in the Gear step's Buy panel. */
   function buy(pay) {
     const pick = document.getElementById("buyItem").value;
@@ -681,6 +705,7 @@
     const each = priceText === "" ? NaN : Math.max(0, Math.round(parseFloat(priceText) * 100) / 100);
     if (pay && !Number.isFinite(each)) return toast("Enter a price, or use “Add without paying”.");
     const qty = Math.max(1, parseInt(document.getElementById("buyQty").value, 10) || 1);
+    if (pay && C.cashOnHand(state.ch) === null) return toast("Roll starting money on the HP &amp; Money step first, or use “Add without paying”.");
     const total = pay ? Math.round(each * qty * 100) / 100 : 0;
     const before = C.cashOnHand(state.ch) || 0;
     update((c) => {
@@ -689,9 +714,9 @@
         for (let k = 0; k < qty; k++) c.weapons.push(Object.assign({}, C.clone(p), { id: C.uid(), name: item.name, ammo: p.capacity || null, equipped: true, cost: pay ? each : null, notes: [p.notes, item.preset && item.preset !== item.name ? `stats: ${item.preset}` : "", item.note].filter(Boolean).join("; ") }));
       } else if (item && item.kind === "armor") {
         c.armor = item.armor;
-        c.equipment.push({ id: C.uid(), name: item.name, qty: 1, weight: 0, notes: "worn armor", cost: pay ? total : null });
+        c.equipment.push({ id: C.uid(), name: item.name, qty: 1, weight: 0, notes: "worn armor", cost: pay ? each : null, armor: item.armor });
       } else {
-        c.equipment.push({ id: C.uid(), name, qty, weight: 0, notes: item && item.note ? item.note : "", cost: pay ? total : null });
+        c.equipment.push({ id: C.uid(), name, qty, weight: 0, notes: item && item.note ? item.note : "", cost: pay ? each : null });
       }
       if (pay) c.money.cash = Math.round((before - total) * 100) / 100;
       pushLog(c, pay ? `Bought ${qty > 1 ? qty + " × " : ""}${name} for ${usd(total)}` : `Added ${name}`);
@@ -775,17 +800,27 @@
         toast(`${r.height}, ${r.weight} <span class="muted">(2d10 = ${r.heightRoll}, 2d4 = ${r.weightRoll}; uses the ${/^f/i.test(state.ch.gender || "") ? "female" : "male"} row)</span>`);
         break;
       }
-      case "money-roll": { const r = C.rollDie(6); update((c) => { c.money.roll = r; }); toast(`Money roll: ${r}`); break; }
+      case "money-roll": { const r = C.rollDie(6); update((c) => setMoneyRoll(c, r)); toast(`Money roll: ${r}`); break; }
       case "weapon-add": { const p = C.WEAPON_PRESETS[+document.getElementById("weaponPreset").value]; update((c) => { c.weapons.push(Object.assign({ id: C.uid(), ammo: p.capacity || null }, C.clone(p))); }); break; }
       case "weapon-add-custom": update((c) => { c.weapons.push({ id: C.uid(), name: "New weapon", category: "melee", damage: "1d6", critical: "×2", range: "" }); }); break;
       case "item-add": { const n = document.getElementById("itemName").value.trim(); if (n) update((c) => { c.equipment.push({ id: C.uid(), name: n, qty: 1, notes: "" }); }); break; }
       case "item-remove": case "weapon-remove": {
-        // Removing something bought during creation gives the money back.
         const list = a === "item-remove" ? "equipment" : "weapons";
         const it = state.ch[list][i];
-        const refund = it && it.cost > 0 ? it.cost : 0;
-        update((c) => { c[list].splice(i, 1); if (refund) c.money.cash = Math.round(((C.cashOnHand(c) || 0) + refund) * 100) / 100; }, { undo: `Remove ${it ? it.name : "item"}` });
-        if (refund) toast(`Removed ${esc(it.name)}; refunded ${usd(refund)}.`);
+        if (!it) break;
+        // Something bought with the Buy panel can be returned for its price (each × how many are left);
+        // the player chooses, since an item lost in play shouldn't put money back.
+        const refund = it.cost > 0 ? Math.round(it.cost * (list === "equipment" ? it.qty : 1) * 100) / 100 : 0;
+        const remove = (giveBack) => {
+          update((c) => {
+            c[list].splice(i, 1);
+            if (it.armor && c.armor === it.armor) c.armor = "None";   // returned armor is no longer worn
+            if (giveBack) c.money.cash = Math.round(((C.cashOnHand(c) || 0) + refund) * 100) / 100;
+          }, { undo: `Remove ${it.name}` });
+          if (giveBack) toast(`Removed ${esc(it.name)}; refunded ${usd(refund)}.`);
+        };
+        if (!refund) { remove(false); break; }
+        confirmDialog(`<h2>Remove ${esc(it.name)}?</h2><p>It was bought for ${usd(refund)}. Return it and get the money back (e.g. while creating the character), or just remove it (lost, sold for less, used up)?</p>`, `Refund ${usd(refund)}`, "Just remove").then((ok) => remove(ok)).catch(() => {});
         break;
       }
       case "buy": case "buy-free": buy(a === "buy"); break;
@@ -882,7 +917,7 @@
       }
       case "feat-available": state.featAvailable = el.checked; render(); break;
       case "buy-pick": {
-        const item = C.CATALOG[+el.value];
+        const item = el.value === "" || el.value === "custom" ? null : C.CATALOG[+el.value];
         const name = document.getElementById("buyName");
         const price = document.getElementById("buyPrice");
         if (name) { name.hidden = el.value !== "custom"; if (!name.hidden) name.focus(); }
@@ -918,7 +953,7 @@
       }); break;
       case "feat-choice": update((c) => { c.feats[i].choice = el.value || null; }); break;
       case "hp-roll": update((c) => { c.levelLog[+el.dataset.level - 1].hpRoll = el.value ? Math.max(1, Math.min(6, +el.value)) : null; }); break;
-      case "money-set": update((c) => { c.money.roll = el.value ? Math.max(1, Math.min(6, +el.value)) : null; }); break;
+      case "money-set": update((c) => setMoneyRoll(c, el.value ? Math.max(1, Math.min(6, +el.value)) : null)); break;
       case "weapon": update((c) => { const k = el.dataset.k; c.weapons[i][k] = el.type === "number" ? (el.value === "" ? null : +el.value) : el.value; }); break;
       case "weapon-check": update((c) => { c.weapons[i][el.dataset.k] = el.checked; }); break;
       case "item": update((c) => { const k = el.dataset.k; c.equipment[i][k] = el.type === "number" ? +el.value : el.value; }, { render: el.type === "number" }); break;

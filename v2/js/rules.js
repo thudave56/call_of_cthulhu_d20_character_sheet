@@ -233,6 +233,7 @@
     { name: "Gun butt, pistol", category: "melee", damage: "1d4", critical: "×2", range: "", weight: 2 },
     { name: "Knife, kukri", category: "melee", damage: "1d4", critical: "18-20/×2", range: "10 ft", weight: 3 },
     { name: "Hatchet or tomahawk", category: "melee", damage: "1d6", critical: "×3", range: "10 ft", weight: 3.5 },
+    { name: "Nunchaku", category: "melee", damage: "1d6", critical: "×2", range: "", weight: 2, notes: "requires the Martial Artist feat to use" },
     { name: "Croquet mallet", category: "melee", damage: "1d4", critical: "×2", range: "", weight: 2.5 },
     { name: "Nightstick or billy club", category: "melee", damage: "1d4", critical: "×2", range: "", weight: 1.5 },
     { name: "Fencing foil", category: "melee", damage: "1d4", critical: "18-20/×2", range: "", weight: 2.5 },
@@ -1160,7 +1161,8 @@
     c.equipment = arr(c.equipment).filter(isObj).map((e) => ({
       id: ID_RE.test(String(e.id || "")) ? String(e.id) : uid(), name: str(e.name, 200), qty: Math.max(1, toInt(e.qty, 1)),
       weight: Math.max(0, toNum(e.weight, 0)), notes: str(e.notes, 300),
-      cost: numOrNull(e.cost) === null ? null : Math.max(0, Math.round(toNum(e.cost, 0) * 100) / 100),   // paid at creation
+      cost: numOrNull(e.cost) === null ? null : Math.max(0, Math.round(toNum(e.cost, 0) * 100) / 100),   // price paid for each one
+      armor: ARMOR.some((a) => a.name === e.armor && a.name !== "None") ? e.armor : null,   // bought armor this row puts on
     }));
     c.log = arr(c.log).filter(isObj).slice(0, 60).map((l) => ({ t: str(l.t, 40), text: str(l.text, 300) }));
     const skills = isObj(c.skills) ? c.skills : {};
