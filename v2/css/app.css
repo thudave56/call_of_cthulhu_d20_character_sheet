@@ -437,3 +437,7 @@ input.spec { width: 9em; padding: .2rem .4rem; }
 .weapon-item { grid-template-columns: minmax(0, 1fr) auto; }
 .weapon-item .gear-wname { min-width: 0; }
 .equip-btn { min-width: 6.5em; }
+.funds { padding: .45rem .7rem; background: var(--surface-2); border-radius: 8px; }
+.funds.bad { background: var(--bad-bg); color: var(--bad); }
+.buy-row select { max-width: 26em; }
+.prof-fix { margin: .75rem 0; padding: .55rem .8rem; border-radius: 8px; background: var(--warn-bg); border: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }

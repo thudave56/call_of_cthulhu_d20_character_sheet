@@ -196,6 +196,7 @@
     if (old.shield && parseInt(old.shield.bonus, 10)) review.push(`the rulebook has no shields; "${old.shield.name || "shield"}" was not copied`);
     c.weapons = (old.weapons || []).map((w) => ({ id: CoC.uid(), name: w.name || "Weapon", category: w.type === "ranged" ? "pistol" : "melee", damage: w.damage || "", critical: w.critical || "×2", range: w.range || "", weight: parseFloat(w.weight) || 0 }));
     if (c.weapons.some((w) => w.category === "pistol")) review.push("ranged weapons were copied as pistols; set the right category, capacity and rate of fire (Gear step)");
+    if (c.weapons.length) review.push("the original sheet had no Weapon Proficiency feat: add one for each weapon type, or attacks are at −4 (p.43; Feats step)");
     c.equipment = (old.equipment || []).map((e) => ({ id: CoC.uid(), name: e.name || "", qty: parseInt(e.quantity, 10) || 1, weight: parseFloat(e.weight) || 0, notes: e.notes || "" }));
     c.money.cash = old.currentMoney ? parseFloat(old.currentMoney) : null;
     c.sessionNotes = old.sessionNotes || "";

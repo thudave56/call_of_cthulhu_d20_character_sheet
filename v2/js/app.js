@@ -146,11 +146,21 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-  function confirmDialog(html, okLabel = "OK") {
-    return new Promise((resolve) => {
+  /**
+   * Modal question. Resolves true for the main button and false for the other.
+   * With a custom `otherLabel` (a real second choice, not just Cancel), closing
+   * the dialog with Escape rejects instead, so nothing happens.
+   */
+  function confirmDialog(html, okLabel = "OK", otherLabel = null) {
+    return new Promise((resolve, reject) => {
       const dlg = document.getElementById("dialog");
-      dlg.innerHTML = `<form method="dialog" class="dialog-body">${html}<div class="dialog-actions"><button value="cancel" class="btn ghost">Cancel</button><button value="ok" class="btn primary">${esc(okLabel)}</button></div></form>`;
-      dlg.onclose = () => resolve(dlg.returnValue === "ok");
+      dlg.returnValue = "";
+      dlg.innerHTML = `<form method="dialog" class="dialog-body">${html}<div class="dialog-actions">${otherLabel ? '<button value="" class="btn ghost">Cancel</button>' : ""}<button value="other" class="btn ghost">${esc(otherLabel || "Cancel")}</button><button value="ok" class="btn primary">${esc(okLabel)}</button></div></form>`;
+      dlg.onclose = () => {
+        if (dlg.returnValue === "ok") resolve(true);
+        else if (dlg.returnValue === "other" || !otherLabel) resolve(false);
+        else reject(new Error("cancelled"));
+      };
       dlg.showModal();
     });
   }
@@ -404,6 +414,7 @@
     <fieldset class="field"><legend class="lbl">Optional rules</legend>
       <label class="check"><input type="checkbox" data-action="opt-defense" ${ch.options.defenseBonus ? "checked" : ""}/> Variant: Defense bonus by level (Table 1-15, p.15) — adds to AC; Offense characters also get a bonus Weapon Proficiency feat.</label>
       <label class="check"><input type="checkbox" data-action="opt-offense-wp" ${ch.options.offenseWeaponProficiency ? "checked" : ""}/> House rule: give Offense characters the bonus Weapon Proficiency even without the variant. (As written, p.15 grants it as part of the Defense Bonus variant, to balance that variant.)</label>
+      <label class="check"><input type="checkbox" data-action="opt-nonprof" ${ch.options.noNonproficiencyPenalty ? "checked" : ""}/> House rule: no −4 for weapons the investigator isn't proficient with. (As written, p.43, attacks without the matching Weapon Proficiency feat are at −4. Feats that require proficiency, such as Weapon Focus, still need the feat.)</label>
     </fieldset>
     ${field("Cthulhu Mythos ranks", inp("mythos", ch.mythos, 'type="number" min="0"'), "Never bought with skill points: starts at 0 and rises through play (Mythos insanity, tomes). Maximum Sanity = 99 − Mythos ranks − any Mythos bonus (misc).")}
     ${field("Background & description", `<textarea data-bind="notes" rows="4">${esc(ch.notes)}</textarea>`)}`;
@@ -515,6 +526,14 @@
     else if (def.choice === "skill") opts = C.skillIds(ch).filter((id) => id !== "Cthulhu Mythos").map((s) => [s, s]);
     return `<select data-action="feat-choice" data-i="${i}" aria-label="${esc(f.name)} choice"><option value="">— choose ${def.choice} —</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${f.choice === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
   }
+  /** "Add Weapon Proficiency (Pistol)" buttons for weapon types the character can't use without −4 (p.43). */
+  function proficiencyFixes(ch, d) {
+    const missing = C.nonproficientWeapons(ch);
+    if (!missing.length) return "";
+    const free = d.featSlots - ch.feats.length;
+    return `<div class="prof-fix"><strong>Attacks at −4:</strong> no character is proficient with weapons by default (p.43). ${missing.map((g) => `<button class="btn small" data-action="feat-add" data-name="Weapon Proficiency" data-choice="${esc(g.category)}" title="${esc(g.weapons.join(", "))}" ${free > 0 ? "" : "disabled"}>Add Weapon Proficiency (${esc(g.label)})</button>`).join(" ")} <span class="muted small">${free > 0 ? `${free} feat slot${free > 1 ? "s" : ""} free.` : "No feat slot free: swap a feat on the Feats step, or accept the −4."}</span></div>`;
+  }
+
   function edFeats(ch, d) {
     const chosen = ch.feats.map((f, i) => {
       const probs = C.featPrereqIssues(ch, f);
@@ -534,7 +553,7 @@
       return `<li class="${disabled ? "dim" : ""}"><button class="btn small" data-action="feat-add" data-name="${esc(f.name)}" ${disabled ? "disabled" : ""}>Add</button> <strong>${esc(f.name)}</strong>${f.psychic ? ' <span class="tag">Psychic</span>' : ""}${f.multi ? ' <span class="tag" title="Can be taken more than once">×</span>' : ""}
         <span class="hint">${esc(f.text)}${pre ? ` <em>Requires: ${esc(pre)}.</em>` : ""}${probs.length ? ` <span class="bad">(${probs.map(esc).join("; ")})</span>` : ""}</span></li>`;
     }).join("");
-    return `<div class="sp-tracker ${ch.feats.length > d.featSlots ? "bad" : ch.feats.length === d.featSlots ? "ok" : ""}">Feats: <strong>${ch.feats.length}</strong> / ${d.featSlots} <span class="muted">(2 at 1st level, +1 at every level divisible by 3${C.offenseBonusFeat(ch) ? ", +1 bonus Weapon Proficiency for the Offense option" : ""})</span></div>
+    return `${proficiencyFixes(ch, d)}<div class="sp-tracker ${ch.feats.length > d.featSlots ? "bad" : ch.feats.length === d.featSlots ? "ok" : ""}">Feats: <strong>${ch.feats.length}</strong> / ${d.featSlots} <span class="muted">(2 at 1st level, +1 at every level divisible by 3${C.offenseBonusFeat(ch) ? ", +1 bonus Weapon Proficiency for the Offense option" : ""})</span></div>
       <p class="hint">No character is proficient with weapons by default: without the right Weapon Proficiency feat, attacks take −4 (p.43). Psychic feats need GM approval.</p>
       <h3>Your feats</h3><ul class="feat-list chosen">${chosen || '<li class="muted">None yet.</li>'}</ul>
       <h3>Available feats</h3>
@@ -561,6 +580,41 @@
       </div>`;
   }
 
+  /** Money string. */
+  const usd = (n) => (n < 0 ? "−" : "") + "$" + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  /**
+   * Character creation: buy equipment from the rulebook price tables (or enter
+   * anything else with a price); the cost comes off the cash on hand.
+   */
+  function buyPanel(ch, d) {
+    const cash = C.cashOnHand(ch);
+    const groups = [];
+    C.CATALOG.forEach((item, i) => {
+      const { price } = C.catalogPrice(item, ch.era);
+      // Not sold in this period (e.g. a laptop in the 1920s): leave it out. Eras with no printed prices show everything.
+      const pricedEra = ["1901-1920", "1921-1940", "1981+"].includes(ch.era);
+      if (pricedEra && price == null) return;
+      let g = groups.find((x) => x.label === item.group);
+      if (!g) groups.push(g = { label: item.group, opts: [] });
+      g.opts.push(`<option value="${i}">${esc(item.name)}${price != null ? ` — ${usd(price)}` : ""}</option>`);
+    });
+    const options = groups.map((g) => `<optgroup label="${esc(g.label)}">${g.opts.join("")}</optgroup>`).join("");
+    const era = (C.ERAS[ch.era] || {}).label || ch.era;
+    const basis = ch.era === "1981+" ? "2000s prices" : ch.era === "1901-1920" || ch.era === "1921-1940" ? "1920s prices" : "no prices are printed for this era, so enter what your GM allows";
+    return `<h3>Buy equipment</h3>
+      <p class="funds ${cash !== null && cash < 0 ? "bad" : ""}">Cash on hand: <strong>${cash === null ? "—" : usd(cash)}</strong>${d.money.rolled ? ` <span class="muted">(starting money ${usd(d.money.startingTotal)})</span>` : ` <span class="warn">Roll starting money on the <a href="#/edit/${ch.id}/hp">HP &amp; Money</a> step first.</span>`}</p>
+      <div class="row buy-row">
+        <select id="buyItem" data-action="buy-pick" aria-label="Item to buy"><option value="">— choose an item —</option>${options}<option value="custom">Something else (type its name)…</option></select>
+        <input id="buyName" placeholder="Item name" aria-label="Item name" hidden />
+        <label class="field inline"><span class="lbl">Price $</span><input id="buyPrice" type="number" min="0" step="0.01" style="width:7em" aria-label="Price each" /></label>
+        <label class="field inline"><span class="lbl">Qty</span><input id="buyQty" type="number" min="1" value="1" style="width:4em" aria-label="Quantity" /></label>
+        <button class="btn small primary" data-action="buy">Buy</button>
+        <button class="btn small ghost" data-action="buy-free" title="For things the investigator already owns or was given">Add without paying</button>
+      </div>
+      <p class="hint">${esc(era)}: ${esc(basis)} (Tables 6-2, 6-4, 6-9 to 6-12 and the equipment lists on pp.114–117). Change the price if your GM sets a different one; anything not listed goes under "Something else". Weapons arrive with their stats; removing something you bought refunds it.</p>`;
+  }
+
   function edGear(ch, d) {
     const weapons = d.weapons.map((w, i) => `<tr>
       <td><input data-action="weapon" data-i="${i}" data-k="name" value="${esc(w.weapon.name)}" aria-label="Weapon name" /></td>
@@ -573,10 +627,11 @@
       <td>${w.ranged ? "" : `<label class="check"><input type="checkbox" data-action="weapon-check" data-i="${i}" data-k="twoHanded" ${w.weapon.twoHanded ? "checked" : ""}/> 2H</label>`}
           ${!w.ranged && w.weapon.category === "melee" ? `<select data-action="weapon" data-i="${i}" data-k="finesseAs" aria-label="Weapon Finesse group"><option value="">no finesse</option>${C.FINESSE_WEAPONS.map((f) => `<option ${w.weapon.finesseAs === f ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>` : ""}</td>
       <td><label class="check"><input type="checkbox" data-action="weapon-check" data-i="${i}" data-k="equipped" ${w.weapon.equipped ? "checked" : ""}/> Equipped</label></td>
-      <td class="num strong">${fmt(w.bonus)}${C.isProficient(ch, w.weapon) ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
+      <td class="num strong">${fmt(w.bonus)}${!w.parts.nonproficient ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
       <td><button class="btn small ghost" data-action="weapon-remove" data-i="${i}" aria-label="Remove weapon">✕</button></td></tr>`).join("");
     const items = ch.equipment.map((e, i) => `<tr><td><input data-action="item" data-i="${i}" data-k="name" value="${esc(e.name)}" aria-label="Item" /></td><td><input type="number" min="0" data-action="item" data-i="${i}" data-k="qty" value="${esc(e.qty ?? 1)}" style="width:4em" aria-label="Quantity" /></td><td><input type="number" min="0" step="0.5" data-action="item" data-i="${i}" data-k="weight" value="${esc(e.weight ?? "")}" style="width:4em" aria-label="Weight each (lb)" /></td><td><input data-action="item" data-i="${i}" data-k="notes" value="${esc(e.notes || "")}" aria-label="Notes" /></td><td><button class="btn small ghost" data-action="item-remove" data-i="${i}" aria-label="Remove item">✕</button></td></tr>`).join("");
-    return `<h3>Armor (Table 6-4)</h3>
+    return `${buyPanel(ch, d)}${proficiencyFixes(ch, d)}
+      <h3>Armor (Table 6-4)</h3>
       ${field("Worn armor", `<select data-bind="armor">${C.ARMOR.map((a) => `<option ${a.name === ch.armor ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select>`, `AC ${d.combat.ac} (10 ${fmt(d.combat.acParts.dex)} Dex + ${d.combat.acParts.armor} armor${d.combat.acParts.defense ? ` + ${d.combat.acParts.defense} defense bonus` : ""}). ${d.combat.armor.note ? esc(d.combat.armor.note) + ". " : ""}${d.combat.acp ? `Armor check penalty ${d.combat.acp} to Balance, Climb, Escape Artist, Hide, Jump, Move Silently, Swim, Tumble and attack rolls.` : ""}`)}
       ${field("Armor weight (lb)", `<input type="number" min="0" step="0.5" data-bind="armorWeight" value="${esc(ch.armorWeight || "")}" />`, "Table 6-4 gives no weights; enter your own if your GM tracks them.")}
       <p class="hint">Gear carried or worn: <strong>${d.gearWeight} lb</strong>. The rulebook has no carrying-capacity table for investigators; the only weight rule is Swim: −1 per 5 lb of gear (p.37), applied automatically (${Math.floor(d.gearWeight / 5) ? "−" + Math.floor(d.gearWeight / 5) : "no penalty"}).</p>
@@ -625,6 +680,50 @@
     o[keys[keys.length - 1]] = value;
   }
   function numOrStr(el) { return el.type === "number" ? (el.value === "" ? null : Number(el.value)) : el.value; }
+
+  /**
+   * Set the starting-money roll. If cash on hand was already entered or spent
+   * from, it moves by the same amount as the starting money, so purchases stay paid.
+   */
+  function setMoneyRoll(c, roll) {
+    const before = C.money(c);
+    c.money.roll = roll;
+    const after = C.money(c);
+    if (c.money.cash !== null && c.money.cash !== undefined) {
+      const delta = (after.rolled ? after.startingTotal : 0) - (before.rolled ? before.startingTotal : 0);
+      c.money.cash = Math.round((C.toNum(c.money.cash, 0) + delta) * 100) / 100;
+    }
+  }
+
+  /** Buy (or just add) the item chosen in the Gear step's Buy panel. */
+  function buy(pay) {
+    const pick = document.getElementById("buyItem").value;
+    const item = pick === "custom" || pick === "" ? null : C.CATALOG[+pick];
+    const name = item ? item.name : document.getElementById("buyName").value.trim();
+    if (!pick || !name) return toast(pick === "custom" ? "Type the item's name." : "Choose an item first.");
+    const priceText = document.getElementById("buyPrice").value;
+    const each = priceText === "" ? NaN : Math.max(0, Math.round(parseFloat(priceText) * 100) / 100);
+    if (pay && !Number.isFinite(each)) return toast("Enter a price, or use “Add without paying”.");
+    const qty = Math.max(1, parseInt(document.getElementById("buyQty").value, 10) || 1);
+    if (pay && C.cashOnHand(state.ch) === null) return toast("Roll starting money on the HP &amp; Money step first, or use “Add without paying”.");
+    const total = pay ? Math.round(each * qty * 100) / 100 : 0;
+    const before = C.cashOnHand(state.ch) || 0;
+    update((c) => {
+      if (item && item.kind === "weapon") {
+        const p = C.WEAPON_PRESETS.find((w) => w.name === item.preset) || { category: item.category || "melee", damage: "", critical: "×2" };
+        for (let k = 0; k < qty; k++) c.weapons.push(Object.assign({}, C.clone(p), { id: C.uid(), name: item.name, ammo: p.capacity || null, equipped: true, cost: pay ? each : null, notes: [p.notes, item.preset && item.preset !== item.name ? `stats: ${item.preset}` : "", item.note].filter(Boolean).join("; ") }));
+      } else if (item && item.kind === "armor") {
+        c.armor = item.armor;
+        c.equipment.push({ id: C.uid(), name: item.name, qty: 1, weight: 0, notes: "worn armor", cost: pay ? each : null, armor: item.armor });
+      } else {
+        c.equipment.push({ id: C.uid(), name, qty, weight: 0, notes: item && item.note ? item.note : "", cost: pay ? each : null });
+      }
+      if (pay) c.money.cash = Math.round((before - total) * 100) / 100;
+      pushLog(c, pay ? `Bought ${qty > 1 ? qty + " × " : ""}${name} for ${usd(total)}` : `Added ${name}`);
+    }, { undo: `${pay ? "Buy" : "Add"} ${name}` });
+    const after = C.cashOnHand(state.ch);
+    toast(pay ? `Bought ${esc(name)} for ${usd(total)}. Cash left: <strong>${usd(after)}</strong>${after < 0 ? ' <span class="bad">(overspent)</span>' : ""}` : `Added ${esc(name)}.`);
+  }
 
   function levelUp() {
     const ch = state.ch;
@@ -692,7 +791,7 @@
         update((c) => { c.skills[`${base} (${name})`] = c.skills[`${base} (${name})`] || { ranks: 0, misc: 0 }; });
         break;
       }
-      case "feat-add": update((c) => { c.feats.push({ name: el.dataset.name }); }); break;
+      case "feat-add": update((c) => { c.feats.push({ name: el.dataset.name, choice: el.dataset.choice || null }); }); break;
       case "feat-remove": update((c) => { c.feats.splice(i, 1); }); break;
       case "hp-roll-die": { const l = +el.dataset.level; const r = C.rollDie(6); update((c) => { c.levelLog[l - 1].hpRoll = r; }); toast(`Level ${l} hit die: ${r}`); break; }
       case "roll-height-weight": {
@@ -701,12 +800,30 @@
         toast(`${r.height}, ${r.weight} <span class="muted">(2d10 = ${r.heightRoll}, 2d4 = ${r.weightRoll}; uses the ${/^f/i.test(state.ch.gender || "") ? "female" : "male"} row)</span>`);
         break;
       }
-      case "money-roll": { const r = C.rollDie(6); update((c) => { c.money.roll = r; }); toast(`Money roll: ${r}`); break; }
+      case "money-roll": { const r = C.rollDie(6); update((c) => setMoneyRoll(c, r)); toast(`Money roll: ${r}`); break; }
       case "weapon-add": { const p = C.WEAPON_PRESETS[+document.getElementById("weaponPreset").value]; update((c) => { c.weapons.push(Object.assign({ id: C.uid(), ammo: p.capacity || null }, C.clone(p))); }); break; }
       case "weapon-add-custom": update((c) => { c.weapons.push({ id: C.uid(), name: "New weapon", category: "melee", damage: "1d6", critical: "×2", range: "" }); }); break;
-      case "weapon-remove": update((c) => { c.weapons.splice(i, 1); }); break;
       case "item-add": { const n = document.getElementById("itemName").value.trim(); if (n) update((c) => { c.equipment.push({ id: C.uid(), name: n, qty: 1, notes: "" }); }); break; }
-      case "item-remove": update((c) => { c.equipment.splice(i, 1); }); break;
+      case "item-remove": case "weapon-remove": {
+        const list = a === "item-remove" ? "equipment" : "weapons";
+        const it = state.ch[list][i];
+        if (!it) break;
+        // Something bought with the Buy panel can be returned for its price (each × how many are left);
+        // the player chooses, since an item lost in play shouldn't put money back.
+        const refund = it.cost > 0 ? Math.round(it.cost * (list === "equipment" ? it.qty : 1) * 100) / 100 : 0;
+        const remove = (giveBack) => {
+          update((c) => {
+            c[list].splice(i, 1);
+            if (it.armor && c.armor === it.armor) c.armor = "None";   // returned armor is no longer worn
+            if (giveBack) c.money.cash = Math.round(((C.cashOnHand(c) || 0) + refund) * 100) / 100;
+          }, { undo: `Remove ${it.name}` });
+          if (giveBack) toast(`Removed ${esc(it.name)}; refunded ${usd(refund)}.`);
+        };
+        if (!refund) { remove(false); break; }
+        confirmDialog(`<h2>Remove ${esc(it.name)}?</h2><p>It was bought for ${usd(refund)}. Return it and get the money back (e.g. while creating the character), or just remove it (lost, sold for less, used up)?</p>`, `Refund ${usd(refund)}`, "Just remove").then((ok) => remove(ok)).catch(() => {});
+        break;
+      }
+      case "buy": case "buy-free": buy(a === "buy"); break;
       case "spell-add": { const v = document.getElementById("spellPreset").value; const p = v === "" ? { name: "New spell", cost: "" } : SPELL_PRESETS[+v]; update((c) => { c.spells.push(Object.assign({ id: C.uid() }, C.clone(p))); }); break; }
       case "spell-remove": update((c) => { c.spells.splice(i, 1); }); break;
       case "tome-add": { const v = document.getElementById("tomePreset").value; const p = v === "" ? { name: "New tome", dc: 20 } : TOME_PRESETS[+v]; update((c) => { c.tomes.push(Object.assign({ id: C.uid() }, C.clone(p))); }); break; }
@@ -799,6 +916,14 @@
         break;
       }
       case "feat-available": state.featAvailable = el.checked; render(); break;
+      case "buy-pick": {
+        const item = el.value === "" || el.value === "custom" ? null : C.CATALOG[+el.value];
+        const name = document.getElementById("buyName");
+        const price = document.getElementById("buyPrice");
+        if (name) { name.hidden = el.value !== "custom"; if (!name.hidden) name.focus(); }
+        if (price) { const p = item ? C.catalogPrice(item, state.ch.era).price : null; price.value = p == null ? "" : p; }
+        break;
+      }
       case "attack-option": update((c) => { c.attackOption = el.value; const need = C.goodSaveCount(el.value); c.goodSaves = c.goodSaves.slice(0, need); }); break;
       case "good-save": update((c) => {
         // Keep the most recent picks; ticking one too many drops the oldest.
@@ -810,6 +935,7 @@
       case "opt-defense": update((c) => { c.options.defenseBonus = el.checked; }); break;
       case "opt-offense-wp": update((c) => { c.options.offenseWeaponProficiency = el.checked; }); break;
       case "opt-unmastered": update((c) => { c.options.unmasteredMagic = el.checked; }); break;
+      case "opt-nonprof": update((c) => { c.options.noNonproficiencyPenalty = el.checked; }); break;
       case "spell": case "tome": update((c) => { const k = el.dataset.k; c[a === "spell" ? "spells" : "tomes"][i][k] = el.type === "number" ? (el.value === "" ? 0 : +el.value) : el.value; }); break;
       case "ability-increase": update((c) => { c.levelLog[+el.dataset.level - 1].abilityIncrease = el.value || null; return C.lockIntMods(c, +el.dataset.level); }); break;
       case "core-spec": case "extra-spec": {
@@ -827,7 +953,7 @@
       }); break;
       case "feat-choice": update((c) => { c.feats[i].choice = el.value || null; }); break;
       case "hp-roll": update((c) => { c.levelLog[+el.dataset.level - 1].hpRoll = el.value ? Math.max(1, Math.min(6, +el.value)) : null; }); break;
-      case "money-set": update((c) => { c.money.roll = el.value ? Math.max(1, Math.min(6, +el.value)) : null; }); break;
+      case "money-set": update((c) => setMoneyRoll(c, el.value ? Math.max(1, Math.min(6, +el.value)) : null)); break;
       case "weapon": update((c) => { const k = el.dataset.k; c.weapons[i][k] = el.type === "number" ? (el.value === "" ? null : +el.value) : el.value; }); break;
       case "weapon-check": update((c) => { c.weapons[i][el.dataset.k] = el.checked; }); break;
       case "item": update((c) => { const k = el.dataset.k; c.equipment[i][k] = el.type === "number" ? +el.value : el.value; }, { render: el.type === "number" }); break;

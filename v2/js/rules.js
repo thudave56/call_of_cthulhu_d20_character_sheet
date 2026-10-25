@@ -7,9 +7,9 @@
  * unit-tested in Node (tests/rules.test.js) and shared by every UI design.
  */
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory();
-  else root.CoC = factory();
-})(typeof self !== "undefined" ? self : this, function () {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("./catalog.js"));
+  else root.CoC = factory(root.CoCCatalog);
+})(typeof self !== "undefined" ? self : this, function (catalogRows) {
   "use strict";
 
   const SCHEMA_VERSION = 2;
@@ -233,6 +233,7 @@
     { name: "Gun butt, pistol", category: "melee", damage: "1d4", critical: "×2", range: "", weight: 2 },
     { name: "Knife, kukri", category: "melee", damage: "1d4", critical: "18-20/×2", range: "10 ft", weight: 3 },
     { name: "Hatchet or tomahawk", category: "melee", damage: "1d6", critical: "×3", range: "10 ft", weight: 3.5 },
+    { name: "Nunchaku", category: "melee", damage: "1d6", critical: "×2", range: "", weight: 2, notes: "requires the Martial Artist feat to use" },
     { name: "Croquet mallet", category: "melee", damage: "1d4", critical: "×2", range: "", weight: 2.5 },
     { name: "Nightstick or billy club", category: "melee", damage: "1d4", critical: "×2", range: "", weight: 1.5 },
     { name: "Fencing foil", category: "melee", damage: "1d4", critical: "18-20/×2", range: "", weight: 2.5 },
@@ -494,7 +495,7 @@
       weapons: [],
       equipment: [],
       notes: "", sessionNotes: "",
-      options: { defenseBonus: false, offenseWeaponProficiency: false, unmasteredMagic: false },
+      options: { defenseBonus: false, offenseWeaponProficiency: false, unmasteredMagic: false, noNonproficiencyPenalty: false },
       abilityDrain: {},        // permanent ability loss from spells (p.128): lowers the score for good
       spells: [],              // spells known (Ch. 7)
       tomes: [],               // Mythos tomes being read or already read (p.119-122)
@@ -510,6 +511,10 @@
     };
     return Object.assign(c, overrides);
   }
+
+  // Equipment for sale at character creation: the rulebook's price lists,
+  // kept in catalog.js (Tables 6-2, 6-4, 6-9 to 6-12 and pp.114–117).
+  const CATALOG = catalogRows || [];
 
   // ---------------------------------------------------------------------------
   // Specialties offered for the "any one" skills. Players may still enter any
@@ -660,6 +665,27 @@
     };
   }
 
+  /**
+   * Attack penalty for a weapon the character isn't proficient with: −4 (p.43),
+   * or 0 under the optional house rule that waives it. The house rule doesn't
+   * make the character proficient, so feats that require proficiency still do.
+   */
+  function nonproficiencyPenalty(c, weapon) {
+    return isProficient(c, weapon) || (c.options && c.options.noNonproficiencyPenalty) ? 0 : -4;
+  }
+  /** Weapon categories the character carries weapons in but isn't proficient with: [{ category, label, weapons }]. */
+  function nonproficientWeapons(c) {
+    const out = [];
+    if (c.options && c.options.noNonproficiencyPenalty) return out;   // house rule: no −4 to warn about
+    for (const w of c.weapons || []) {
+      if (isProficient(c, w)) continue;
+      let g = out.find((x) => x.category === w.category);
+      if (!g) out.push(g = { category: w.category, label: WEAPON_CATEGORIES[w.category] || w.category, weapons: [] });
+      g.weapons.push(w.name);
+    }
+    return out;
+  }
+
   function isProficient(c, weapon) {
     if (!weapon || weapon.category === "unarmed") return true;
     return hasFeat(c, "Weapon Proficiency", weapon.category);
@@ -683,7 +709,7 @@
     const ranged = RANGED_CATEGORIES.includes(weapon.category);
     const finesse = !ranged && (c.feats || []).some((f) => f.name === "Weapon Finesse" && f.choice && weapon.finesseAs === f.choice);
     const abil = ranged ? "Dex" : finesse ? "Dex" : "Str";
-    const prof = isProficient(c, weapon) ? 0 : -4;
+    const prof = nonproficiencyPenalty(c, weapon);
     const chosen = (f) => f.choice && (f.choice === weapon.id || f.choice === weapon.name);
     const focus = (c.feats || []).some((f) => f.name === "Weapon Focus" && chosen(f)) ? 1 : 0;
     const acp = cb.acp; // armor check penalty also applies to attack rolls (p.94)
@@ -920,6 +946,25 @@
   // ---------------------------------------------------------------------------
   // Money (p.15, Wealth p.42)
   // ---------------------------------------------------------------------------
+  /** Cash on hand: the amount entered, or the starting money (Tables 1-13, 1-14) until one is entered. */
+  function cashOnHand(c) {
+    if (c.money && c.money.cash !== null && c.money.cash !== undefined) return toNum(c.money.cash, 0);
+    const m = money(c);
+    return m.rolled ? m.startingTotal : null;
+  }
+  /**
+   * The rulebook price of a catalog item for the character's era. The price
+   * tables give a 1920s and a 2000s column (Tables 6-2, 6-9 to 6-11): eras up to
+   * 1940 use the 1920s price, 1981+ the 2000s price. 1941–1980 has no printed
+   * price, so the player enters what the GM allows. Returns { price, basis }.
+   */
+  function catalogPrice(item, era) {
+    if (!item) return { price: null, basis: null };
+    if (era === "1901-1920" || era === "1921-1940") return { price: item.p1920 ?? null, basis: item.p1920 == null ? "not sold in the 1920s" : "1920s price" };
+    if (era === "1981+") return { price: item.p2000 ?? null, basis: item.p2000 == null ? "no 2000s price" : "2000s price" };
+    return { price: null, basis: "no price printed for this era" };
+  }
+
   function money(c) {
     const era = ERAS[c.era] || ERAS["1921-1940"];
     const prof = PROFESSION_BY_NAME[c.profession];
@@ -1002,6 +1047,8 @@
       for (const m of featPrereqIssues(c, f)) err(m, "feats");
     }
     if (offenseBonusFeat(c) && !hasFeat(c, "Weapon Proficiency")) warn("The Offense option's bonus feat must be a Weapon Proficiency (p.15) — pick one.", "feats");
+    // Weapons the character can't use without the −4 nonproficiency penalty (p.43).
+    for (const g of nonproficientWeapons(c)) warn(`Not proficient with ${g.label.toLowerCase()} (${g.weapons.join(", ")}): attacks are at −4 until you take Weapon Proficiency (${g.label.toLowerCase()}) (p.43).`, "feats");
     // Level log
     const L = toInt(c.level, 1);
     if ((c.levelLog || []).length !== L) err(`Level history has ${(c.levelLog || []).length} entries for level ${L}.`, "basics");
@@ -1012,6 +1059,8 @@
       if (!e || !e.abilityIncrease) warn(`Level ${l}: choose an ability score to increase.`, "abilities");
     }
     if (!money(c).rolled) warn("Starting money not rolled yet.", "hp");
+    const cash = cashOnHand(c);
+    if (cash !== null && cash < 0) err(`Spent $${(-cash).toFixed(2)} more than the cash on hand.`, "gear");
     return issues;
   }
 
@@ -1094,7 +1143,7 @@
     const roll = toInt(money.roll, 0);
     c.money = { roll: roll >= 1 && roll <= 6 ? roll : null, cash: numOrNull(money.cash), notes: str(money.notes, 500) };
     const opt = isObj(c.options) ? c.options : {};
-    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency, unmasteredMagic: !!opt.unmasteredMagic };
+    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency, unmasteredMagic: !!opt.unmasteredMagic, noNonproficiencyPenalty: !!opt.noNonproficiencyPenalty };
     const arr = (v) => (Array.isArray(v) ? v : []);
     c.goodSaves = [...new Set(arr(c.goodSaves).filter((k) => ["fort", "ref", "will"].includes(k)))];
     c.coreSkills = arr(c.coreSkills).filter((x) => typeof x === "string").map((x) => str(x, 120)).slice(0, 12);
@@ -1106,11 +1155,14 @@
       twoHanded: !!w.twoHanded, capacity: numOrNull(w.capacity) === null ? null : Math.max(0, toInt(w.capacity)),
       ammo: numOrNull(w.ammo) === null ? null : Math.max(0, toInt(w.ammo)), weight: Math.max(0, toNum(w.weight, 0)),
       equipped: w.equipped !== false,   // ready to use; unequipped weapons are carried but not in the attack list
+      cost: numOrNull(w.cost) === null ? null : Math.max(0, Math.round(toNum(w.cost, 0) * 100) / 100),   // paid at creation
     }));
     for (const w of c.weapons) if (w.capacity !== null && w.ammo !== null && w.ammo > w.capacity) w.ammo = w.capacity;
     c.equipment = arr(c.equipment).filter(isObj).map((e) => ({
       id: ID_RE.test(String(e.id || "")) ? String(e.id) : uid(), name: str(e.name, 200), qty: Math.max(1, toInt(e.qty, 1)),
       weight: Math.max(0, toNum(e.weight, 0)), notes: str(e.notes, 300),
+      cost: numOrNull(e.cost) === null ? null : Math.max(0, Math.round(toNum(e.cost, 0) * 100) / 100),   // price paid for each one
+      armor: ARMOR.some((a) => a.name === e.armor && a.name !== "None") ? e.armor : null,   // bought armor this row puts on
     }));
     c.log = arr(c.log).filter(isObj).slice(0, 60).map((l) => ({ t: str(l.t, 40), text: str(l.text, 300) }));
     const skills = isObj(c.skills) ? c.skills : {};
@@ -1349,9 +1401,9 @@
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, CATALOG, catalogPrice, cashOnHand, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
-    newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
+    newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, nonproficiencyPenalty, nonproficientWeapons, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,
     validate, syncLevelLog, lockIntMods, derive,

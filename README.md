@@ -9,6 +9,7 @@ The site opens **Investigator Sheets (v2)**, the rules-checked sheet in [`v2/`](
 ## What v2 does
 
 - **Saved characters, per browser.** Every change saves automatically. The character list shows HP and Sanity for each investigator and highlights the last one played. Export and import `.json` files to move characters between devices.
+- **Buy equipment at creation** from the rulebook's price lists (weapons, ammunition, armor and about 400 general items, priced for the 1920s or 2000s); the cost comes off the starting cash.
 - **Guided creation** in steps: Basics, Abilities, Skills, Feats, HP & Money, Gear, Magic and Review. Each step lists only its own rule problems, and the step tabs show what still needs fixing.
 - **Three play layouts**, chosen from the **Layout** menu at the top:
   - **Table Tracker**: a dashboard for a laptop or tablet.
