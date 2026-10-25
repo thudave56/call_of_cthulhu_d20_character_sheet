@@ -106,7 +106,7 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 | Cthulhu Mythos can't be bought, has no max; max Sanity = 99 − (ranks + bonuses) | p.18, p.27, p.47 | `mythos` field, `sanity` | ✓ |
 | Swim −1 per 5 lb of gear; no other encumbrance rule exists | p.37 | `gearWeight`, `skillTable` | ✓ |
 | Feat prerequisites, choices, multi/stacking; aptitude bonuses don't stack | Tables 3-1, 3-2, p.39–45 | `FEATS`, `featPrereqIssues` | ✓ |
-| Weapon Proficiency by category (nonproficient −4); Finesse, Focus, Improved Critical | p.40–43 | `weaponAttack` | ✓ |
+| Weapon Proficiency by category (nonproficient −4, with an optional house rule that waives it); Finesse, Focus, Improved Critical | p.40–43 | `weaponAttack`, `nonproficiencyPenalty` | ✓ |
 | Armor: AC bonus and check penalty (to skills and attacks); no Max Dex | Table 6-4, p.94–95 | `ARMOR`, `combat` | ✓ |
 | Weapon stats | Tables 6-1 and 6-3, p.94–95 | `WEAPON_PRESETS` | — |
 | Sanity: start 5×Wis, max 99−Mythos, ½ Wis per roll → check, 20%/hour → indefinite, 0 → slide, −10 permanent, +1d6 per level (cap at max), therapy capped at starting, Mythos insanity +2 then +1 | p.47–51 | `sanity`, `loseSanity`, `gainSanity`, `mythosInsanity` | ✓ |

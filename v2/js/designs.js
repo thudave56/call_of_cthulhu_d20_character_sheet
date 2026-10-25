@@ -225,7 +225,7 @@
   function weaponCard(ch, w, i, x) {
     const { esc, fmt } = x;
     const wp = w.weapon;
-    const prof = C.isProficient(ch, wp);
+    const prof = !w.parts.nonproficient;   // no −4 shown (proficient, or the house rule waives it)
     const dmg = `${esc(wp.damage)}${w.damageBonus ? " " + fmt(w.damageBonus) : ""}`;
     const full = w.fullAttack && w.fullAttack.normal ? [["normal", w.fullAttack.normal, "Full attack"], ...(w.fullAttack.rapid ? [["rapid", w.fullAttack.rapid, "Full + Rapid Shot"]] : [])] : [];
     const fullBtns = full.map(([k, f, l]) => `<button class="btn ghost" data-action="fire-full" data-i="${i}" data-mode="${k}" title="Full-round action (p.80-81, Table 5-12)${f.bulletsPerAttack > 1 ? `: ${f.bulletsPerAttack} rounds per attack` : ""}">${l} <small>${f.sequence.map(fmt).join("/")}</small></button>`).join("");
@@ -255,7 +255,7 @@
     const all = d.weapons.map((w, i) => [w, i]).filter(([w]) => w.weapon.equipped).concat([[d.unarmed, "u"]]);
     const rows = all.map(([w, i]) => {
       const wp = w.weapon;
-      const prof = C.isProficient(ch, wp);
+      const prof = !w.parts.nonproficient;
       const ammo = wp.capacity ? `<span class="ammo no-print"><button class="mini-btn" data-action="ammo" data-i="${i}" data-v="-1" aria-label="Spend one round of ${esc(wp.name)}">−</button><span>${esc(rounds(wp))}/${esc(wp.capacity)}</span><button class="btn small ghost" data-action="ammo" data-i="${i}" data-v="reload" aria-label="Reload ${esc(wp.name)}">Reload</button></span><span class="print-only">${esc(rounds(wp))}/${esc(wp.capacity)} rds</span>` : "";
       return `<tr>
         <th scope="row">${esc(wp.name)}${prof ? "" : ` <span class="bad" title="Not proficient: −4 included. Take the Weapon Proficiency (${esc(C.WEAPON_CATEGORIES[wp.category] || wp.category)}) feat to remove it (p.43).">(−4 nonprof.)</span>`}${wp.notes ? `<br><small class="muted">${esc(wp.notes)}</small>` : ""}</th>

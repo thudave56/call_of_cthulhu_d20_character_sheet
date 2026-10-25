@@ -587,3 +587,15 @@ test("Weapons without the matching Weapon Proficiency are flagged (-4, p.43)", (
   c.feats.push({ name: "Weapon Proficiency", choice: "pistol" }, { name: "Weapon Proficiency", choice: "melee" });
   assert.deepEqual(CoC.nonproficientWeapons(c), []);
 });
+
+test("House rule: no nonproficiency penalty (optional), proficiency itself unchanged", () => {
+  const c = CoC.sampleCharacter();
+  c.feats = c.feats.filter((f) => f.name !== "Weapon Proficiency");
+  assert.equal(CoC.derive(c).weapons[0].parts.nonproficient, -4);
+  c.options.noNonproficiencyPenalty = true;
+  const d = CoC.derive(c);
+  assert.equal(d.weapons[0].parts.nonproficient, 0);
+  assert.equal(CoC.isProficient(c, c.weapons[0]), false);          // feat prerequisites still see "not proficient"
+  assert.deepEqual(CoC.nonproficientWeapons(c), []);
+  assert.equal(CoC.normalize(c).options.noNonproficiencyPenalty, true);
+});

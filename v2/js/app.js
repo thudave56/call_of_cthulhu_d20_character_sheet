@@ -404,6 +404,7 @@
     <fieldset class="field"><legend class="lbl">Optional rules</legend>
       <label class="check"><input type="checkbox" data-action="opt-defense" ${ch.options.defenseBonus ? "checked" : ""}/> Variant: Defense bonus by level (Table 1-15, p.15) — adds to AC; Offense characters also get a bonus Weapon Proficiency feat.</label>
       <label class="check"><input type="checkbox" data-action="opt-offense-wp" ${ch.options.offenseWeaponProficiency ? "checked" : ""}/> House rule: give Offense characters the bonus Weapon Proficiency even without the variant. (As written, p.15 grants it as part of the Defense Bonus variant, to balance that variant.)</label>
+      <label class="check"><input type="checkbox" data-action="opt-nonprof" ${ch.options.noNonproficiencyPenalty ? "checked" : ""}/> House rule: no −4 for weapons the investigator isn't proficient with. (As written, p.43, attacks without the matching Weapon Proficiency feat are at −4. Feats that require proficiency, such as Weapon Focus, still need the feat.)</label>
     </fieldset>
     ${field("Cthulhu Mythos ranks", inp("mythos", ch.mythos, 'type="number" min="0"'), "Never bought with skill points: starts at 0 and rises through play (Mythos insanity, tomes). Maximum Sanity = 99 − Mythos ranks − any Mythos bonus (misc).")}
     ${field("Background & description", `<textarea data-bind="notes" rows="4">${esc(ch.notes)}</textarea>`)}`;
@@ -616,7 +617,7 @@
       <td>${w.ranged ? "" : `<label class="check"><input type="checkbox" data-action="weapon-check" data-i="${i}" data-k="twoHanded" ${w.weapon.twoHanded ? "checked" : ""}/> 2H</label>`}
           ${!w.ranged && w.weapon.category === "melee" ? `<select data-action="weapon" data-i="${i}" data-k="finesseAs" aria-label="Weapon Finesse group"><option value="">no finesse</option>${C.FINESSE_WEAPONS.map((f) => `<option ${w.weapon.finesseAs === f ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>` : ""}</td>
       <td><label class="check"><input type="checkbox" data-action="weapon-check" data-i="${i}" data-k="equipped" ${w.weapon.equipped ? "checked" : ""}/> Equipped</label></td>
-      <td class="num strong">${fmt(w.bonus)}${C.isProficient(ch, w.weapon) ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
+      <td class="num strong">${fmt(w.bonus)}${!w.parts.nonproficient ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
       <td><button class="btn small ghost" data-action="weapon-remove" data-i="${i}" aria-label="Remove weapon">✕</button></td></tr>`).join("");
     const items = ch.equipment.map((e, i) => `<tr><td><input data-action="item" data-i="${i}" data-k="name" value="${esc(e.name)}" aria-label="Item" /></td><td><input type="number" min="0" data-action="item" data-i="${i}" data-k="qty" value="${esc(e.qty ?? 1)}" style="width:4em" aria-label="Quantity" /></td><td><input type="number" min="0" step="0.5" data-action="item" data-i="${i}" data-k="weight" value="${esc(e.weight ?? "")}" style="width:4em" aria-label="Weight each (lb)" /></td><td><input data-action="item" data-i="${i}" data-k="notes" value="${esc(e.notes || "")}" aria-label="Notes" /></td><td><button class="btn small ghost" data-action="item-remove" data-i="${i}" aria-label="Remove item">✕</button></td></tr>`).join("");
     return `${buyPanel(ch, d)}${proficiencyFixes(ch, d)}
@@ -899,6 +900,7 @@
       case "opt-defense": update((c) => { c.options.defenseBonus = el.checked; }); break;
       case "opt-offense-wp": update((c) => { c.options.offenseWeaponProficiency = el.checked; }); break;
       case "opt-unmastered": update((c) => { c.options.unmasteredMagic = el.checked; }); break;
+      case "opt-nonprof": update((c) => { c.options.noNonproficiencyPenalty = el.checked; }); break;
       case "spell": case "tome": update((c) => { const k = el.dataset.k; c[a === "spell" ? "spells" : "tomes"][i][k] = el.type === "number" ? (el.value === "" ? 0 : +el.value) : el.value; }); break;
       case "ability-increase": update((c) => { c.levelLog[+el.dataset.level - 1].abilityIncrease = el.value || null; return C.lockIntMods(c, +el.dataset.level); }); break;
       case "core-spec": case "extra-spec": {

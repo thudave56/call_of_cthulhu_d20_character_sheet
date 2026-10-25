@@ -494,7 +494,7 @@
       weapons: [],
       equipment: [],
       notes: "", sessionNotes: "",
-      options: { defenseBonus: false, offenseWeaponProficiency: false, unmasteredMagic: false },
+      options: { defenseBonus: false, offenseWeaponProficiency: false, unmasteredMagic: false, noNonproficiencyPenalty: false },
       abilityDrain: {},        // permanent ability loss from spells (p.128): lowers the score for good
       spells: [],              // spells known (Ch. 7)
       tomes: [],               // Mythos tomes being read or already read (p.119-122)
@@ -664,9 +664,18 @@
     };
   }
 
+  /**
+   * Attack penalty for a weapon the character isn't proficient with: −4 (p.43),
+   * or 0 under the optional house rule that waives it. The house rule doesn't
+   * make the character proficient, so feats that require proficiency still do.
+   */
+  function nonproficiencyPenalty(c, weapon) {
+    return isProficient(c, weapon) || (c.options && c.options.noNonproficiencyPenalty) ? 0 : -4;
+  }
   /** Weapon categories the character carries weapons in but isn't proficient with: [{ category, label, weapons }]. */
   function nonproficientWeapons(c) {
     const out = [];
+    if (c.options && c.options.noNonproficiencyPenalty) return out;   // house rule: no −4 to warn about
     for (const w of c.weapons || []) {
       if (isProficient(c, w)) continue;
       let g = out.find((x) => x.category === w.category);
@@ -699,7 +708,7 @@
     const ranged = RANGED_CATEGORIES.includes(weapon.category);
     const finesse = !ranged && (c.feats || []).some((f) => f.name === "Weapon Finesse" && f.choice && weapon.finesseAs === f.choice);
     const abil = ranged ? "Dex" : finesse ? "Dex" : "Str";
-    const prof = isProficient(c, weapon) ? 0 : -4;
+    const prof = nonproficiencyPenalty(c, weapon);
     const chosen = (f) => f.choice && (f.choice === weapon.id || f.choice === weapon.name);
     const focus = (c.feats || []).some((f) => f.name === "Weapon Focus" && chosen(f)) ? 1 : 0;
     const acp = cb.acp; // armor check penalty also applies to attack rolls (p.94)
@@ -1133,7 +1142,7 @@
     const roll = toInt(money.roll, 0);
     c.money = { roll: roll >= 1 && roll <= 6 ? roll : null, cash: numOrNull(money.cash), notes: str(money.notes, 500) };
     const opt = isObj(c.options) ? c.options : {};
-    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency, unmasteredMagic: !!opt.unmasteredMagic };
+    c.options = { defenseBonus: !!opt.defenseBonus, offenseWeaponProficiency: !!opt.offenseWeaponProficiency, unmasteredMagic: !!opt.unmasteredMagic, noNonproficiencyPenalty: !!opt.noNonproficiencyPenalty };
     const arr = (v) => (Array.isArray(v) ? v : []);
     c.goodSaves = [...new Set(arr(c.goodSaves).filter((k) => ["fort", "ref", "will"].includes(k)))];
     c.coreSkills = arr(c.coreSkills).filter((x) => typeof x === "string").map((x) => str(x, 120)).slice(0, 12);
@@ -1392,7 +1401,7 @@
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
     firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, CATALOG, catalogPrice, cashOnHand, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
-    newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, nonproficientWeapons, weaponAttack, threatRange, parseDamage,
+    newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, nonproficiencyPenalty, nonproficientWeapons, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,
     validate, syncLevelLog, lockIntMods, derive,
