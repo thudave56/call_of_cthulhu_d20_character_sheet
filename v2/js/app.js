@@ -572,10 +572,13 @@
     const cash = C.cashOnHand(ch);
     const groups = [];
     C.CATALOG.forEach((item, i) => {
+      const { price } = C.catalogPrice(item, ch.era);
+      // Not sold in this period (e.g. a laptop in the 1920s): leave it out. Eras with no printed prices show everything.
+      const pricedEra = ["1901-1920", "1921-1940", "1981+"].includes(ch.era);
+      if (pricedEra && price == null) return;
       let g = groups.find((x) => x.label === item.group);
       if (!g) groups.push(g = { label: item.group, opts: [] });
-      const { price } = C.catalogPrice(item, ch.era);
-      g.opts.push(`<option value="${i}">${esc(item.name)}${price != null ? ` — ${usd(price)}` : ""}</option>`);
+      g.opts.push(`<option value="${i}">${esc(item.name)}${price != null ? ` — ${usd(price)}${item.estimate ? " (est.)" : ""}` : ""}</option>`);
     });
     const options = groups.map((g) => `<optgroup label="${esc(g.label)}">${g.opts.join("")}</optgroup>`).join("");
     const era = (C.ERAS[ch.era] || {}).label || ch.era;
@@ -590,7 +593,7 @@
         <button class="btn small primary" data-action="buy">Buy</button>
         <button class="btn small ghost" data-action="buy-free" title="For things the investigator already owns or was given">Add without paying</button>
       </div>
-      <p class="hint">${esc(era)}: ${esc(basis)} (Tables 6-2, 6-4, 6-9, 6-10, 6-11). The rulebook has no price list for general gear, so use "Something else" with your GM's price. Weapons arrive with their stats; removing something you bought refunds it.</p>`;
+      <p class="hint">${esc(era)}: ${esc(basis)} (Tables 6-2, 6-4, 6-9, 6-10, 6-11). The rulebook prints no prices for general gear: those marked "est." are typical prices for the period, so change the price if your GM sets a different one. Weapons arrive with their stats; removing something you bought refunds it.</p>`;
   }
 
   function edGear(ch, d) {
