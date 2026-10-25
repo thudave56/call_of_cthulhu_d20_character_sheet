@@ -113,6 +113,15 @@ async function main() {
   // The hidden roll/toast bubble is invisible, not peeking at the bottom of the screen.
   assert.equal(await page.$eval("#toast", (t) => t.classList.contains("show") || getComputedStyle(t).visibility), "hidden");
   step("new investigator: profession, Tab focus, hidden toast");
+
+  // "Any one" template skills are picked from a dropdown of the rulebook's specialties.
+  await page.click('.steps a[href$="/skills"]');
+  const pick = 'select[data-action="core-spec"][data-kind="pick"]';
+  await page.waitForSelector(pick);
+  const slot = await page.$eval(pick, (el) => el.dataset.slot);
+  await page.selectOption(`${pick}[data-slot="${slot}"]`, "occult");
+  await page.waitForSelector('[data-action="ranks"][data-id="Knowledge (occult)"]');
+  step("specialty dropdowns");
   for (const s of ["abilities", "skills", "feats", "hp", "gear", "magic", "review"]) {
     await page.click(`.steps a[href$="/${s}"]`);
     await page.waitForSelector(".editor-body");

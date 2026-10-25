@@ -512,6 +512,23 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Specialties offered for the "any one" skills. Players may still enter any
+  // other specialty their GM allows ("Other…").
+  // ---------------------------------------------------------------------------
+  const SPECIALTIES = {
+    // The standard fields of study (p.32). "local" takes a place, e.g. "local: Arkham".
+    Knowledge: ["accounting", "anthropology", "archaeology", "architecture", "art", "astronomy", "biology", "chemistry",
+      "electronics", "engineering", "geography", "geology", "history", "law", "mathematics", "medicine", "meteorology",
+      "occult", "philosophy", "physics", "psychology", "religion", "streetwise"],
+    // The most common specialties (p.27).
+    Craft: ["carpentry", "chemistry", "clockwork", "electronics", "gunsmith", "photography", "sculpting", "songwriting", "writing"],
+    // Specializations named on p.33; each instrument is its own skill.
+    Performance: ["acting", "dancing", "singing", "stage magic", "storytelling", "performance art", "piano", "guitar", "saxophone"],
+    // Common scenario languages (p.36), plus the classical languages of many Mythos tomes.
+    "Speak Other Language": ["Arabic", "Chinese", "French", "German", "Greek", "Latin", "Spanish"],
+  };
+
+  // ---------------------------------------------------------------------------
   // Magic (Ch. 7). Spells cost only Sanity and ability damage — there are no
   // magic points (p.126). Damage is temporary unless marked permanent ("drain").
   // ---------------------------------------------------------------------------
@@ -1332,7 +1349,7 @@
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    firearmFullAttack, lookup, rollExpr, rollDiceExpr, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,

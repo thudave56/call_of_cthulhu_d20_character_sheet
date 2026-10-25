@@ -39,7 +39,7 @@
     { key: "review", label: "Review" },
   ];
 
-  const state = { ch: null, dirty: false, route: { view: "list" }, saveTimer: null, design: S.getPref("design", "tracker"), pocketTab: "vitals", skillFilter: "", skillMode: "all", featFilter: "", featAvailable: false, banners: [], undo: null };
+  const state = { ch: null, dirty: false, route: { view: "list" }, saveTimer: null, design: S.getPref("design", "tracker"), pocketTab: "vitals", skillFilter: "", skillMode: "all", featFilter: "", featAvailable: false, otherSpec: {}, banners: [], undo: null };
 
   // ---------------------------------------------------------------------------
   // Utilities
@@ -207,7 +207,7 @@
   // Rendering
   // ---------------------------------------------------------------------------
   // Attributes that identify a control across re-renders, so focus can be put back.
-  const FOCUS_KEYS = ["action", "bind", "live", "filter", "i", "id", "k", "a", "level", "slot", "v", "n", "mode", "name"];
+  const FOCUS_KEYS = ["action", "kind", "bind", "live", "filter", "i", "id", "k", "a", "level", "slot", "v", "n", "mode", "name"];
   function focusSelector(el) {
     if (!el || el === document.body || !$app.contains(el) && !$nav.contains(el)) return null;
     if (el.id) return "#" + CSS.escape(el.id);
@@ -433,22 +433,41 @@
       <div class="row">${C.abilityIncreaseLevels(ch.level).map((l) => field(`Level ${l}`, `<select data-action="ability-increase" data-level="${l}"><option value="">— choose —</option>${C.ABILITIES.map((a) => `<option ${ch.levelLog[l - 1].abilityIncrease === a ? "selected" : ""}>${a}</option>`).join("")}</select>`)).join("")}</div>` : ""}`;
   }
 
+  /**
+   * Specialty picker for an "any one" skill: a dropdown of the rulebook's
+   * specialties, plus "Other…" with a text box for anything else. Specialties
+   * already taken by another core skill are shown but can't be picked again.
+   */
+  function specPicker(base, current, attrs, key, label, taken) {
+    const list = C.SPECIALTIES[base] || [];
+    const other = state.otherSpec[key] || (current && !list.includes(current));
+    const opts = list.map((v) => {
+      const used = v !== current && taken.has(`${base} (${v})`);
+      return `<option value="${esc(v)}" ${!other && v === current ? "selected" : ""} ${used ? "disabled" : ""}>${esc(v)}${used ? " (taken)" : ""}</option>`;
+    }).join("");
+    return `<select class="spec" ${attrs} data-kind="pick" aria-label="${esc(label)}"><option value="">— choose —</option>${opts}<option value="__other" ${other ? "selected" : ""}>Other…</option></select>`
+      + (other ? `<input class="spec" ${attrs} data-kind="text" value="${esc(current)}" placeholder="specialty" aria-label="${esc(label)} (other)" />` : "");
+  }
+
   function edSkills(ch, d) {
     const tmpl = C.templateCore(ch.profession);
+    const taken = new Set(ch.coreSkills.filter((id) => !id.includes("*")));
     // Template slots with specialty pickers
     const slotHtml = tmpl.map((t, i) => {
       if (!t.includes("*")) return `<li>${esc(t)}</li>`;
       const base = C.skillBase(t);
-      const prefix = t.includes("local:") ? "local: " : "";
       const current = ch.coreSkills[i] && !ch.coreSkills[i].includes("*") ? C.skillSpecialty(ch.coreSkills[i]).replace(/^local:\s*/, "") : "";
-      return `<li>${esc(base)} (${prefix}<input class="spec" data-action="core-spec" data-slot="${i}" value="${esc(current)}" placeholder="${prefix ? "city" : "specialty"}" aria-label="${esc(base)} specialty" />)</li>`;
+      // Knowledge (local: …) takes a place name, so it stays a text box.
+      if (t.includes("local:")) return `<li>${esc(base)} (local: <input class="spec" data-action="core-spec" data-slot="${i}" value="${esc(current)}" placeholder="city" aria-label="${esc(base)} (local) city" />)</li>`;
+      return `<li>${esc(base)} (${specPicker(base, current, `data-action="core-spec" data-slot="${i}"`, "core-" + i, `${base} specialty`, taken)})</li>`;
     }).join("");
     const extra = ch.coreSkills.slice(9);
     const options = (sel) => `<option value="">— choose —</option>` + C.SKILLS.filter((s) => !s.mythos).map((s) => `<option value="${esc(s.name)}" ${sel && C.skillBase(sel) === s.name ? "selected" : ""}>${esc(s.name)}</option>`).join("");
     const extraHtml = [0, 1, 2].map((i) => {
       const id = extra[i] || "";
       const def = id ? C.skillDef(id) : null;
-      return `<div class="extra-core"><select data-action="extra-core" data-i="${i}" aria-label="Extra core skill ${i + 1}">${options(id)}</select>${def && def.specialty ? `<input class="spec" data-action="extra-spec" data-i="${i}" value="${esc(C.skillSpecialty(id) === "*" ? "" : C.skillSpecialty(id))}" placeholder="specialty" aria-label="Extra core skill ${i + 1} specialty" />` : ""}</div>`;
+      const spec = def && def.specialty ? (C.skillSpecialty(id) === "*" ? "" : C.skillSpecialty(id)) : "";
+      return `<div class="extra-core"><select data-action="extra-core" data-i="${i}" aria-label="Extra core skill ${i + 1}">${options(id)}</select>${def && def.specialty ? specPicker(C.skillBase(id), spec, `data-action="extra-spec" data-i="${i}"`, "extra-" + i, `Extra core skill ${i + 1} specialty`, taken) : ""}</div>`;
     }).join("");
     const sp = d.skillPoints;
     const rows = d.skills.filter((r) => !r.def.mythos).map((r) => `<tr class="${r.core ? "core" : ""}">
@@ -467,7 +486,7 @@
         <p class="hint">Core skills cost 1 point per rank (max level + 3). All other skills cost 1 point per ½ rank (max half that); half ranks don't add to checks. Cthulhu Mythos can't be bought — it comes from play.</p></div>
     </div>
     <div class="sp-tracker ${sp.remaining < 0 ? "bad" : sp.remaining === 0 ? "ok" : ""}">Skill points: <strong>${sp.spent}</strong> / ${sp.available} spent · ${sp.remaining >= 0 ? sp.remaining + " left" : -sp.remaining + " over!"} <span class="muted">(${sp.perLevel.join(" + ")})</span></div>
-    <div class="row"><label class="field inline"><span class="lbl">Add a specialty skill</span><select id="addSpecBase">${C.SKILLS.filter((s) => s.specialty).map((s) => `<option>${s.name}</option>`).join("")}</select><input id="addSpecName" placeholder="e.g. occult, French, painting" /><button class="btn small" data-action="add-spec">Add</button></label></div>
+    <div class="row"><label class="field inline"><span class="lbl">Add a specialty skill</span><select id="addSpecBase">${C.SKILLS.filter((s) => s.specialty).map((s) => `<option>${s.name}</option>`).join("")}</select><input id="addSpecName" placeholder="e.g. occult, French, painting" list="specSuggest" /><datalist id="specSuggest">${[...new Set(Object.values(C.SPECIALTIES).flat())].map((v) => `<option value="${esc(v)}">`).join("")}</datalist><button class="btn small" data-action="add-spec">Add</button></label></div>
     <div class="table-wrap"><table class="skill-edit"><thead><tr><th>Skill</th><th>Core</th><th>Ranks</th><th>Max</th><th>Cost</th><th>Abil</th><th>Misc</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   function breakdown(r) {
@@ -703,6 +722,33 @@
     deferRender = true;
     try { onChange(e); } finally { deferRender = false; }
   }
+  /** A template "any one" slot got its specialty (dropdown or Other… text). */
+  function setCoreSpec(el) {
+    update((c) => {
+      const slot = +el.dataset.slot; const t = C.templateCore(c.profession)[slot];
+      const val = el.value.trim();
+      const old = c.coreSkills[slot];
+      c.coreSkills[slot] = val ? t.replace("*", val) : t;
+      if (old && c.skills[old] && old !== c.coreSkills[slot] && !old.includes("*")) { c.skills[c.coreSkills[slot]] = c.skills[old]; delete c.skills[old]; }
+      if (old && !old.includes("*") && !c.coreSkills[slot].includes("*")) renameSkillChoice(c, old, c.coreSkills[slot]);
+    });
+  }
+  /** An extra core skill was chosen, or its specialty set. */
+  function setExtraCore(a, el, i) {
+    update((c) => {
+      const core = c.coreSkills.slice(0, 9);
+      while (core.length < 9) core.push(C.templateCore(c.profession)[core.length]);
+      const extra = c.coreSkills.slice(9);
+      const old = extra[i];
+      if (a === "extra-core") extra[i] = el.value; else extra[i] = `${C.skillBase(extra[i])} (${el.value.trim() || "*"})`;
+      if (a === "extra-spec" && old && !old.includes("*")) {
+        if (c.skills[old] && !c.skills[extra[i]]) { c.skills[extra[i]] = c.skills[old]; delete c.skills[old]; }
+        renameSkillChoice(c, old, extra[i]);
+      }
+      if (C.skillDef(extra[i]) && C.skillDef(extra[i]).specialty && !/\(/.test(extra[i])) extra[i] = `${extra[i]} (*)`;
+      c.coreSkills = core.concat(extra.filter(Boolean));
+    });
+  }
   /** Skill Emphasis follows a renamed specialty skill. */
   function renameSkillChoice(c, from, to) {
     if (!from || from === to) return;
@@ -766,27 +812,14 @@
       case "opt-unmastered": update((c) => { c.options.unmasteredMagic = el.checked; }); break;
       case "spell": case "tome": update((c) => { const k = el.dataset.k; c[a === "spell" ? "spells" : "tomes"][i][k] = el.type === "number" ? (el.value === "" ? 0 : +el.value) : el.value; }); break;
       case "ability-increase": update((c) => { c.levelLog[+el.dataset.level - 1].abilityIncrease = el.value || null; return C.lockIntMods(c, +el.dataset.level); }); break;
-      case "core-spec": update((c) => {
-        const slot = +el.dataset.slot; const t = C.templateCore(c.profession)[slot];
-        const val = el.value.trim();
-        const old = c.coreSkills[slot];
-        c.coreSkills[slot] = val ? t.replace("*", val) : t;
-        if (old && c.skills[old] && old !== c.coreSkills[slot] && !old.includes("*")) { c.skills[c.coreSkills[slot]] = c.skills[old]; delete c.skills[old]; }
-        if (old && !old.includes("*") && !c.coreSkills[slot].includes("*")) renameSkillChoice(c, old, c.coreSkills[slot]);
-      }); break;
-      case "extra-core": case "extra-spec": update((c) => {
-        const core = c.coreSkills.slice(0, 9);
-        while (core.length < 9) core.push(C.templateCore(c.profession)[core.length]);
-        const extra = c.coreSkills.slice(9);
-        const old = extra[i];
-        if (a === "extra-core") extra[i] = el.value; else extra[i] = `${C.skillBase(extra[i])} (${el.value.trim() || "*"})`;
-        if (a === "extra-spec" && old && !old.includes("*")) {
-          if (c.skills[old] && !c.skills[extra[i]]) { c.skills[extra[i]] = c.skills[old]; delete c.skills[old]; }
-          renameSkillChoice(c, old, extra[i]);
-        }
-        if (C.skillDef(extra[i]) && C.skillDef(extra[i]).specialty && !/\(/.test(extra[i])) extra[i] = `${extra[i]} (*)`;
-        c.coreSkills = core.concat(extra.filter(Boolean));
-      }); break;
+      case "core-spec": case "extra-spec": {
+        const key = a === "core-spec" ? "core-" + el.dataset.slot : "extra-" + el.dataset.i;
+        if (el.value === "__other") { state.otherSpec[key] = true; render(); setTimeout(() => { const t = document.querySelector(`input[data-action="${a}"][data-${a === "core-spec" ? "slot" : "i"}="${a === "core-spec" ? el.dataset.slot : el.dataset.i}"][data-kind="text"]`); if (t) t.focus(); }, 0); break; }
+        if (el.dataset.kind === "pick") delete state.otherSpec[key];
+        if (a === "core-spec") setCoreSpec(el); else setExtraCore(a, el, i);
+        break;
+      }
+      case "extra-core": delete state.otherSpec["extra-" + i]; setExtraCore(a, el, i); break;
       case "ranks": case "misc": update((c) => {
         const id = el.dataset.id;
         c.skills[id] = c.skills[id] || { ranks: 0, misc: 0 };

@@ -101,6 +101,7 @@ To exercise play mode: deal 17 damage and the sheet shows **−1, Dying**, with 
 | 12 core skills (9 template + 3 choice); specialties are separate skills | p.11–13, p.16 | `templateCore`, `validate` | ✓ |
 | Skill points (8+Int)×4, then 8+Int per level (min 1); core 1 pt/rank; noncore 1 pt per ½ rank; half ranks don't count | p.16–18 | `skillPoints`, `skillTable` | ✓ |
 | Trained-only skills, key abilities, armor-penalty skills | Table 2-1, p.18 | `SKILLS` | ✓ |
+| Specialty choices offered for "any one" skills: the 23 standard Knowledge fields, common Craft specialties, Performance specializations, common languages; "Other…" for anything else | p.27, p.32, p.33, p.36 | `SPECIALTIES` | ✓ |
 | Synergy +2 at 5 ranks | Table 2-4, p.22 | `SYNERGIES` | ✓ |
 | Cthulhu Mythos can't be bought, has no max; max Sanity = 99 − (ranks + bonuses) | p.18, p.27, p.47 | `mythos` field, `sanity` | ✓ |
 | Swim −1 per 5 lb of gear; no other encumbrance rule exists | p.37 | `gearWeight`, `skillTable` | ✓ |
