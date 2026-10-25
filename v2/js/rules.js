@@ -511,6 +511,9 @@
     return Object.assign(c, overrides);
   }
 
+  // Equipment for sale at character creation — CATALOG_PLACEHOLDER
+  const CATALOG = [];
+
   // ---------------------------------------------------------------------------
   // Specialties offered for the "any one" skills. Players may still enter any
   // other specialty their GM allows ("Other…").
@@ -920,6 +923,25 @@
   // ---------------------------------------------------------------------------
   // Money (p.15, Wealth p.42)
   // ---------------------------------------------------------------------------
+  /** Cash on hand: the amount entered, or the starting money (Tables 1-13, 1-14) until one is entered. */
+  function cashOnHand(c) {
+    if (c.money && c.money.cash !== null && c.money.cash !== undefined) return toNum(c.money.cash, 0);
+    const m = money(c);
+    return m.rolled ? m.startingTotal : null;
+  }
+  /**
+   * The rulebook price of a catalog item for the character's era. The price
+   * tables give a 1920s and a 2000s column (Tables 6-2, 6-9 to 6-11): eras up to
+   * 1940 use the 1920s price, 1981+ the 2000s price. 1941–1980 has no printed
+   * price, so the player enters what the GM allows. Returns { price, basis }.
+   */
+  function catalogPrice(item, era) {
+    if (!item) return { price: null, basis: null };
+    if (era === "1901-1920" || era === "1921-1940") return { price: item.p1920 ?? null, basis: item.p1920 == null ? "not sold in the 1920s" : "1920s price" };
+    if (era === "1981+") return { price: item.p2000 ?? null, basis: item.p2000 == null ? "no 2000s price" : "2000s price" };
+    return { price: null, basis: "no price printed for this era" };
+  }
+
   function money(c) {
     const era = ERAS[c.era] || ERAS["1921-1940"];
     const prof = PROFESSION_BY_NAME[c.profession];
@@ -1012,6 +1034,8 @@
       if (!e || !e.abilityIncrease) warn(`Level ${l}: choose an ability score to increase.`, "abilities");
     }
     if (!money(c).rolled) warn("Starting money not rolled yet.", "hp");
+    const cash = cashOnHand(c);
+    if (cash !== null && cash < 0) err(`Spent $${(-cash).toFixed(2)} more than the cash on hand.`, "gear");
     return issues;
   }
 
@@ -1106,11 +1130,13 @@
       twoHanded: !!w.twoHanded, capacity: numOrNull(w.capacity) === null ? null : Math.max(0, toInt(w.capacity)),
       ammo: numOrNull(w.ammo) === null ? null : Math.max(0, toInt(w.ammo)), weight: Math.max(0, toNum(w.weight, 0)),
       equipped: w.equipped !== false,   // ready to use; unequipped weapons are carried but not in the attack list
+      cost: numOrNull(w.cost) === null ? null : Math.max(0, Math.round(toNum(w.cost, 0) * 100) / 100),   // paid at creation
     }));
     for (const w of c.weapons) if (w.capacity !== null && w.ammo !== null && w.ammo > w.capacity) w.ammo = w.capacity;
     c.equipment = arr(c.equipment).filter(isObj).map((e) => ({
       id: ID_RE.test(String(e.id || "")) ? String(e.id) : uid(), name: str(e.name, 200), qty: Math.max(1, toInt(e.qty, 1)),
       weight: Math.max(0, toNum(e.weight, 0)), notes: str(e.notes, 300),
+      cost: numOrNull(e.cost) === null ? null : Math.max(0, Math.round(toNum(e.cost, 0) * 100) / 100),   // paid at creation
     }));
     c.log = arr(c.log).filter(isObj).slice(0, 60).map((l) => ({ t: str(l.t, 40), text: str(l.text, 300) }));
     const skills = isObj(c.skills) ? c.skills : {};
@@ -1349,7 +1375,7 @@
     baseAttackBonus, attackSequence, baseSave, goodSaveCount, coreMaxRanks, noncoreMaxRanks, featSlots,
     abilityIncreaseLevels, defenseBonus, agingCategory, xpForLevel, offenseBonusFeat, gearWeight, sampleCharacter,
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
-    firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
+    firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, CATALOG, catalogPrice, cashOnHand, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
     newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,

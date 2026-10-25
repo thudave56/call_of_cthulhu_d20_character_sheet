@@ -340,7 +340,7 @@
     </section>`;
   }
   /** Cash on hand: the amount entered, or the starting money (Tables 1-13, 1-14) until one is entered. */
-  function cashOnHand(ch, d) { return ch.money.cash ?? (d.money.rolled ? d.money.startingTotal : null); }
+  function cashOnHand(ch) { return C.cashOnHand(ch); }
 
   function notesBlock(ch, d, x) {
     return `<section class="panel notes" aria-label="Session notes"><h2>Session notes</h2>
