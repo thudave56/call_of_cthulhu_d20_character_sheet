@@ -602,7 +602,7 @@
     const options = groups.map((g) => `<optgroup label="${esc(g.label)}">${g.opts.join("")}</optgroup>`).join("");
     const era = (C.ERAS[ch.era] || {}).label || ch.era;
     const basis = ch.era === "1981+" ? "2000s prices" : ch.era === "1901-1920" || ch.era === "1921-1940" ? "1920s prices" : "no prices are printed for this era, so enter what your GM allows";
-    return `<h3>Buy equipment</h3>
+    return `<h3>Equipment</h3>
       <p class="funds ${cash !== null && cash < 0 ? "bad" : ""}">Cash on hand: <strong>${cash === null ? "—" : usd(cash)}</strong>${d.money.rolled ? ` <span class="muted">(starting money ${usd(d.money.startingTotal)})</span>` : ` <span class="warn">Roll starting money on the <a href="#/edit/${ch.id}/hp">HP &amp; Money</a> step first.</span>`}</p>
       <div class="row buy-row">
         <select id="buyItem" data-action="buy-pick" aria-label="Item to buy"><option value="">— choose an item —</option>${options}<option value="custom">Something else (type its name)…</option></select>
@@ -612,7 +612,7 @@
         <button class="btn small primary" data-action="buy">Buy</button>
         <button class="btn small ghost" data-action="buy-free" title="For things the investigator already owns or was given">Add without paying</button>
       </div>
-      <p class="hint">${esc(era)}: ${esc(basis)} (Tables 6-2, 6-4, 6-9 to 6-12 and the equipment lists on pp.114–117). Change the price if your GM sets a different one; anything not listed goes under "Something else". Weapons arrive with their stats; removing something you bought refunds it.</p>`;
+      <p class="hint">${esc(era)}: ${esc(basis)} (Tables 6-2, 6-4, 6-9 to 6-12 and the equipment lists on pp.114–117). Change the price if your GM sets a different one; anything not listed goes under "Something else". Weapons arrive with their stats and armor is put on. Removing something you bought asks whether to refund it. During play, add things freely under Equipment &amp; Money on the Play screen.</p>`;
   }
 
   function edGear(ch, d) {
@@ -630,17 +630,18 @@
       <td class="num strong">${fmt(w.bonus)}${!w.parts.nonproficient ? "" : ' <span class="bad" title="Not proficient: −4">!</span>'}</td>
       <td><button class="btn small ghost" data-action="weapon-remove" data-i="${i}" aria-label="Remove weapon">✕</button></td></tr>`).join("");
     const items = ch.equipment.map((e, i) => `<tr><td><input data-action="item" data-i="${i}" data-k="name" value="${esc(e.name)}" aria-label="Item" /></td><td><input type="number" min="0" data-action="item" data-i="${i}" data-k="qty" value="${esc(e.qty ?? 1)}" style="width:4em" aria-label="Quantity" /></td><td><input type="number" min="0" step="0.5" data-action="item" data-i="${i}" data-k="weight" value="${esc(e.weight ?? "")}" style="width:4em" aria-label="Weight each (lb)" /></td><td><input data-action="item" data-i="${i}" data-k="notes" value="${esc(e.notes || "")}" aria-label="Notes" /></td><td><button class="btn small ghost" data-action="item-remove" data-i="${i}" aria-label="Remove item">✕</button></td></tr>`).join("");
-    return `${buyPanel(ch, d)}${proficiencyFixes(ch, d)}
+    return `${buyPanel(ch, d)}
+      ${items ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Item</th><th>Qty</th><th>lb each</th><th>Notes</th><th></th></tr></thead><tbody>${items}</tbody></table></div>` : ""}
+      ${proficiencyFixes(ch, d)}
       <h3>Armor (Table 6-4)</h3>
       ${field("Worn armor", `<select data-bind="armor">${C.ARMOR.map((a) => `<option ${a.name === ch.armor ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select>`, `AC ${d.combat.ac} (10 ${fmt(d.combat.acParts.dex)} Dex + ${d.combat.acParts.armor} armor${d.combat.acParts.defense ? ` + ${d.combat.acParts.defense} defense bonus` : ""}). ${d.combat.armor.note ? esc(d.combat.armor.note) + ". " : ""}${d.combat.acp ? `Armor check penalty ${d.combat.acp} to Balance, Climb, Escape Artist, Hide, Jump, Move Silently, Swim, Tumble and attack rolls.` : ""}`)}
       ${field("Armor weight (lb)", `<input type="number" min="0" step="0.5" data-bind="armorWeight" value="${esc(ch.armorWeight || "")}" />`, "Table 6-4 gives no weights; enter your own if your GM tracks them.")}
       <p class="hint">Gear carried or worn: <strong>${d.gearWeight} lb</strong>. The rulebook has no carrying-capacity table for investigators; the only weight rule is Swim: −1 per 5 lb of gear (p.37), applied automatically (${Math.floor(d.gearWeight / 5) ? "−" + Math.floor(d.gearWeight / 5) : "no penalty"}).</p>
       <h3>Weapons</h3>
       <div class="row"><select id="weaponPreset" aria-label="Weapon preset">${[["Melee (Table 6-1)", (w) => w.category === "melee" || w.category === "unarmed"], ["Generic firearms (Table 6-3)", (w) => w.category !== "melee" && w.category !== "unarmed" && !w.source], ["Specific firearms (Table 6-5)", (w) => w.source === "Table 6-5"]].map(([label, f]) => `<optgroup label="${label}">${C.WEAPON_PRESETS.map((w, i) => [w, i]).filter(([w]) => f(w)).map(([w, i]) => `<option value="${i}">${esc(w.name)} (${esc(w.damage)})</option>`).join("")}</optgroup>`).join("")}</select><button class="btn small" data-action="weapon-add">Add weapon</button><button class="btn small ghost" data-action="weapon-add-custom">Add custom</button></div>
+      <p class="hint">To pay for a weapon, buy it from the Equipment list above. These buttons add one without paying (one the investigator already owns), with stats from Tables 6-1, 6-3 and 6-5.</p>
       ${weapons ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Name</th><th>Category</th><th>Damage</th><th>Crit</th><th>Range</th><th>Cap.</th><th>lb</th><th></th><th>Ready</th><th>Attack</th><th></th></tr></thead><tbody>${weapons}</tbody></table></div>` : '<p class="muted">No weapons.</p>'}
-      <h3>Equipment</h3>
-      <div class="row"><input id="itemName" placeholder="Flashlight, notebook, camera…" aria-label="New item" /><button class="btn small" data-action="item-add">Add item</button></div>
-      ${items ? `<div class="table-wrap"><table class="gear-table"><thead><tr><th>Item</th><th>Qty</th><th>lb each</th><th>Notes</th><th></th></tr></thead><tbody>${items}</tbody></table></div>` : ""}`;
+`;
   }
 
   function edMagic(ch, d) {
@@ -803,7 +804,6 @@
       case "money-roll": { const r = C.rollDie(6); update((c) => setMoneyRoll(c, r)); toast(`Money roll: ${r}`); break; }
       case "weapon-add": { const p = C.WEAPON_PRESETS[+document.getElementById("weaponPreset").value]; update((c) => { c.weapons.push(Object.assign({ id: C.uid(), ammo: p.capacity || null }, C.clone(p))); }); break; }
       case "weapon-add-custom": update((c) => { c.weapons.push({ id: C.uid(), name: "New weapon", category: "melee", damage: "1d6", critical: "×2", range: "" }); }); break;
-      case "item-add": { const n = document.getElementById("itemName").value.trim(); if (n) update((c) => { c.equipment.push({ id: C.uid(), name: n, qty: 1, notes: "" }); }); break; }
       case "item-remove": case "weapon-remove": {
         const list = a === "item-remove" ? "equipment" : "weapons";
         const it = state.ch[list][i];
