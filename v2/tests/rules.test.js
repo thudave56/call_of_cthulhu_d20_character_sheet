@@ -539,3 +539,15 @@ test("Weapons are equipped unless marked otherwise (old saves keep theirs ready)
   assert.deepEqual(c.weapons.map((w) => w.equipped), [true, false]);
   assert.equal(CoC.derive(c).weapons.length, 2);   // both still carried (weight, feats)
 });
+
+test("Every 'any one' template skill has a specialty list (p.27, p.32, p.33, p.36)", () => {
+  for (const p of CoC.PROFESSIONS) {
+    for (const t of CoC.templateCore(p.name).filter((id) => id.includes("*") && !id.includes("local:"))) {
+      const list = CoC.SPECIALTIES[CoC.skillBase(t)];
+      assert.ok(list && list.length, `${p.name}: ${t}`);
+    }
+  }
+  assert.ok(CoC.SPECIALTIES.Knowledge.includes("occult"));
+  assert.equal(CoC.SPECIALTIES.Knowledge.length, 23);   // "the twenty-three standard fields of study" (p.32)
+  assert.ok(CoC.SPECIALTIES["Speak Other Language"].includes("Latin"));
+});
