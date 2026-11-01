@@ -142,6 +142,16 @@ async function main() {
   }
   step("editor steps open");
 
+  // Quick investigator: the basics in, a complete character that follows the creation rules out.
+  await page.goto(BASE + "#/quick");
+  await page.waitForSelector("#qName");
+  await page.fill("#qName", "Quick Smoke");
+  await page.selectOption("#qProfession", "Detective");
+  await page.click('[data-action="quick-build"]');
+  await page.waitForFunction(() => /\/review$/.test(location.hash) && App.state.ch.name === "Quick Smoke");
+  assert.deepEqual(await page.evaluate(() => CoC.validate(App.state.ch).map((i) => i.msg)), []);
+  step("quick investigator");
+
   await page.setViewportSize({ width: 390, height: 844 });
   for (const design of ["tracker", "sheet", "pocket"]) {
     await page.selectOption('[data-action="design"]', design);

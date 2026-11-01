@@ -5,7 +5,7 @@
  * refreshed); when offline the last copy is served. Characters themselves live
  * in localStorage, so they are available offline either way.
  */
-const CACHE = "investigator-sheets-v2";
+const CACHE = "investigator-sheets-v3";
 const FILES = [
   "./", "./index.html", "./css/app.css", "./js/catalog.js", "./js/rules.js", "./js/store.js", "./js/designs.js", "./js/app.js",
   "./manifest.webmanifest", "./icon.svg", "../version-switch.js",
