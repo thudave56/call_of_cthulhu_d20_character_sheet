@@ -516,6 +516,29 @@
   // kept in catalog.js (Tables 6-2, 6-4, 6-9 to 6-12 and pp.114–117).
   const CATALOG = catalogRows || [];
 
+  /**
+   * Put a catalog item on the character (weapons with their stats, armor worn,
+   * anything else as equipment). With `pay`, `each` × `qty` comes off the cash
+   * on hand (which must already be known). `name` is used when there is no item.
+   * Returns the total paid.
+   */
+  function addCatalogItem(c, item, { name = null, qty = 1, each = null, pay = false } = {}) {
+    const label = item ? item.name : name;
+    const cost = pay ? each : null;
+    if (item && item.kind === "weapon") {
+      const p = WEAPON_PRESETS.find((w) => w.name === item.preset) || { category: "melee", damage: "", critical: "×2" };
+      for (let k = 0; k < qty; k++) c.weapons.push(Object.assign({}, clone(p), { id: uid(), name: item.name, ammo: p.capacity || null, equipped: true, cost, notes: [p.notes, item.preset && item.preset !== item.name ? `stats: ${item.preset}` : "", item.note].filter(Boolean).join("; ") }));
+    } else if (item && item.kind === "armor") {
+      c.armor = item.armor;
+      c.equipment.push({ id: uid(), name: item.name, qty: 1, weight: 0, notes: "worn armor", cost, armor: item.armor });
+    } else {
+      c.equipment.push({ id: uid(), name: label, qty, weight: 0, notes: item && item.note ? item.note : "", cost });
+    }
+    const total = pay ? Math.round(each * qty * 100) / 100 : 0;
+    if (pay) c.money.cash = Math.round(((cashOnHand(c) || 0) - total) * 100) / 100;
+    return total;
+  }
+
   // ---------------------------------------------------------------------------
   // Specialties offered for the "any one" skills. Players may still enter any
   // other specialty their GM allows ("Other…").
@@ -1372,6 +1395,127 @@
   }
 
   /** Worked example used by v2/DESIGNS.md and the tests (3rd-level Professor, age 52). */
+  // ---------------------------------------------------------------------------
+  // Quick build: a complete, rules-legal 1st-level investigator from the basics
+  // (name, era, age, gender, profession, attack option). Every choice it makes
+  // can be changed afterwards in the editor.
+  // ---------------------------------------------------------------------------
+  // Specialties tried first for each profession's "any one" skills, then the general lists.
+  const QUICK_SPECIALTIES = {
+    Antiquarian: { Knowledge: ["art", "archaeology", "occult"], "Speak Other Language": ["Latin"] },
+    Archaeologist: { Knowledge: ["anthropology"], "Speak Other Language": ["Arabic"] },
+    "Artist/Musician": { Craft: ["sculpting"], Performance: ["piano"] },
+    "Blue-Collar Worker": { Craft: ["carpentry"] },
+    Dilettante: { Knowledge: ["local: Arkham"], "Speak Other Language": ["French"] },
+    "Doctor/Nurse": { Knowledge: ["psychology"] },
+    "Priest/Clergyman": { Knowledge: ["history", "philosophy"], "Speak Other Language": ["Latin"] },
+    Professor: { Knowledge: ["history", "archaeology", "occult"], "Speak Other Language": ["Latin"] },
+    Technician: { Craft: ["electronics"], Knowledge: ["engineering"] },
+    "White-Collar Worker": { Knowledge: ["accounting"] },
+    "Writer/Reporter": { Knowledge: ["history", "occult"] },
+  };
+  const QUICK_SPECIALTY_DEFAULTS = {
+    Knowledge: ["occult", "history", "archaeology", "anthropology", "art", "psychology", "religion", "law", "local: Arkham"],
+    Craft: ["photography", "writing", "carpentry"], Performance: ["acting", "singing"], "Speak Other Language": ["Latin", "French", "German"],
+  };
+  // The three extra core skills, and noncore skills for any points left over: an investigator's staples.
+  const QUICK_EXTRA_CORE = ["Spot", "Listen", "Search", "Research", "Knowledge (occult)", "Sense Motive", "Heal", "Gather Information", "Drive", "Hide", "Diplomacy"];
+  const QUICK_NONCORE = ["Spot", "Listen", "Search", "Research", "Hide", "Move Silently", "Sense Motive", "Drive", "Heal", "Climb", "Swim", "Jump"];
+  // A feat that suits each profession (the other is a Weapon Proficiency).
+  const QUICK_FEAT = {
+    Agent: { name: "Stealthy" }, Antiquarian: { name: "Sharp-Eyed" }, Archaeologist: { name: "Athletic" },
+    "Artist/Musician": { name: "Persuasive" }, "Blue-Collar Worker": { name: "Gearhead" }, Criminal: { name: "Nimble" },
+    Detective: { name: "Alertness" }, Dilettante: { name: "Wealth" }, "Doctor/Nurse": { name: "Skill Emphasis", choice: "Heal" },
+    Parapsychologist: { name: "Iron Will" }, "Priest/Clergyman": { name: "Iron Will" }, Professor: { name: "Skill Emphasis", choice: "Research" },
+    Psychologist: { name: "Sharp-Eyed" }, Soldier: { name: "Point Blank Shot" }, Technician: { name: "Gearhead" },
+    "White-Collar Worker": { name: "Trustworthy" }, "Writer/Reporter": { name: "Trustworthy" },
+  };
+  // Starting kit, bought at the era's price: a firearm to match the proficiency, and a flashlight.
+  const QUICK_WEAPON = { pistol: ".45 ACP semiautomatic", rifle: "Rifle, bolt-action, military" };
+  const QUICK_GEAR = ["Flashlight, 3 cell"];
+
+  /** 4d6, drop the lowest, six times; the whole set is rerolled while it is too low (p.6). */
+  function rollAbilitySet(rng = Math.random) {
+    let set;
+    for (let tries = 0; tries < 1000; tries++) {   // capped, so a broken random source can't hang the page
+      set = ABILITIES.map(() => { const d = [0, 1, 2, 3].map(() => rollDie(6, rng)).sort((x, y) => x - y); return d[1] + d[2] + d[3]; });
+      const total = set.reduce((s, v) => s + abilityMod(v), 0);
+      if (total > 0 && Math.max(...set) > 13) break;
+    }
+    return set;
+  }
+
+  /**
+   * Fill in everything after the basics: abilities (rolled, best scores on the
+   * abilities the profession's skills use), core skills and specialties, skill
+   * ranks, good saves, feats, money, height and weight, and a starting kit.
+   * Takes the character's level back to 1. Returns { character, rolls }.
+   */
+  function quickBuild(src, rng = Math.random) {
+    let c = normalize(Object.assign(clone(src), { level: 1, levelLog: [{ level: 1, intMod: null, hpRoll: null, abilityIncrease: null }], levelLogArchive: {} }));
+    const prof = PROFESSION_BY_NAME[c.profession];
+    const tmpl = templateCore(c.profession);
+    // Abilities: the highest rolls go to the abilities most of the template skills use.
+    const rolls = rollAbilitySet(rng);
+    const tieBreak = ["Dex", "Con", "Int", "Wis", "Cha", "Str"];
+    const uses = Object.fromEntries(ABILITIES.map((a) => [a, tmpl.filter((id) => (skillDef(id) || {}).ability === a).length]));
+    const order = ABILITIES.slice().sort((a, b) => uses[b] - uses[a] || tieBreak.indexOf(a) - tieBreak.indexOf(b));
+    const sorted = rolls.slice().sort((x, y) => y - x);
+    order.forEach((a, k) => { c.abilities[a] = sorted[k]; });
+    // Core skills: the template with its specialties filled in, plus three staples.
+    const core = [];
+    const prefs = QUICK_SPECIALTIES[c.profession] || {};
+    for (const t of tmpl) {
+      if (!t.includes("*")) { core.push(t); continue; }
+      const base = skillBase(t);
+      const local = /\(local: \*\)/.test(t);
+      const choices = (prefs[base] || []).concat(QUICK_SPECIALTY_DEFAULTS[base] || [], SPECIALTIES[base] || [])
+        .filter((v) => local === v.startsWith("local: "))
+        .map((v) => local ? v.slice(7) : v);
+      const pick = choices.find((v) => !core.includes(t.replace("*", v)) && !tmpl.includes(t.replace("*", v)));
+      core.push(t.replace("*", pick));
+    }
+    for (const id of QUICK_EXTRA_CORE) if (core.length < 12 && !core.includes(id)) core.push(id);
+    c.coreSkills = core;
+    c.skills = {};
+    c.mythos = 0;
+    c = lockIntMods(c, 1);
+    // Skill points: one rank at a time around the core skills (so each is usable),
+    // up to the maximum, then half ranks in useful noncore skills.
+    let left = skillPoints(c).available;
+    const coreMax = coreMaxRanks(1), noncoreMax = noncoreMaxRanks(1);
+    for (let r = 1; r <= coreMax && left > 0; r++) {
+      for (const id of core) { if (left <= 0) break; c.skills[id] = { ranks: r, misc: 0 }; left -= 1; }
+    }
+    const noncore = QUICK_NONCORE.filter((id) => !core.includes(id));
+    for (let r = 0.5; r <= noncoreMax && left > 0; r += 0.5) {
+      for (const id of noncore) { if (left <= 0) break; c.skills[id] = { ranks: r, misc: 0 }; left -= 1; }
+    }
+    // Good saves: the ones backed by the best abilities (Will first on a tie).
+    const scores = abilityScores(c);
+    const saveAbil = { will: "Wis", ref: "Dex", fort: "Con" };
+    c.goodSaves = ["will", "ref", "fort"].sort((a, b) => scores[saveAbil[b]].mod - scores[saveAbil[a]].mod).slice(0, goodSaveCount(c.attackOption));
+    // Feats: Weapon Proficiency for the starting firearm, a profession feat, and
+    // the Offense option's bonus proficiency when the table uses it.
+    const gunCategory = c.profession === "Soldier" ? "rifle" : "pistol";
+    c.feats = [{ name: "Weapon Proficiency", choice: gunCategory }, Object.assign({ choice: null }, QUICK_FEAT[c.profession] || { name: "Alertness" })];
+    if (offenseBonusFeat(c)) c.feats.push({ name: "Weapon Proficiency", choice: "melee" });
+    while (c.feats.length > featSlots(c)) c.feats.pop();
+    // Money, size and the starting kit.
+    c.money = { roll: rollDie(6, rng), cash: null, notes: c.money && c.money.notes || "" };
+    if (!c.height && !c.weight) { const hw = rollHeightWeight(c.gender, rng); c.height = hw.height; c.weight = hw.weight; }
+    c.weapons = []; c.equipment = []; c.armor = "None";
+    for (const name of [QUICK_WEAPON[gunCategory]].concat(QUICK_GEAR)) {
+      const item = CATALOG.find((x) => x.name === name);
+      if (!item) continue;
+      const { price } = catalogPrice(item, c.era);
+      addCatalogItem(c, item, { each: price, pay: price != null });
+    }
+    c.hp = { current: null, subdual: 0, stable: false };
+    c.sanity = Object.assign(newCharacter().sanity, { log: [] });
+    return { character: normalize(c), rolls };
+  }
+
   function sampleCharacter() {
     const c = newCharacter({
       name: "Dr. Kristof Lehmann (sample)", gender: "M", age: 52, era: "1921-1940", profession: "Professor", level: 3,
@@ -1403,7 +1547,7 @@
     SANITY_LOSS_EXAMPLES, TEMP_INSANITY_DURATION, SHORT_TEMP_INSANITY, LONG_TEMP_INSANITY, INDEFINITE_INSANITY,
     firearmFullAttack, lookup, rollExpr, rollDiceExpr, SPECIALTIES, CATALOG, catalogPrice, cashOnHand, parseSpellCost, spellSaveDC, tomeStudyBonus, CONDITIONS, CONDITION_BY_KEY, conditionEffects, parseSanityLoss, sanityCheck, rollTemporaryInsanity, rollIndefiniteInsanity,
     SHOTGUN_DAMAGE, TWO_WEAPON, HEIGHT_WEIGHT, DC_EXAMPLES, ABILITY_CHECK_EXAMPLES, ATTACK_MODIFIERS, COVER, CONCEALMENT, rollHeightWeight,
-    newCharacter, normalize, abilityScores, mods, saves, combat, isProficient, nonproficiencyPenalty, nonproficientWeapons, weaponAttack, threatRange, parseDamage,
+    newCharacter, normalize, quickBuild, rollAbilitySet, addCatalogItem, abilityScores, mods, saves, combat, isProficient, nonproficiencyPenalty, nonproficientWeapons, weaponAttack, threatRange, parseDamage,
     hitPoints, hpState, sanity, sanityState, loseSanity, gainSanity, newSanityHour, mythosInsanity,
     templateCore, isCore, skillPoints, skillIds, skillTable, money, hasFeat, featCount, featPrereqIssues,
     validate, syncLevelLog, lockIntMods, derive,

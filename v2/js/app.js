@@ -172,6 +172,7 @@
     const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
     if (!parts.length) return { view: "list" };
     if (parts[0] === "new") return { view: "new" };
+    if (parts[0] === "quick") return { view: "quick" };
     let id = "";
     try { id = decodeURIComponent(parts[1] || ""); } catch (e) { id = ""; }
     if (parts[0] === "edit" && id) return { view: "edit", id, step: parts[2] || "basics" };
@@ -270,6 +271,7 @@
     document.body.dataset.design = r.view === "play" ? state.design : "";
     renderNav();
     if (r.view === "list") $app.innerHTML = renderList();
+    else if (r.view === "quick") $app.innerHTML = renderQuick();
     else if (r.view === "edit") $app.innerHTML = renderEditor(r.step);
     else if (r.view === "play") $app.innerHTML = D.render(state.design, state.ch, C.derive(state.ch), ctx());
     document.title = (state.ch && r.view !== "list" ? (state.ch.name || "New investigator") + " — " : "") + "Investigator Sheets";
@@ -283,7 +285,7 @@
     // and used whenever a character is played.
     const layouts = D.list.map((d) => `<option value="${d.key}" ${d.key === state.design ? "selected" : ""} title="${esc(d.blurb)}">${esc(d.name)}</option>`).join("");
     const layoutMenu = `<label class="layout-menu" title="Choose how the play screen is laid out"><span class="layout-lbl">Layout</span><select data-action="design" aria-label="Layout preference">${layouts}</select></label>`;
-    const charLinks = r.view === "list" || !id ? "" : `
+    const charLinks = r.view === "list" || r.view === "quick" || !id ? "" : `
       <a class="navlink ${r.view === "edit" ? "active" : ""}" href="#/edit/${id}/${r.step || "basics"}">Edit</a>
       <a class="navlink ${r.view === "play" ? "active" : ""}" href="#/play/${id}">Play</a>`;
     $nav.innerHTML = `${charLinks}
@@ -329,6 +331,7 @@
         </div>
         <div class="list-buttons">
           <a class="btn primary" href="#/new">+ New investigator</a>
+          <a class="btn" href="#/quick" title="Choose the basics; abilities, skills, feats, money and gear are filled in for you">Quick investigator</a>
           <button class="btn ghost" data-action="import">Import file</button>
           <button class="btn ghost" data-action="sample" title="Adds the worked example from the rulebook-check document">Add sample</button>
           ${items.length ? '<button class="btn ghost" data-action="export-all">Export all</button>' : ""}
@@ -338,6 +341,39 @@
       ${items.length ? `<div class="card-grid">${cards}</div>` : `<div class="empty"><p>No investigators yet.</p><p class="muted">Create one, or import a <code>.json</code> file exported from this or the original sheet.</p></div>`}
       <p class="muted small">Rules: Call of Cthulhu d20 core rulebook. You can still open <a href="../index.html?v1">the original sheet (v1)</a>.</p>
     </section>`;
+  }
+
+  /** Quick investigator: the basics only; everything else is filled in by C.quickBuild. */
+  function renderQuick() {
+    const profs = C.PROFESSIONS.map((p) => `<option ${p.name === "Professor" ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+    const eras = Object.entries(C.ERAS).map(([k, v]) => `<option value="${k}" ${k === "1921-1940" ? "selected" : ""}>${esc(v.label)}</option>`).join("");
+    return `<section class="editor quick-view">
+      <h1 tabindex="-1">Quick investigator</h1>
+      <p class="muted">Choose the basics. The sheet then rolls the ability scores (4d6, drop the lowest, best scores on the abilities your profession's skills use), picks core skills and specialties, spends the skill points, chooses good saves and feats, rolls starting money, height and weight, and buys a firearm and a flashlight. You can change any of it afterwards.</p>
+      <div class="editor-body"><div class="grid2">
+        ${field("Character name", '<input id="qName" required autocomplete="off" />')}
+        ${field("Player", '<input id="qPlayer" autocomplete="off" />')}
+        ${field("Gender", '<input id="qGender" autocomplete="off" list="qGenders" placeholder="e.g. Female" /><datalist id="qGenders"><option>Female</option><option>Male</option></datalist>', "Picks the row for height and weight (Table 1-12).")}
+        ${field("Age", '<input id="qAge" type="number" min="15" max="120" value="30" />', "50 and over brings aging effects (Table 1-11).")}
+        ${field("Era", `<select id="qEra">${eras}</select>`, "Sets starting money and prices.")}
+        ${field("Profession", `<select id="qProfession">${profs}</select>`)}
+        ${field("Attack option", '<select id="qAttack"><option value="defense">Defense — 2 good saves, BAB +0 at 1st</option><option value="offense">Offense — 1 good save, BAB +1 at 1st</option></select>', "Tables 1-8 / 1-9.")}
+      </div></div>
+      <div class="editor-foot"><a class="btn ghost" href="#/">← Back</a><button class="btn primary" data-action="quick-build">Build investigator →</button></div>
+    </section>`;
+  }
+  /** Save a quick-built character and open its Review step. */
+  function finishQuickBuild(ch, rolls) {
+    persist(true);
+    // Rebuilding the open character: carry over the revision just saved, or the save looks stale.
+    if (state.ch && state.ch.id === ch.id) ch.rev = state.ch.rev;
+    state.ch = ch;
+    state.dirty = true;
+    state.undo = null;
+    state.banners = [`Quick-built from the basics. Rolled ${rolls.join(", ")} for the ability scores. Every choice can be changed in the steps above.`];
+    pushLog(state.ch, `Quick build: rolled ${rolls.join(", ")}`);
+    persist(true);
+    go(`#/edit/${ch.id}/review`);
   }
 
   // ---------------------------------------------------------------------------
@@ -396,7 +432,8 @@
     const eras = Object.entries(C.ERAS).map(([k, v]) => `<option value="${k}" ${k === ch.era ? "selected" : ""}>${esc(v.label)}</option>`).join("");
     const need = C.goodSaveCount(ch.attackOption);
     const saveBox = (k, label) => `<label class="check"><input type="checkbox" data-action="good-save" value="${k}" ${ch.goodSaves.includes(k) ? "checked" : ""}/> ${label}</label>`;
-    return `<div class="grid2">
+    return `${ch.level === 1 ? `<div class="quick-fill"><button class="btn small" data-action="quick-fill">Fill in the rest automatically</button> <span class="muted small">Rolls abilities and picks skills, saves, feats, money and a starting kit for this profession and era. You can change any of it.</span></div>` : ""}
+    <div class="grid2">
       ${field("Character name", inp("name", ch.name, 'required autocomplete="off"'))}
       ${field("Player", inp("player", ch.player, 'autocomplete="off"'))}
       ${field("Age", inp("age", ch.age, 'type="number" min="15" max="120"'), `Aging: ${esc(d.aging.label)}${d.aging.physical ? ` — ${d.aging.physical} Str/Dex/Con, +${d.aging.mental} Int/Wis/Cha (Table 1-11)` : ""}`)}
@@ -708,18 +745,8 @@
     const qty = Math.max(1, parseInt(document.getElementById("buyQty").value, 10) || 1);
     if (pay && C.cashOnHand(state.ch) === null) return toast("Roll starting money on the HP &amp; Money step first, or use “Add without paying”.");
     const total = pay ? Math.round(each * qty * 100) / 100 : 0;
-    const before = C.cashOnHand(state.ch) || 0;
     update((c) => {
-      if (item && item.kind === "weapon") {
-        const p = C.WEAPON_PRESETS.find((w) => w.name === item.preset) || { category: item.category || "melee", damage: "", critical: "×2" };
-        for (let k = 0; k < qty; k++) c.weapons.push(Object.assign({}, C.clone(p), { id: C.uid(), name: item.name, ammo: p.capacity || null, equipped: true, cost: pay ? each : null, notes: [p.notes, item.preset && item.preset !== item.name ? `stats: ${item.preset}` : "", item.note].filter(Boolean).join("; ") }));
-      } else if (item && item.kind === "armor") {
-        c.armor = item.armor;
-        c.equipment.push({ id: C.uid(), name: item.name, qty: 1, weight: 0, notes: "worn armor", cost: pay ? each : null, armor: item.armor });
-      } else {
-        c.equipment.push({ id: C.uid(), name, qty, weight: 0, notes: item && item.note ? item.note : "", cost: pay ? each : null });
-      }
-      if (pay) c.money.cash = Math.round((before - total) * 100) / 100;
+      C.addCatalogItem(c, item, { name, qty, each, pay });
       pushLog(c, pay ? `Bought ${qty > 1 ? qty + " × " : ""}${name} for ${usd(total)}` : `Added ${name}`);
     }, { undo: `${pay ? "Buy" : "Add"} ${name}` });
     const after = C.cashOnHand(state.ch);
@@ -824,6 +851,23 @@
         break;
       }
       case "buy": case "buy-free": buy(a === "buy"); break;
+      case "quick-build": {
+        const v = (id) => document.getElementById(id).value;
+        const name = v("qName").trim();
+        if (!name) { toast("Give the investigator a name."); document.getElementById("qName").focus(); break; }
+        const base = C.newCharacter({ name, player: v("qPlayer").trim(), gender: v("qGender").trim(), age: C.toInt(v("qAge"), 30), era: v("qEra"), profession: v("qProfession"), attackOption: v("qAttack") });
+        const { character, rolls } = C.quickBuild(base);
+        finishQuickBuild(character, rolls);
+        break;
+      }
+      case "quick-fill": {
+        const ch = state.ch;
+        const filled = Object.values(ch.skills).some((s) => C.toNum(s.ranks) > 0) || ch.feats.length || ch.weapons.length || ch.equipment.length || ch.money.roll;
+        const run = () => { const { character, rolls } = C.quickBuild(state.ch); state.undo = { ch: state.ch, label: "Quick build" }; const u = state.undo; finishQuickBuild(character, rolls); state.undo = u; };
+        if (!filled) { run(); break; }
+        confirmDialog(`<h2>Fill in the rest automatically?</h2><p>This replaces the ability scores, core skills and ranks, good saves, feats, starting money, weapons and equipment with a fresh quick build for a ${esc(ch.profession)} in ${esc((C.ERAS[ch.era] || {}).label || ch.era)}. Name, age, gender and notes stay.</p>`, "Replace with a quick build").then((ok) => ok && run());
+        break;
+      }
       case "spell-add": { const v = document.getElementById("spellPreset").value; const p = v === "" ? { name: "New spell", cost: "" } : SPELL_PRESETS[+v]; update((c) => { c.spells.push(Object.assign({ id: C.uid() }, C.clone(p))); }); break; }
       case "spell-remove": update((c) => { c.spells.splice(i, 1); }); break;
       case "tome-add": { const v = document.getElementById("tomePreset").value; const p = v === "" ? { name: "New tome", dc: 20 } : TOME_PRESETS[+v]; update((c) => { c.tomes.push(Object.assign({ id: C.uid() }, C.clone(p))); }); break; }

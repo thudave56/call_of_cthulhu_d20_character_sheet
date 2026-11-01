@@ -599,3 +599,29 @@ test("House rule: no nonproficiency penalty (optional), proficiency itself uncha
   assert.deepEqual(CoC.nonproficientWeapons(c), []);
   assert.equal(CoC.normalize(c).options.noNonproficiencyPenalty, true);
 });
+
+test("Quick build: a legal 1st-level investigator for every profession, era and attack option", () => {
+  // Seeded generator so a failure can be reproduced.
+  let seed = 7;
+  const rng = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  for (const p of CoC.PROFESSIONS) for (const era of Object.keys(CoC.ERAS)) for (const attackOption of ["defense", "offense"]) for (const age of [25, 55, 70, 85]) {
+    const { character: c, rolls } = CoC.quickBuild(CoC.newCharacter({ name: "Q", profession: p.name, era, attackOption, age, gender: age % 2 ? "Female" : "Male", level: 5 }), rng);
+    const issues = CoC.validate(c);
+    assert.deepEqual(issues, [], `${p.name} / ${era} / ${attackOption} / age ${age}: ${issues.map((i) => i.msg).join("; ")}`);
+    assert.equal(c.level, 1);
+    assert.equal(c.name, "Q");
+    assert.ok(rolls.reduce((s, v) => s + CoC.abilityMod(v), 0) > 0 && Math.max(...rolls) > 13, "rerolls a set that is too low (p.6)");
+    assert.deepEqual(Object.values(c.abilities).sort((x, y) => x - y), rolls.slice().sort((x, y) => x - y), "uses the rolled scores");
+    assert.equal(CoC.skillPoints(c).remaining, 0);
+    assert.equal(c.weapons.length, 1);
+    assert.ok(CoC.isProficient(c, c.weapons[0]));
+    assert.ok(CoC.cashOnHand(c) >= 0);
+  }
+});
+
+test("Quick build: best scores go to the abilities the profession's skills use", () => {
+  const { character: c, rolls } = CoC.quickBuild(CoC.newCharacter({ name: "Q", profession: "Professor" }));
+  const best = Math.max(...rolls);
+  assert.equal(c.abilities.Int, best);   // 6 of the Professor's 9 template skills are Int-based
+  assert.ok(c.coreSkills.every((id) => !id.includes("*")));
+});
